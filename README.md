@@ -1,0 +1,1 @@
+# Yoskoyos.github.io
