@@ -518,6 +518,31 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   </main>
 </div>
 
+<!-- Edit NVR modal -->
+<div class="overlay hidden" id="edit-modal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title">Editează NVR</div>
+      <div class="modal-x" id="edit-x">✕</div>
+    </div>
+    <div class="modal-body">
+      <div class="fg"><label>Nume NVR</label><input type="text" id="e-name" placeholder="ex: NVR-Principal-01"></div>
+      <div class="f2">
+        <div class="fg"><label>Adresă IP / Domeniu</label><input type="text" id="e-ip" placeholder="192.168.1.200" inputmode="url"></div>
+        <div class="fg"><label>Port HTTP</label><input type="text" id="e-port" placeholder="80" inputmode="numeric"></div>
+      </div>
+      <div class="f2">
+        <div class="fg"><label>Nr. canale</label><select id="e-ch"><option>4</option><option>8</option><option>16</option><option>21</option><option>32</option><option>64</option></select></div>
+        <div class="fg"><label>Locație</label><input type="text" id="e-loc" placeholder="ex: Depozit, parter"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="edit-cancel">Anulează</button>
+      <button class="btn primary" id="edit-save">Salvează</button>
+    </div>
+  </div>
+</div>
+
 <!-- Credentials modal -->
 <div class="overlay hidden" id="cred-modal">
   <div class="modal">
@@ -781,7 +806,11 @@ function nvrCardHTML(n, showDetail){
     <div class="nvr-actions">
       <button class="nvr-btn nvr-cred-btn" data-nid="${n.id}">
         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        ${hasCreds?'Editează credențiale':'Setează credențiale'}
+        ${hasCreds?'Credențiale':'Credențiale'}
+      </button>
+      <button class="nvr-btn nvr-edit-btn" data-nid="${n.id}">
+        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Editează
       </button>
       <button class="nvr-btn primary nvr-webui-btn" data-nid="${n.id}">
         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
@@ -816,6 +845,9 @@ function bindNvrActions(container){
       const detail = el.closest('.nvr-card').querySelector('.nvr-detail');
       detail.classList.toggle('open');
     });
+  });
+  container.querySelectorAll('.nvr-edit-btn').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); openEditModal(parseInt(btn.dataset.nid)); });
   });
   container.querySelectorAll('.nvr-cred-btn').forEach(btn => {
     btn.addEventListener('click', e => { e.stopPropagation(); openCredModal(parseInt(btn.dataset.nid)); });
@@ -937,6 +969,52 @@ function openCredModal(nid){
 }
 
 function closeCredModal(){ qs('#cred-modal').classList.add('hidden'); credNid=null; }
+
+// Edit NVR modal
+let editNid = null;
+function openEditModal(nid){
+  editNid = nid;
+  const n = nvrs.find(x=>x.id===nid);
+  if (!n) return;
+  qs('#e-name').value = n.name;
+  qs('#e-ip').value = n.ip;
+  qs('#e-port').value = n.port;
+  qs('#e-loc').value = n.location||'';
+  qs('#e-ch').value = String(n.channels);
+  // add option if not present
+  if (![...qs('#e-ch').options].some(o=>o.value===String(n.channels))) {
+    const opt = document.createElement('option');
+    opt.value = opt.textContent = String(n.channels);
+    qs('#e-ch').appendChild(opt);
+    qs('#e-ch').value = String(n.channels);
+  }
+  qs('#edit-modal').classList.remove('hidden');
+}
+function closeEditModal(){ qs('#edit-modal').classList.add('hidden'); editNid=null; }
+qs('#edit-x').addEventListener('click', closeEditModal);
+qs('#edit-cancel').addEventListener('click', closeEditModal);
+qs('#edit-modal').addEventListener('click', e=>{ if(e.target===qs('#edit-modal')) closeEditModal(); });
+qs('#edit-save').addEventListener('click', ()=>{
+  if (!editNid) return;
+  const name = qs('#e-name').value.trim();
+  const ip   = qs('#e-ip').value.trim();
+  if (!name || !ip) { toast('Completează numele și IP-ul', 'err'); return; }
+  const idx = nvrs.findIndex(n=>n.id===editNid);
+  if (idx<0) return;
+  nvrs[idx].name     = name;
+  nvrs[idx].ip       = ip;
+  nvrs[idx].port     = parseInt(qs('#e-port').value)||80;
+  nvrs[idx].channels = parseInt(qs('#e-ch').value)||16;
+  nvrs[idx].location = qs('#e-loc').value.trim();
+  nvrs[idx].status   = 'unknown';
+  nvrs[idx].cams     = [];
+  save(SK.nvrs, nvrs);
+  closeEditModal();
+  renderAll();
+  toast(`NVR "${name}" actualizat`, 'ok');
+  addLog('info', `NVR editat: <b>${name}</b> (${ip}:${nvrs[idx].port})`);
+  setTimeout(()=>checkAll(), 500);
+});
 
 qs('#cred-x').addEventListener('click', closeCredModal);
 qs('#cred-cancel').addEventListener('click', closeCredModal);
