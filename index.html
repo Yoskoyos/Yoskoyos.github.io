@@ -591,7 +591,7 @@ let nvrs   = load(SK.nvrs,   []);
 let creds  = load(SK.creds,  {});
 let alerts = load(SK.alerts, []);
 let logEntries = load(SK.log, []);
-let cfg    = load(SK.cfg, { interval:60, notif:false, hddThresh:85, theme:'', tgToken:'', tgChatId:'', tgEnabled:false });
+let cfg    = load(SK.cfg, { interval:60, notif:false, hddThresh:85, theme:'', tgToken:'', tgChatId:'', tgEnabled:false, proxyUrl:'https://yca-nvr-proxy.dima-florin1987.workers.dev' });
 
 // No defaults — user adds their own NVRs
 
@@ -640,68 +640,66 @@ function checkNvr(nvr){
     const result = { online: false, cams: [], hdds: [], temp: null, uptime: null };
     const { user, pass } = getAuth(nvr);
     const base = `http://${nvr.ip}:${nvr.port}`;
+    const proxy = (cfg.proxyUrl || 'https://yca-nvr-proxy.dima-florin1987.workers.dev').replace(/\/$/, '');
+    const authHeader = { 'Authorization': 'Basic ' + btoa(user + ':' + pass) };
 
-    // Step 1: ping NVR with fetch + Basic auth (works after insecure content allowed)
-    try {
+    // Helper: fetch through Cloudflare Worker proxy (bypasses HTTPS mixed-content block)
+    function proxyFetch(path, timeoutMs = 8000) {
       const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 7000);
-      const r = await fetch(`${base}/ISAPI/System/deviceInfo`, {
-        signal: ctrl.signal,
-        headers: { 'Authorization': 'Basic ' + btoa(user + ':' + pass) }
-      });
-      clearTimeout(tid);
+      const tid = setTimeout(() => ctrl.abort(), timeoutMs);
+      const url = `${proxy}/?url=${encodeURIComponent(base + path)}`;
+      return fetch(url, { signal: ctrl.signal, headers: authHeader })
+        .finally(() => clearTimeout(tid));
+    }
+
+    // Step 1: check NVR is alive via /ISAPI/System/deviceInfo
+    try {
+      const r = await proxyFetch('/ISAPI/System/deviceInfo', 9000);
 
       if (r.status === 200 || r.status === 401) {
-        // 200 = auth ok, 401 = NVR alive but needs digest — either way NVR is ONLINE
+        // 200 = auth ok, 401 = NVR alive but needs Digest — either way NVR is ONLINE
         result.online = true;
 
         if (r.status === 200) {
-          // Parse device info XML
-          const xml = await r.text();
-          const get = tag => { const m = xml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`)); return m ? m[1] : null; };
-          result.model   = get('model');
-          result.firmware= get('firmwareVersion');
+          try {
+            const xml = await r.text();
+            const get = tag => { const m = xml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`)); return m ? m[1] : null; };
+            result.model    = get('model');
+            result.firmware = get('firmwareVersion');
+          } catch {}
         }
 
-        // Step 2: probe each channel snapshot
-        let checked = 0;
-        const total = Math.min(nvr.channels, 32);
+        // Step 2: probe each channel snapshot via proxy
+        const total = Math.min(nvr.channels || 0, 32);
         if (total === 0) { resolve(result); return; }
 
+        let resolved = false;
+        const safeDone = () => { if (!resolved) { resolved = true; resolve(result); } };
+
+        let pending = total;
         for (let ch = 1; ch <= total; ch++) {
-          (function(chNum){
-            const ci = new Image();
-            ci.onload = () => {
-              result.cams[chNum-1] = 'ok';
-              if(++checked === total) resolve(result);
-            };
-            ci.onerror = () => {
-              // 401 on image = camera exists but auth needed; treat as online
-              // real offline camera returns connection refused / timeout
-              result.cams[chNum-1] = 'ok';
-              if(++checked === total) resolve(result);
-            };
-            // Use credentials in URL for image (Basic auth workaround)
+          (async function(chNum) {
             try {
-              const u = new URL(`${base}/ISAPI/Streaming/channels/${chNum}01/picture`);
-              u.username = user; u.password = pass;
-              ci.src = u.toString() + '?t=' + Date.now();
+              const snap = await proxyFetch(`/ISAPI/Streaming/channels/${chNum}01/picture?t=${Date.now()}`, 7000);
+              // 200 = got image, 401 = cam exists needs auth → both mean cam is alive
+              result.cams[chNum - 1] = (snap.status === 200 || snap.status === 401) ? 'ok' : 'err';
             } catch {
-              ci.src = `http://${user}:${pass}@${nvr.ip}:${nvr.port}/ISAPI/Streaming/channels/${chNum}01/picture?t=${Date.now()}`;
+              result.cams[chNum - 1] = 'err';
             }
-            setTimeout(() => {
-              result.cams[chNum-1] = result.cams[chNum-1] || 'err';
-              if(++checked === total && checked >= total) {}
-            }, 6000);
+            if (--pending === 0) safeDone();
           })(ch);
         }
-        // Safety resolve after 9s
-        setTimeout(() => resolve(result), 9000);
+
+        // Safety resolve after 12s in case some channels hang
+        setTimeout(safeDone, 12000);
+
       } else {
+        // e.g. 403, 500 — proxy reached NVR but got unexpected status
         result.online = false;
         resolve(result);
       }
     } catch(e) {
+      // Network error or timeout — NVR unreachable
       result.online = false;
       resolve(result);
     }
