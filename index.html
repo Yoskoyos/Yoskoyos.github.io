@@ -102,6 +102,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .snap-card.err .snap-card-info{color:var(--err)}
 .snap-nvr-btn{padding:4px 12px;height:28px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:11px;font-weight:600;color:var(--fg-2);cursor:pointer;font-family:var(--mono);transition:all .15s}
 .snap-nvr-btn.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+.ch-cell.rec-stopped{background:rgba(239,68,68,.25);border-color:var(--err);color:var(--err);animation:blink-rec 1.5s infinite}
+@keyframes blink-rec{0%,100%{opacity:1}50%{opacity:.5}}
 /* ── Nav tabs ── */
 .nav{flex-shrink:0;background:var(--bg-1);border-top:1px solid var(--border);display:flex;overflow-x:auto;
   padding-left:max(16px,env(safe-area-inset-left,0px));
@@ -725,12 +727,28 @@ function checkNvr(nvr){
           } catch {}
         }
 
-        // Step 2: probe each channel snapshot via proxy
+        // Step 2: probe each channel snapshot + recording status via proxy
         const total = Math.min(nvr.channels || 0, 32);
         if (total === 0) { resolve(result); return; }
 
         let resolved = false;
         const safeDone = () => { if (!resolved) { resolved = true; resolve(result); } };
+
+        // Step 2a: get recording status for all channels at once
+        let recStatus = {}; // chNum -> true/false
+        try {
+          const recR = await proxyFetch('/ISAPI/ContentMgmt/record/control/manual/status/tracks', 6000);
+          if (recR.status === 200) {
+            const recXml = await recR.text();
+            // parse <TrackStatus><id>101</id><enabled>true</enabled>...
+            const matches = [...recXml.matchAll(/<TrackStatus>[\s\S]*?<id>(\d+)<\/id>[\s\S]*?<enabled>(true|false)<\/enabled>[\s\S]*?<\/TrackStatus>/g)];
+            for (const m of matches) {
+              const trackId = parseInt(m[1]);
+              const ch = Math.floor(trackId / 100); // 101 -> ch1, 201 -> ch2
+              if (ch >= 1 && ch <= total) recStatus[ch] = m[2] === 'true';
+            }
+          }
+        } catch {}
 
         let pending = total;
         for (let ch = 1; ch <= total; ch++) {
@@ -742,6 +760,9 @@ function checkNvr(nvr){
             } catch {
               result.cams[chNum - 1] = 'err';
             }
+            // recording status: true=recording, false=stopped, undefined=unknown
+            result.rec = result.rec || {};
+            result.rec[chNum] = recStatus[chNum]; // true/false/undefined
             if (--pending === 0) safeDone();
           })(ch);
         }
@@ -790,6 +811,27 @@ async function checkAll(){
       const activeCams = res.cams.filter(c=>c==='ok').length;
       const totalCams  = res.cams.length;
       const offlineCams = totalCams - activeCams;
+
+      // --- Recording status check ---
+      const prevRec = nvr.rec || {};
+      const newRec  = res.rec || {};
+      nvrs[idx].rec = newRec;
+
+      for (let ch = 1; ch <= (nvr.channels||0); ch++) {
+        const wasRec = prevRec[ch];
+        const isRec  = newRec[ch];
+        // only alert when we have a definitive answer (not undefined)
+        if (isRec === false && wasRec !== false) {
+          // camera was recording before (or unknown), now stopped
+          addLog('err', `<b>${nvr.name}</b> CH${ch} — <b>a oprit înregistrarea!</b>`);
+          addAlert('crit', nvr, `CH${ch} a oprit înregistrarea!`, 'crit');
+          hasWarn = true;
+        } else if (isRec === true && wasRec === false) {
+          // recording resumed
+          addLog('ok', `<b>${nvr.name}</b> CH${ch} — înregistrare reluată`);
+        }
+      }
+      // --- end recording check ---
 
       nvrs[idx].status = offlineCams > 0 ? 'warning' : 'online';
       nvrs[idx].activeCams = activeCams;
@@ -863,12 +905,23 @@ function nvrCardHTML(n, showDetail){
   let chGrid = '';
   if (n.cams && n.cams.length > 0) {
     const cols = n.channels <= 8 ? 4 : n.channels <= 16 ? 8 : 11;
+    const recMap = n.rec || {};
     const cells = Array.from({length: n.channels}, (_,i) => {
+      const ch = i + 1;
       const s = n.cams[i] || 'none';
-      return `<div class="ch-cell ${s}" title="CH${i+1}: ${s==='ok'?'Online':s==='err'?'Offline':'—'}">CH${i+1}</div>`;
+      const recVal = recMap[ch]; // true=rec, false=stopped, undefined=unknown
+      const recIcon = s === 'ok'
+        ? (recVal === true  ? '⏺' : recVal === false ? '⏹' : '')
+        : '';
+      const recTitle = s === 'ok'
+        ? (recVal === true  ? ' · Înregistrează' : recVal === false ? ' · Înregistrare oprită!' : '')
+        : '';
+      const recClass = recVal === false && s === 'ok' ? 'rec-stopped' : '';
+      return `<div class="ch-cell ${s} ${recClass}" title="CH${ch}: ${s==='ok'?'Online':s==='err'?'Offline':'—'}${recTitle}">${recIcon}CH${ch}</div>`;
     }).join('');
+    const stoppedRec = Object.entries(recMap).filter(([ch,v]) => v===false && n.cams[+ch-1]==='ok').length;
     chGrid = `<div style="margin-top:8px">
-      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-3);font-weight:700;margin-bottom:6px">Canale (${activeCams}/${n.channels} active)</div>
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-3);font-weight:700;margin-bottom:6px">Canale (${activeCams}/${n.channels} active${stoppedRec>0?` · <span style="color:var(--err)">${stoppedRec} fără înregistrare</span>`:''})</div>
       <div class="ch-grid" style="grid-template-columns:repeat(${cols},1fr)">${cells}</div>
     </div>`;
   }
