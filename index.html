@@ -568,14 +568,7 @@ let alerts = load(SK.alerts, []);
 let logEntries = load(SK.log, []);
 let cfg    = load(SK.cfg, { interval:60, notif:false, hddThresh:85, theme:'', tgToken:'', tgChatId:'', tgEnabled:false });
 
-// Seed with defaults if empty
-if (!nvrs.length) {
-  nvrs = [
-    { id:1, name:'NVR-Principal-01', ip:'192.168.1.200', port:80, channels:16, location:'Rastel server, parter', status:'unknown', lastSeen:null, cams:[], hdds:[], temp:null, uptime:null },
-    { id:2, name:'Depozit Caldararu', ip:'5.2.140.62', port:8001, channels:21, location:'Depozit Caldararu', status:'unknown', lastSeen:null, cams:[], hdds:[], temp:null, uptime:null },
-  ];
-  save(SK.nvrs, nvrs);
-}
+// No defaults — user adds their own NVRs
 
 let nextId = Math.max(0, ...nvrs.map(n=>n.id)) + 1;
 let monitorTimer = null;
