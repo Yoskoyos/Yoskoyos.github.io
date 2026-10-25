@@ -1,797 +1,1079 @@
-<!DOCTYPE html>
-<html lang="ro">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>YCA Solutions</title>
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="YCA Solutions">
-<meta name="application-name" content="YCA Solutions">
-<meta name="theme-color" content="#0d1117">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<title>YCA CCTV Monitor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
 <style>
+/* ── Token system — dark surveillance aesthetic ── */
 :root {
-  --bg:#0d1117; --bg-s:#161b22; --bg-c:#1c2128; --bg-ch:#222830;
-  --bor:#30363d; --bor2:#21262d;
-  --fg:#e6edf3; --fg2:#8b949e; --fg3:#484f58;
-  --acc:#238636; --on:#3fb950; --off:#f85149; --war:#d29922; --blu:#58a6ff;
-  --r:12px; --r2:8px;
-  --tbh:calc(56px + env(safe-area-inset-bottom,0px));
+  --bg:        #0a0b0d;
+  --bg-1:      #111318;
+  --bg-2:      #181c22;
+  --bg-3:      #1e2330;
+  --border:    #252b38;
+  --border-2:  #2e3547;
+  --fg:        #e2e8f4;
+  --fg-2:      #8b95a8;
+  --fg-3:      #4a5568;
+  --ok:        #22c55e;
+  --ok-dim:    rgba(34,197,94,.12);
+  --warn:      #f59e0b;
+  --warn-dim:  rgba(245,158,11,.12);
+  --err:       #ef4444;
+  --err-dim:   rgba(239,68,68,.12);
+  --blue:      #3b82f6;
+  --blue-dim:  rgba(59,130,246,.12);
+  --accent:    #00d9ff;
+  --accent-dim:rgba(0,217,255,.08);
+  --r:         10px;
+  --r-sm:      6px;
+  --mono:      'IBM Plex Mono', monospace;
+  --sans:      'IBM Plex Sans', system-ui, sans-serif;
+  color-scheme: dark;
 }
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;overscroll-behavior:none}
-body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--fg);font-size:14px;line-height:1.5;overflow:hidden}
 
-/* shell */
-.app{display:flex;flex-direction:column;height:100dvh;height:100vh}
+/* Light theme */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg:        #f0f2f5;
+    --bg-1:      #ffffff;
+    --bg-2:      #f8f9fb;
+    --bg-3:      #edf0f5;
+    --border:    #dde1ea;
+    --border-2:  #c8cdd8;
+    --fg:        #0f1422;
+    --fg-2:      #4a5568;
+    --fg-3:      #94a3b8;
+    --accent-dim:rgba(0,217,255,.06);
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg:#f0f2f5;--bg-1:#ffffff;--bg-2:#f8f9fb;--bg-3:#edf0f5;
+  --border:#dde1ea;--border-2:#c8cdd8;--fg:#0f1422;--fg-2:#4a5568;--fg-3:#94a3b8;
+  --accent-dim:rgba(0,217,255,.06);color-scheme:light;
+}
 
-/* topbar */
-.topbar{background:var(--bg-s);border-bottom:1px solid var(--bor);padding-top:env(safe-area-inset-top,0px);flex-shrink:0;position:relative;z-index:10}
-.topbar-inner{display:flex;align-items:center;height:52px;padding:0 max(16px,env(safe-area-inset-left,0px));gap:10px}
-.logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px}
-.logo-ico{width:30px;height:30px;background:var(--acc);border-radius:8px;display:grid;place-items:center}
-.tbar-r{margin-left:auto;display:flex;gap:8px}
-.ico-btn{width:36px;height:36px;border-radius:10px;border:1px solid var(--bor);background:var(--bg-c);color:var(--fg2);display:grid;place-items:center;cursor:pointer}
-.ico-btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--fg);font-size:14px;-webkit-tap-highlight-color:transparent;overflow:hidden}
 
-/* pages */
-.pages{flex:1;overflow:hidden;position:relative}
-.page{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
-  padding:16px max(16px,env(safe-area-inset-right,0px)) calc(var(--tbh)+16px) max(16px,env(safe-area-inset-left,0px));
-  opacity:0;pointer-events:none;transform:translateX(16px);transition:opacity .18s,transform .18s}
-.page.on{opacity:1;pointer-events:auto;transform:none}
+/* ── Layout shell ── */
+.app{display:flex;flex-direction:column;height:100%;max-height:100%}
 
-/* tabbar */
-.tabbar{position:fixed;bottom:0;left:0;right:0;height:var(--tbh);background:var(--bg-s);border-top:1px solid var(--bor);
-  display:flex;align-items:flex-start;padding-top:6px;
-  padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);z-index:10}
-.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0;cursor:pointer;color:var(--fg3);transition:color .15s;position:relative}
-.tab.on{color:var(--blu)}
-.tab-lbl{font-size:10px;font-weight:600}
-.tab-bdg{position:absolute;top:0;right:calc(50% - 18px);background:var(--off);color:#fff;font-size:9px;font-weight:700;border-radius:8px;padding:1px 5px;min-width:16px;text-align:center;line-height:14px;display:none}
-.tab-bdg.on{display:block}
+/* ── Header ── */
+header{
+  flex-shrink:0;
+  background:var(--bg-1);
+  border-bottom:1px solid var(--border);
+  padding:0 max(16px,env(safe-area-inset-right,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  display:flex;align-items:center;gap:12px;height:54px;
+  position:sticky;top:env(safe-area-inset-top,0px);z-index:50;
+}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg-1);z-index:51}
 
-/* dashboard */
-.sec-ttl{font-size:11px;font-weight:600;color:var(--fg2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
-.stats2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
-.stile{background:var(--bg-s);border:1px solid var(--bor);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:6px}
-.stile-ico{width:32px;height:32px;border-radius:8px;display:grid;place-items:center}
-.stile-ico.g{background:rgba(63,185,80,.15);color:var(--on)}
-.stile-ico.r{background:rgba(248,81,73,.15);color:var(--off)}
-.stile-ico.y{background:rgba(210,153,34,.15);color:var(--war)}
-.stile-ico.b{background:rgba(88,166,255,.15);color:var(--blu)}
-.stile-num{font-size:28px;font-weight:700;letter-spacing:-1.5px;line-height:1}
-.stile-lbl{font-size:11px;color:var(--fg2)}
+.logo{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-weight:600;font-size:13px;letter-spacing:.04em;color:var(--fg)}
+.logo-mark{width:28px;height:28px;border:1.5px solid var(--accent);border-radius:5px;display:grid;place-items:center;flex-shrink:0}
+.logo-mark svg{color:var(--accent)}
+.logo-sub{font-size:10px;color:var(--fg-3);letter-spacing:.08em;text-transform:uppercase;margin-top:1px}
 
-.alert-strip{background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.25);border-radius:var(--r);padding:12px 14px;margin-bottom:20px;display:none}
-.alert-strip.on{display:block}
-.alert-hdr{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;font-weight:600;color:var(--off)}
-.alert-row{font-size:12px;color:var(--fg2);padding:4px 0;border-bottom:1px solid var(--bor2);display:flex;justify-content:space-between;align-items:center}
-.alert-row:last-child{border-bottom:none}
-.alert-row b{color:var(--fg);font-weight:600}
+.hdr-center{flex:1;display:flex;align-items:center;justify-content:center;gap:16px}
+.sys-pulse{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--fg-2)}
+.pulse-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(34,197,94,.4)}50%{opacity:.7;box-shadow:0 0 0 4px rgba(34,197,94,0)}}
+.pulse-dot.warn{background:var(--warn);animation:pulse-w 2s infinite}
+@keyframes pulse-w{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.4)}50%{box-shadow:0 0 0 4px rgba(245,158,11,0)}}
+.pulse-dot.err{background:var(--err);animation:pulse-e 2s infinite}
+@keyframes pulse-e{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.4)}50%{box-shadow:0 0 0 4px rgba(239,68,68,0)}}
 
-.act-list{display:flex;flex-direction:column;gap:8px}
-.act-item{background:var(--bg-s);border:1px solid var(--bor);border-radius:var(--r2);padding:10px 12px;display:flex;align-items:center;gap:10px}
-.act-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.act-dot.online{background:var(--on)}.act-dot.offline{background:var(--off)}.act-dot.warning{background:var(--war)}
-.act-txt{flex:1;min-width:0;font-size:12px}
-.act-txt b{color:var(--fg);font-weight:600}
-.act-txt span{color:var(--fg2)}
-.act-time{font-size:10px;color:var(--fg3);font-family:'JetBrains Mono',monospace;white-space:nowrap}
+.hdr-actions{display:flex;align-items:center;gap:6px}
+.icon-btn{width:34px;height:34px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-2);color:var(--fg-2);display:grid;place-items:center;cursor:pointer;transition:all .15s;flex-shrink:0}
+.icon-btn:hover{border-color:var(--border-2);color:var(--fg);background:var(--bg-3)}
+.icon-btn.active{border-color:var(--ok);background:rgba(34,197,94,.1);color:var(--ok)}
 
-/* camera list */
-.cam-list{display:flex;flex-direction:column;gap:10px}
-.cam-row{background:var(--bg-c);border:1px solid var(--bor);border-radius:var(--r);overflow:hidden;cursor:pointer}
-.cam-row.is-offline{border-color:rgba(248,81,73,.3)}
-.cam-row.is-warning{border-color:rgba(210,153,34,.3)}
-.cam-prev{position:relative;height:140px;background:#0a0c0f;overflow:hidden}
-.cam-prev canvas{width:100%;height:100%;display:block}
-.cam-prev .ovl{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.5) 0%,transparent 40%,transparent 55%,rgba(0,0,0,.65) 100%);display:flex;flex-direction:column;justify-content:space-between;padding:8px 10px}
-.cam-bdg{align-self:flex-start;display:flex;align-items:center;gap:5px;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);border-radius:6px;padding:3px 8px;font-size:10px;font-weight:600;color:#fff;font-family:'JetBrains Mono',monospace}
-.bdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-.bdot.online{background:var(--on);animation:pulse 2s infinite}
-.bdot.offline{background:var(--off)}
-.bdot.warning{background:var(--war)}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-.cam-ts{align-self:flex-end;font-size:9px;font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.65)}
-.off-cov{position:absolute;inset:0;background:rgba(10,12,15,.82);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--fg3)}
-.off-cov p{font-size:11px;font-weight:500}
-.cam-info{padding:10px 12px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--bor2)}
-.cam-name{font-size:13px;font-weight:600}
-.cam-loc{font-size:11px;color:var(--fg2);margin-top:1px}
-.cam-st{font-size:11px;font-weight:700;text-align:right}
-.cam-st.online{color:var(--on)}.cam-st.offline{color:var(--off)}.cam-st.warning{color:var(--war)}
-.cam-up{font-size:10px;color:var(--fg3);font-family:'JetBrains Mono',monospace;text-align:right;margin-top:1px}
+/* ── Nav tabs ── */
+.nav{flex-shrink:0;background:var(--bg-1);border-bottom:1px solid var(--border);display:flex;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));}
+.nav-tab{padding:0 16px;height:40px;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--fg-3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;letter-spacing:.02em;text-transform:uppercase}
+.nav-tab:hover{color:var(--fg-2)}
+.nav-tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.nav-tab .badge{min-width:16px;height:16px;border-radius:8px;background:var(--err);color:#fff;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 4px;font-family:var(--mono)}
 
-/* nvr */
-.nvr-card{background:var(--bg-c);border:1px solid var(--bor);border-radius:var(--r);padding:14px;margin-bottom:10px}
-.nvr-hdr{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.nvr-ico{width:38px;height:38px;background:rgba(88,166,255,.12);border-radius:10px;display:grid;place-items:center;color:var(--blu);flex-shrink:0}
-.nvr-name{font-size:14px;font-weight:600}
-.nvr-sub{font-size:11px;color:var(--fg2);margin-top:1px}
-.nvr-sbdg{margin-left:auto;font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;flex-shrink:0}
-.nvr-sbdg.online{background:rgba(63,185,80,.15);color:var(--on)}
-.nvr-sbdg.offline{background:rgba(248,81,73,.15);color:var(--off)}
-.nvr-sbdg.warning{background:rgba(210,153,34,.15);color:var(--war)}
-.nvr-prog-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.nvr-prog{flex:1;height:5px;background:var(--bor);border-radius:3px;overflow:hidden}
-.nvr-prog-fill{height:100%;background:var(--blu);border-radius:3px}
-.nvr-prog-lbl{font-size:10px;color:var(--fg2);font-family:'JetBrains Mono',monospace;white-space:nowrap}
-.nvr-meta{display:flex;gap:10px;flex-wrap:wrap}
-.nvr-mi{display:flex;flex-direction:column;gap:2px;flex:1;min-width:80px;background:var(--bg-s);border:1px solid var(--bor2);border-radius:var(--r2);padding:8px 10px}
-.nvr-mv{font-size:13px;font-weight:600}
-.nvr-mk{font-size:10px;color:var(--fg2)}
-.nvr-del{margin-top:10px;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px;border-radius:var(--r2);border:1px solid rgba(248,81,73,.25);background:rgba(248,81,73,.06);color:var(--off);font-size:12px;font-weight:500;cursor:pointer}
+/* ── Main scroll area ── */
+.main{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+  padding:20px max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));}
 
-/* sheet */
-.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;backdrop-filter:blur(4px);display:flex;align-items:flex-end;display:none}
-.sheet-bg.on{display:flex}
-.sheet{width:100%;background:var(--bg-c);border-radius:20px 20px 0 0;border:1px solid var(--bor);border-bottom:none;padding-bottom:env(safe-area-inset-bottom,16px);max-height:92vh;display:flex;flex-direction:column}
-.sh-handle{width:36px;height:4px;background:var(--fg3);border-radius:2px;margin:12px auto 4px;flex-shrink:0}
-.sh-hdr{display:flex;align-items:center;gap:10px;padding:8px 20px 12px;border-bottom:1px solid var(--bor);flex-shrink:0}
-.sh-hdr h2{font-size:16px;font-weight:600;flex:1}
-.sh-x{width:28px;height:28px;border-radius:50%;background:var(--bg-s);border:1px solid var(--bor);color:var(--fg2);display:grid;place-items:center;cursor:pointer;flex-shrink:0}
-.sh-body{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 20px;flex:1;display:flex;flex-direction:column;gap:12px}
-.sh-foot{padding:12px 20px;border-top:1px solid var(--bor);display:flex;gap:8px;flex-shrink:0}
+/* ── Panels ── */
+.panel{display:none}
+.panel.on{display:block}
 
-/* forms */
-.fg{display:flex;flex-direction:column;gap:5px}
-.fg label{font-size:11px;font-weight:600;color:var(--fg2);text-transform:uppercase;letter-spacing:.5px}
-.fg input,.fg select{background:var(--bg-s);border:1px solid var(--bor);border-radius:var(--r2);padding:11px 12px;font-size:14px;color:var(--fg);font-family:inherit;outline:none;-webkit-appearance:none}
-.fg input:focus,.fg select:focus{border-color:var(--blu)}
-.fg input::placeholder{color:var(--fg3)}
+/* ── Status bar ── */
+.status-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+.stat-card{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;position:relative;overflow:hidden}
+.stat-card::before{content:"";position:absolute;top:0;left:0;right:0;height:2px}
+.stat-card.ok::before{background:var(--ok)}
+.stat-card.warn::before{background:var(--warn)}
+.stat-card.err::before{background:var(--err)}
+.stat-card.info::before{background:var(--blue)}
+.stat-num{font-family:var(--mono);font-size:28px;font-weight:600;line-height:1;margin-bottom:4px;font-variant-numeric:tabular-nums}
+.stat-card.ok .stat-num{color:var(--ok)}
+.stat-card.warn .stat-num{color:var(--warn)}
+.stat-card.err .stat-num{color:var(--err)}
+.stat-card.info .stat-num{color:var(--blue)}
+.stat-label{font-size:10px;color:var(--fg-2);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+
+/* ── Section ── */
+.section{margin-bottom:24px}
+.section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--fg-3)}
+.section-action{font-size:11px;color:var(--accent);cursor:pointer;font-weight:600;letter-spacing:.02em;display:flex;align-items:center;gap:4px}
+.section-action:hover{opacity:.8}
+
+/* ── NVR cards ── */
+.nvr-grid{display:flex;flex-direction:column;gap:10px}
+.nvr-card{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.nvr-card.status-online{border-left:3px solid var(--ok)}
+.nvr-card.status-warning{border-left:3px solid var(--warn)}
+.nvr-card.status-offline{border-left:3px solid var(--err)}
+.nvr-top{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;cursor:pointer}
+.nvr-icon{width:36px;height:36px;border-radius:8px;display:grid;place-items:center;flex-shrink:0;background:var(--bg-3);color:var(--fg-2)}
+.nvr-info{flex:1;min-width:0}
+.nvr-name{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nvr-meta{font-family:var(--mono);font-size:10px;color:var(--fg-2);margin-top:2px}
+.nvr-badge{padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;font-family:var(--mono);flex-shrink:0;align-self:flex-start;letter-spacing:.04em}
+.nvr-badge.online{background:var(--ok-dim);color:var(--ok)}
+.nvr-badge.warning{background:var(--warn-dim);color:var(--warn)}
+.nvr-badge.offline{background:var(--err-dim);color:var(--err)}
+.nvr-badge.checking{background:var(--blue-dim);color:var(--blue)}
+
+/* NVR detail rows */
+.nvr-detail{border-top:1px solid var(--border);padding:12px 16px;display:none;flex-direction:column;gap:0}
+.nvr-detail.open{display:flex}
+.nvr-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px}
+.nvr-row:last-child{border-bottom:none}
+.nvr-row-k{color:var(--fg-2);display:flex;align-items:center;gap:6px}
+.nvr-row-v{font-family:var(--mono);font-size:11px;color:var(--fg);font-weight:500}
+
+/* channel grid */
+.ch-grid{display:grid;gap:4px;margin:8px 0}
+.ch-cell{aspect-ratio:1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;font-weight:600;cursor:default}
+.ch-cell.ok{background:var(--ok-dim);color:var(--ok)}
+.ch-cell.err{background:var(--err-dim);color:var(--err)}
+.ch-cell.none{background:var(--bg-3);color:var(--fg-3)}
+
+/* HDD */
+.hdd-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.hdd-item{background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:10px 12px}
+.hdd-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.hdd-name{font-size:11px;font-weight:600;font-family:var(--mono)}
+.hdd-status{font-size:10px;font-weight:700;font-family:var(--mono)}
+.hdd-status.ok{color:var(--ok)}.hdd-status.warn{color:var(--warn)}.hdd-status.err{color:var(--err)}
+.hdd-bar{height:4px;background:var(--bg-3);border-radius:2px;overflow:hidden}
+.hdd-fill{height:100%;border-radius:2px;transition:width .5s}
+.hdd-fill.ok{background:var(--ok)}.hdd-fill.warn{background:var(--warn)}.hdd-fill.err{background:var(--err)}
+.hdd-info{display:flex;justify-content:space-between;font-size:10px;color:var(--fg-2);font-family:var(--mono);margin-top:4px}
+
+/* NVR actions */
+.nvr-actions{display:flex;gap:6px;padding:10px 16px;border-top:1px solid var(--border);background:var(--bg-2)}
+.nvr-btn{flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--fg-2);font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .15s;font-family:var(--sans)}
+.nvr-btn:hover{background:var(--bg-3);color:var(--fg);border-color:var(--border-2)}
+.nvr-btn.primary{border-color:rgba(0,217,255,.3);color:var(--accent);background:var(--accent-dim)}
+.nvr-btn.primary:hover{background:rgba(0,217,255,.15)}
+.nvr-btn.danger{border-color:rgba(239,68,68,.25);color:var(--err);background:var(--err-dim)}
+
+/* ── Alerts panel ── */
+.alert-list{display:flex;flex-direction:column;gap:8px}
+.alert-item{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px;display:flex;align-items:flex-start;gap:12px}
+.alert-item.crit{border-left:3px solid var(--err)}
+.alert-item.warn{border-left:3px solid var(--warn)}
+.alert-item.info{border-left:3px solid var(--blue)}
+.alert-icon{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;flex-shrink:0}
+.alert-item.crit .alert-icon{background:var(--err-dim);color:var(--err)}
+.alert-item.warn .alert-icon{background:var(--warn-dim);color:var(--warn)}
+.alert-item.info .alert-icon{background:var(--blue-dim);color:var(--blue)}
+.alert-body{flex:1;min-width:0}
+.alert-title{font-size:12px;font-weight:600;margin-bottom:2px}
+.alert-desc{font-size:11px;color:var(--fg-2);line-height:1.5}
+.alert-time{font-family:var(--mono);font-size:10px;color:var(--fg-3);white-space:nowrap;flex-shrink:0;margin-top:2px}
+.empty-alerts{text-align:center;padding:48px 20px;color:var(--fg-3)}
+.empty-alerts svg{margin-bottom:12px;display:block;margin-inline:auto;color:var(--fg-3)}
+.empty-alerts p{font-size:13px;color:var(--fg-2)}
+.empty-alerts small{font-size:11px;color:var(--fg-3);display:block;margin-top:4px}
+
+/* ── Log panel ── */
+.log-wrap{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.log-body{font-family:var(--mono);font-size:11px;padding:12px 16px;display:flex;flex-direction:column;gap:4px;max-height:400px;overflow-y:auto}
+.log-line{display:flex;align-items:flex-start;gap:10px;padding:3px 0;border-bottom:1px solid var(--border)}
+.log-line:last-child{border-bottom:none}
+.log-ts{color:var(--fg-3);white-space:nowrap;flex-shrink:0;font-size:10px;padding-top:1px}
+.log-tag{padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700;flex-shrink:0;letter-spacing:.04em}
+.log-tag.ok{background:var(--ok-dim);color:var(--ok)}
+.log-tag.warn{background:var(--warn-dim);color:var(--warn)}
+.log-tag.err{background:var(--err-dim);color:var(--err)}
+.log-tag.info{background:var(--blue-dim);color:var(--blue)}
+.log-msg{color:var(--fg-2);flex:1;line-height:1.5}
+.log-msg b{color:var(--fg)}
+
+/* ── Settings panel ── */
+.settings-section{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
+.settings-section-title{padding:12px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--fg-3);border-bottom:1px solid var(--border);background:var(--bg-2)}
+.form-row{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:16px}
+.form-row:last-child{border-bottom:none}
+.form-label{font-size:12px;font-weight:600;color:var(--fg)}
+.form-hint{font-size:10px;color:var(--fg-3);margin-top:2px}
+.form-input{background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:12px;color:var(--fg);font-family:var(--mono);outline:none;width:180px;transition:border .15s}
+.form-input:focus{border-color:var(--accent)}
+.form-input::placeholder{color:var(--fg-3)}
+.toggle{width:36px;height:20px;border-radius:10px;background:var(--bg-3);border:1px solid var(--border);position:relative;cursor:pointer;transition:background .2s,border .2s;flex-shrink:0}
+.toggle.on{background:var(--ok);border-color:var(--ok)}
+.toggle::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .2s}
+.toggle.on::after{transform:translateX(16px)}
+
+/* NVR form */
+.nvr-form{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
+.nvr-form-title{padding:12px 16px;font-size:13px;font-weight:700;border-bottom:1px solid var(--border);background:var(--bg-2);display:flex;align-items:center;gap:8px}
+.nvr-form-body{padding:16px;display:flex;flex-direction:column;gap:12px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-3)}
+.fg input,.fg select{background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:9px 12px;font-size:13px;color:var(--fg);font-family:var(--mono);outline:none;-webkit-appearance:none;transition:border .15s;width:100%}
+.fg input:focus,.fg select:focus{border-color:var(--accent)}
+.fg input::placeholder{color:var(--fg-3)}
 .f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-actions{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--border);background:var(--bg-2)}
+.btn{padding:9px 16px;border-radius:var(--r-sm);font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--bg-3);color:var(--fg);flex:1;font-family:var(--sans);display:flex;align-items:center;justify-content:center;gap:6px;transition:all .15s}
+.btn:hover{background:var(--bg-2);border-color:var(--border-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#000;font-weight:700}
+.btn.primary:hover{opacity:.9}
+.btn.sm{padding:7px 12px;font-size:11px;flex:none}
 
-/* buttons */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 16px;border-radius:var(--r2);font-size:14px;font-weight:600;cursor:pointer;border:1px solid var(--bor);background:var(--bg-s);color:var(--fg);flex:1;font-family:inherit}
-.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
-.btn.dnger{color:var(--off);border-color:rgba(248,81,73,.3);background:rgba(248,81,73,.06);flex:0 0 auto;padding:11px 14px}
-.btn.hidden{display:none}
+/* ── Overlay / modal ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+.overlay.hidden{display:none}
+.modal{background:var(--bg-1);border:1px solid var(--border-2);border-radius:14px;width:100%;max-width:420px;overflow:hidden}
+.modal-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:15px;font-weight:700}
+.modal-x{width:28px;height:28px;border-radius:50%;background:var(--bg-3);border:1px solid var(--border);color:var(--fg-2);display:grid;place-items:center;cursor:pointer}
+.modal-body{padding:20px;display:flex;flex-direction:column;gap:14px;max-height:70vh;overflow-y:auto}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px}
 
-/* detail */
-.det-prev{aspect-ratio:16/9;background:#0a0c0f;border-radius:var(--r);overflow:hidden}
-.det-prev canvas{width:100%;height:100%;display:block}
-.det-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.det-st{background:var(--bg-s);border:1px solid var(--bor2);border-radius:var(--r2);padding:10px;text-align:center}
-.det-st-v{font-size:15px;font-weight:700}
-.det-st-k{font-size:10px;color:var(--fg2);margin-top:2px}
-.info-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--bor2);font-size:13px}
-.info-row:last-child{border-bottom:none}
-.info-row span:first-child{color:var(--fg2)}
-.info-row span:last-child{font-weight:500;font-family:'JetBrains Mono',monospace;font-size:12px}
+/* ── Toast ── */
+#toast-wrap{position:fixed;top:calc(env(safe-area-inset-top,0px) + 64px);left:50%;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.toast{background:var(--bg-2);border:1px solid var(--border-2);border-radius:8px;padding:10px 16px;font-size:12px;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.5);white-space:nowrap;animation:toast-in .2s ease;pointer-events:auto}
+.toast.ok{border-color:rgba(34,197,94,.4);color:var(--ok)}
+.toast.err{border-color:rgba(239,68,68,.4);color:var(--err)}
+.toast.info{border-color:rgba(59,130,246,.4);color:var(--blue)}
+@keyframes toast-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 
-/* search */
-.srch{position:relative;margin-bottom:14px}
-.srch svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--fg2);pointer-events:none}
-.srch input{width:100%;background:var(--bg-s);border:1px solid var(--bor);border-radius:10px;padding:10px 12px 10px 38px;font-size:14px;color:var(--fg);font-family:inherit;outline:none;-webkit-appearance:none}
-.srch input:focus{border-color:var(--blu)}
-.srch input::placeholder{color:var(--fg3)}
-
-/* empty */
-.empty{text-align:center;padding:48px 20px;color:var(--fg2)}
-.empty svg{color:var(--fg3);margin-bottom:12px;display:block;margin-inline:auto}
-.empty p{font-size:13px}
+/* ── Responsive ── */
+@media(max-width:600px){
+  .status-bar{grid-template-columns:1fr 1fr}
+  .f2{grid-template-columns:1fr}
+  .hdr-center{display:none}
+  header{gap:8px}
+}
+@media(max-width:400px){
+  .nav-tab{padding:0 10px;font-size:11px}
+}
 </style>
-</head>
-<body>
+
+<div id="toast-wrap"></div>
+
 <div class="app">
-  <!-- Topbar -->
-  <div class="topbar">
-    <div class="topbar-inner">
-      <div class="logo">
-        <div class="logo-ico">
-          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2.2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/></svg>
-        </div>
-        YCA Solutions
-      </div>
-      <div class="tbar-r">
-        <button class="ico-btn" id="btn-nvr">
-          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01"/><circle cx="18" cy="12" r="2"/></svg>
-        </button>
-        <button class="ico-btn pri" id="btn-cam">
-          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Pages -->
-  <div class="pages">
-    <!-- Dashboard -->
-    <div class="page on" id="pg-dash">
-      <div class="stats2">
-        <div class="stile"><div class="stile-ico g"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><div class="stile-num" id="d-on">0</div><div class="stile-lbl">Online</div></div>
-        <div class="stile"><div class="stile-ico r"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div class="stile-num" id="d-off">0</div><div class="stile-lbl">Offline</div></div>
-        <div class="stile"><div class="stile-ico y"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><div class="stile-num" id="d-war">0</div><div class="stile-lbl">Avertizări</div></div>
-        <div class="stile"><div class="stile-ico b"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div><div class="stile-num" id="d-tot">0</div><div class="stile-lbl">Total</div></div>
-      </div>
-      <div class="alert-strip" id="d-alerts"><div class="alert-hdr"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>Alerte active</div><div id="d-alerts-list"></div></div>
-      <div class="sec-ttl">Activitate recentă</div>
-      <div class="act-list" id="d-act"></div>
-    </div>
-
-    <!-- Camere -->
-    <div class="page" id="pg-cams">
-      <div class="srch"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="cam-q" placeholder="Caută după nume, locație, IP..."></div>
-      <div class="cam-list" id="cam-list"></div>
-      <div class="empty" id="cam-empty" style="display:none"><svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg><p>Nicio cameră găsită.</p></div>
-    </div>
-
-    <!-- NVR -->
-    <div class="page" id="pg-nvr">
-      <div class="sec-ttl" style="margin-bottom:14px">NVR-uri</div>
-      <div id="nvr-list"></div>
-      <div class="empty" id="nvr-empty" style="display:none"><svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01"/><circle cx="18" cy="12" r="2"/></svg><p>Niciun NVR adăugat.</p></div>
-    </div>
-  </div>
-
-  <!-- Tabbar -->
-  <div class="tabbar">
-    <div class="tab on" data-pg="dash"><svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg><span class="tab-lbl">Dashboard</span><span class="tab-bdg" id="tab-bdg">0</span></div>
-    <div class="tab" data-pg="cams"><svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/></svg><span class="tab-lbl">Camere</span></div>
-    <div class="tab" data-pg="nvr"><svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01"/><circle cx="18" cy="12" r="2"/></svg><span class="tab-lbl">NVR</span></div>
-  </div>
-</div>
-
-<!-- Sheet: detalii cameră -->
-<div class="sheet-bg" id="sh-cam">
-  <div class="sheet">
-    <div class="sh-handle"></div>
-    <div class="sh-hdr"><h2 id="sh-cam-title">Cameră</h2><button class="sh-x" id="sh-cam-x"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-    <div class="sh-body">
-      <div class="det-prev"><canvas id="sh-cv"></canvas></div>
-      <div class="det-stats">
-        <div class="det-st"><div class="det-st-v" id="sh-cam-st">—</div><div class="det-st-k">Status</div></div>
-        <div class="det-st"><div class="det-st-v" id="sh-cam-up">—</div><div class="det-st-k">Uptime</div></div>
-        <div class="det-st"><div class="det-st-v" id="sh-cam-res">—</div><div class="det-st-k">Rezoluție</div></div>
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-mark">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/></svg>
       </div>
       <div>
-        <div class="info-row"><span>Adresă IP</span><span id="sh-cam-ip">—</span></div>
-        <div class="info-row"><span>Protocol</span><span id="sh-cam-proto">—</span></div>
-        <div class="info-row"><span>Locație</span><span id="sh-cam-loc">—</span></div>
-        <div class="info-row"><span>Conectat de la</span><span id="sh-cam-since">—</span></div>
+        <div>YCA Solutions</div>
+        <div class="logo-sub">CCTV Monitor</div>
       </div>
     </div>
-    <div class="sh-foot">
-      <button class="btn dnger" id="sh-cam-del"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
-      <button class="btn pri" id="sh-cam-ok">Închide</button>
+
+    <div class="hdr-center">
+      <div class="sys-pulse">
+        <div class="pulse-dot" id="hdr-dot"></div>
+        <span id="hdr-status-txt">Se verifică...</span>
+      </div>
     </div>
-  </div>
+
+    <div class="hdr-actions">
+      <button class="icon-btn" id="btn-bell" title="Notificări">
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-refresh" title="Refresh acum">
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Nav -->
+  <nav class="nav">
+    <div class="nav-tab on" data-tab="dashboard">Dashboard</div>
+    <div class="nav-tab" data-tab="nvrs">NVR-uri</div>
+    <div class="nav-tab" data-tab="alerts">Alerte <span class="badge" id="alert-badge" style="display:none">0</span></div>
+    <div class="nav-tab" data-tab="log">Jurnal</div>
+    <div class="nav-tab" data-tab="settings">Setări</div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- ── Dashboard ── -->
+    <div class="panel on" id="panel-dashboard">
+      <div class="status-bar" id="stat-bar">
+        <div class="stat-card ok"><div class="stat-num" id="s-online">—</div><div class="stat-label">NVR Online</div></div>
+        <div class="stat-card err"><div class="stat-num" id="s-offline">—</div><div class="stat-label">NVR Offline</div></div>
+        <div class="stat-card ok"><div class="stat-num" id="s-cams">—</div><div class="stat-label">Camere active</div></div>
+        <div class="stat-card warn"><div class="stat-num" id="s-hdd">—</div><div class="stat-label">HDD alertă</div></div>
+      </div>
+
+      <div class="section">
+        <div class="section-hdr">
+          <div class="section-title">Status NVR-uri</div>
+          <div class="section-action" id="dash-refresh-btn">
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            Verifică acum
+          </div>
+        </div>
+        <div class="nvr-grid" id="dash-nvr-list"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-hdr"><div class="section-title">Alerte recente</div></div>
+        <div id="dash-alerts"></div>
+      </div>
+    </div>
+
+    <!-- ── NVR-uri ── -->
+    <div class="panel" id="panel-nvrs">
+      <div class="section">
+        <div class="section-hdr">
+          <div class="section-title">NVR-uri configurate</div>
+          <div class="section-action" id="add-nvr-btn">
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            Adaugă NVR
+          </div>
+        </div>
+
+        <!-- Add NVR form -->
+        <div class="nvr-form" id="add-nvr-form" style="display:none">
+          <div class="nvr-form-title">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01"/><circle cx="18" cy="12" r="2"/></svg>
+            NVR nou
+          </div>
+          <div class="nvr-form-body">
+            <div class="fg"><label>Nume NVR</label><input type="text" id="f-name" placeholder="ex: NVR-Principal-01"></div>
+            <div class="f2">
+              <div class="fg"><label>Adresă IP / Domeniu</label><input type="text" id="f-ip" placeholder="192.168.1.200 sau ddns.example.com" inputmode="url"></div>
+              <div class="fg"><label>Port HTTP</label><input type="text" id="f-port" placeholder="80" inputmode="numeric"></div>
+            </div>
+            <div class="f2">
+              <div class="fg"><label>Utilizator</label><input type="text" id="f-user" placeholder="admin" autocomplete="off"></div>
+              <div class="fg"><label>Parolă</label><input type="password" id="f-pass" placeholder="••••••" autocomplete="new-password"></div>
+            </div>
+            <div class="f2">
+              <div class="fg"><label>Nr. canale</label><select id="f-ch"><option>4</option><option>8</option><option selected>16</option><option>32</option><option>64</option></select></div>
+              <div class="fg"><label>Locație</label><input type="text" id="f-loc" placeholder="ex: Depozit, parter"></div>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn" id="f-cancel">Anulează</button>
+            <button class="btn primary" id="f-save">Salvează NVR</button>
+          </div>
+        </div>
+
+        <div class="nvr-grid" id="nvr-list"></div>
+        <div id="nvr-empty" style="text-align:center;padding:40px 20px;color:var(--fg-3);display:none">
+          <svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="margin:0 auto 12px;display:block"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01"/><circle cx="18" cy="12" r="2"/></svg>
+          <p style="font-size:13px;color:var(--fg-2)">Niciun NVR configurat</p>
+          <p style="font-size:11px;margin-top:4px">Apasă „Adaugă NVR" pentru a începe</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Alerte ── -->
+    <div class="panel" id="panel-alerts">
+      <div class="section">
+        <div class="section-hdr">
+          <div class="section-title">Alerte active</div>
+          <div class="section-action" id="clear-alerts-btn">Șterge toate</div>
+        </div>
+        <div class="alert-list" id="alert-list"></div>
+      </div>
+    </div>
+
+    <!-- ── Jurnal ── -->
+    <div class="panel" id="panel-log">
+      <div class="section">
+        <div class="section-hdr">
+          <div class="section-title">Jurnal de activitate</div>
+          <div class="section-action" id="clear-log-btn">Șterge</div>
+        </div>
+        <div class="log-wrap">
+          <div class="log-body" id="log-body">
+            <div style="text-align:center;padding:20px;color:var(--fg-3);font-size:11px">Nicio înregistrare</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Setări ── -->
+    <div class="panel" id="panel-settings">
+      <div class="settings-section">
+        <div class="settings-section-title">Monitorizare</div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">Interval verificare</div>
+            <div class="form-hint">Cât de des se verifică NVR-urile</div>
+          </div>
+          <select class="form-input" id="s-interval" style="width:120px">
+            <option value="30">30 secunde</option>
+            <option value="60" selected>1 minut</option>
+            <option value="120">2 minute</option>
+            <option value="300">5 minute</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">Notificări push</div>
+            <div class="form-hint">Alertă pe telefon când pică ceva</div>
+          </div>
+          <div class="toggle" id="s-notif"></div>
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">Alertă HDD la</div>
+            <div class="form-hint">Procent utilizare disc</div>
+          </div>
+          <select class="form-input" id="s-hdd-thresh" style="width:120px">
+            <option value="80">80%</option>
+            <option value="85" selected>85%</option>
+            <option value="90">90%</option>
+            <option value="95">95%</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Aplicație</div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">Mod de afișare</div>
+            <div class="form-hint">Temă interfață</div>
+          </div>
+          <select class="form-input" id="s-theme" style="width:120px">
+            <option value="">Sistem</option>
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </div>
+        <div class="form-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+          <div>
+            <div class="form-label">Resetare date</div>
+            <div class="form-hint">Șterge toate NVR-urile și alertele</div>
+          </div>
+          <button class="btn sm" id="s-reset" style="color:var(--err);border-color:rgba(239,68,68,.3);background:var(--err-dim)">Resetează aplicația</button>
+        </div>
+      </div>
+
+      <div style="text-align:center;padding:20px;font-size:10px;color:var(--fg-3);font-family:var(--mono)">
+        YCA Solutions CCTV Monitor v2.0 · Hikvision ISAPI<br>
+        Date stocate local pe acest dispozitiv
+      </div>
+    </div>
+
+  </main>
 </div>
 
-<!-- Sheet: adaugă cameră -->
-<div class="sheet-bg" id="sh-add-cam">
-  <div class="sheet">
-    <div class="sh-handle"></div>
-    <div class="sh-hdr"><h2>Cameră nouă</h2><button class="sh-x" id="sh-ac-x"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-    <div class="sh-body">
-      <div class="fg"><label>Nume cameră</label><input type="text" id="nc-name" placeholder="ex: Intrare principală"></div>
-      <div class="f2">
-        <div class="fg"><label>Adresă IP</label><input type="text" id="nc-ip" placeholder="192.168.1.100" inputmode="decimal"></div>
-        <div class="fg"><label>Port</label><input type="text" id="nc-port" placeholder="554" inputmode="numeric"></div>
+<!-- Credentials modal -->
+<div class="overlay hidden" id="cred-modal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title">Credențiale NVR</div>
+      <div class="modal-x" id="cred-x">✕</div>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--fg-2);background:var(--bg-3);border-radius:6px;padding:10px 12px;display:flex;gap:8px;align-items:flex-start">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--blue);flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <span>Credențialele sunt salvate <b>doar pe acest dispozitiv</b>, în memoria browserului. Nu sunt trimise nicăieri.</span>
       </div>
-      <div class="fg"><label>Locație</label><input type="text" id="nc-loc" placeholder="ex: Etaj 2, birou"></div>
-      <div class="f2">
-        <div class="fg"><label>Protocol</label><select id="nc-proto"><option>RTSP</option><option>HTTP</option><option>ONVIF</option><option>RTMP</option></select></div>
-        <div class="fg"><label>Rezoluție</label><select id="nc-res"><option>1920×1080</option><option>1280×720</option><option>3840×2160</option><option>640×480</option></select></div>
-      </div>
-      <div class="fg"><label>Status inițial</label><select id="nc-status"><option value="online">Online</option><option value="offline">Offline</option><option value="warning">Avertizare</option></select></div>
+      <div class="fg"><label>NVR</label><input type="text" id="cred-nvr-name" readonly style="opacity:.6"></div>
+      <div class="fg"><label>Utilizator</label><input type="text" id="cred-user" placeholder="admin" autocomplete="off"></div>
+      <div class="fg"><label>Parolă</label><input type="password" id="cred-pass" placeholder="••••••" autocomplete="new-password"></div>
     </div>
-    <div class="sh-foot">
-      <button class="btn" id="sh-ac-cancel">Anulează</button>
-      <button class="btn pri" id="sh-ac-save">Adaugă</button>
-    </div>
-  </div>
-</div>
-
-<!-- Sheet: Snapshot Live -->
-<div class="sheet-bg" id="sh-snap">
-  <div class="sheet" style="max-height:96vh">
-    <div class="sh-handle"></div>
-    <div class="sh-hdr">
-      <h2 id="sh-snap-title">Snapshot Live</h2>
-      <div style="display:flex;align-items:center;gap:6px;margin-right:4px">
-        <div id="sh-snap-dot" style="width:7px;height:7px;border-radius:50%;background:#3fb950;animation:pulse 1.5s infinite"></div>
-        <span style="font-size:11px;color:#8b949e;font-family:monospace" id="sh-snap-fps">2s</span>
-      </div>
-      <button class="sh-x" id="sh-snap-x"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-    </div>
-    <div class="sh-body" id="sh-snap-body" style="padding:12px 16px;gap:10px"></div>
-    <div class="sh-foot">
-      <button class="btn" id="sh-snap-close">Închide</button>
-      <button class="btn pri" id="sh-snap-web">Deschide Web UI</button>
-    </div>
-  </div>
-</div>
-
-<!-- Sheet: NVR -->
-<div class="sheet-bg" id="sh-nvr">
-  <div class="sheet">
-    <div class="sh-handle"></div>
-    <div class="sh-hdr"><h2 id="sh-nvr-title">NVR-uri</h2><button class="sh-x" id="sh-nvr-x"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-    <div class="sh-body" id="sh-nvr-body"></div>
-    <div class="sh-foot" id="sh-nvr-foot">
-      <button class="btn" id="sh-nvr-back">Închide</button>
-      <button class="btn pri" id="sh-nvr-new"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>NVR nou</button>
-      <button class="btn pri hidden" id="sh-nvr-save">Salvează</button>
+    <div class="modal-foot">
+      <button class="btn" id="cred-cancel">Anulează</button>
+      <button class="btn primary" id="cred-save">Salvează</button>
     </div>
   </div>
 </div>
 
 <script>
 (function(){
+'use strict';
 
-/* ── Data ── */
-const CK='vc_cams3', NK='vc_nvrs3';
-const DC=[
-  {id:1,name:'CAM-01 Intrare',ip:'192.168.1.101',port:554,location:'Intrare principală',proto:'RTSP',res:'1920×1080',status:'online',uptime:'14d 06h',since:'2026-10-02 08:14'},
-  {id:2,name:'CAM-02 Parcare',ip:'192.168.1.102',port:554,location:'Parcare exterioară',proto:'RTSP',res:'1920×1080',status:'online',uptime:'14d 06h',since:'2026-10-02 08:15'},
-  {id:3,name:'CAM-03 Hol',ip:'192.168.1.103',port:8080,location:'Hol etaj 1',proto:'HTTP',res:'1280×720',status:'warning',uptime:'3d 11h',since:'2026-10-13 04:33'},
-  {id:4,name:'CAM-04 Birou',ip:'192.168.1.104',port:554,location:'Birou directori',proto:'ONVIF',res:'3840×2160',status:'online',uptime:'14d 06h',since:'2026-10-02 08:16'},
-  {id:5,name:'CAM-05 Depozit',ip:'192.168.1.105',port:554,location:'Depozit subteran',proto:'RTSP',res:'1280×720',status:'offline',uptime:'—',since:'2026-10-15 22:07'},
-  {id:6,name:'CAM-06 Spate',ip:'192.168.1.106',port:554,location:'Ieșire spate',proto:'RTSP',res:'1920×1080',status:'online',uptime:'14d 06h',since:'2026-10-02 08:18'},
-  {id:7,name:'CAM-07 Server',ip:'192.168.1.107',port:554,location:'Sala servere',proto:'ONVIF',res:'1920×1080',status:'warning',uptime:'1d 02h',since:'2026-10-15 13:20'},
-  {id:8,name:'CAM-08 Recepție',ip:'192.168.1.108',port:554,location:'Recepție parter',proto:'RTSP',res:'1920×1080',status:'online',uptime:'14d 06h',since:'2026-10-02 08:19'},
-];
-const DN=[
-  {id:1,name:'NVR-Principal-01',ip:'192.168.1.200',port:80,brand:'Hikvision',model:'DS-7616NI-K2',channels:16,active:8,storage:'4',location:'Rastel server, parter',status:'online',since:'2026-10-02 08:00'},
-  {id:2,name:'NVR-Exterior-02',ip:'192.168.1.201',port:80,brand:'Dahua',model:'NVR4216-16P-4KS2',channels:16,active:6,storage:'2',location:'Camera tehnica, etaj 1',status:'warning',since:'2026-10-14 10:30'},
-  {id:3,name:'Tenq / Berlin',ip:'81.196.207.240',port:8005,brand:'Tenq',model:'IP/Domain',channels:16,active:16,storage:'0',location:'Berlin',status:'online',since:'2026-10-16 16:28',weburl:'http://5.2.140.62:81/doc/page/preview.asp'},
-  {id:4,name:'Depozit Caldararu',ip:'5.2.140.62',port:8001,brand:'Hikvision',model:'IP/Domain',channels:21,active:21,storage:'0',location:'Depozit Caldararu',status:'online',since:'2026-10-16 17:00',weburl:'http://5.2.140.62:8001/doc/page/preview.asp'},
-];
-let cams=[], nvrs=[];
-try{cams=JSON.parse(localStorage.getItem(CK))||DC;}catch{cams=DC.slice();}
-try{nvrs=JSON.parse(localStorage.getItem(NK))||DN;}catch{nvrs=DN.slice();}
-const saveCams=()=>{try{localStorage.setItem(CK,JSON.stringify(cams));}catch{}};
-const saveNvrs=()=>{try{localStorage.setItem(NK,JSON.stringify(nvrs));}catch{}};
-/* credențiale NVR — salvate separat în localStorage, nu în datele NVR */
-const CREDK='vc_nvr_creds2';
-let nvrCreds={};
-try{nvrCreds=JSON.parse(localStorage.getItem(CREDK))||{};}catch{}
-const saveCreds=()=>{try{localStorage.setItem(CREDK,JSON.stringify(nvrCreds));}catch{}};
-function buildLiveUrl(n){
-  const c=nvrCreds[n.id]||{};
-  const user=c.user||'';const pass=c.pass||'';
-  const base=n.weburl||('http://'+n.ip+':'+n.port);
-  if(user&&pass){
-    try{const u=new URL(base);u.username=encodeURIComponent(user);u.password=encodeURIComponent(pass);return u.toString();}catch{}
-  }
-  return base;
-}
-let nextC=Math.max(0,...cams.map(c=>c.id))+1;
-let nextN=Math.max(0,...nvrs.map(n=>n.id))+1;
+/* ═══════════════════════════════════════
+   STORAGE
+═══════════════════════════════════════ */
+const SK = {
+  nvrs:    'yca_nvrs_v2',
+  creds:   'yca_creds_v2',
+  alerts:  'yca_alerts_v2',
+  log:     'yca_log_v2',
+  cfg:     'yca_cfg_v2',
+};
 
-/* ── Canvas ── */
-function mb32(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
-function drawFeed(cv,status,seed){
-  const ctx=cv.getContext('2d');
-  const W=cv.width=cv.offsetWidth||320, H=cv.height=cv.offsetHeight||180;
-  if(status==='offline'){
-    ctx.fillStyle='#0a0c0f';ctx.fillRect(0,0,W,H);
-    const id=ctx.createImageData(W,H),d=id.data;
-    for(let i=0;i<d.length;i+=4){const v=Math.random()<.08?Math.floor(Math.random()*60):0;d[i]=d[i+1]=d[i+2]=v;d[i+3]=255;}
-    ctx.putImageData(id,0,0);return;
-  }
-  const rng=mb32(seed+Date.now()/1200|0), hue=(seed*47)%360;
-  const g=ctx.createLinearGradient(0,0,0,H);
-  g.addColorStop(0,`hsl(${hue},8%,10%)`);g.addColorStop(1,`hsl(${hue},5%,5%)`);
-  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-  ctx.strokeStyle=`hsla(${hue},10%,25%,0.35)`;ctx.lineWidth=1;
-  const vx=W/2,vy=H*.45;
-  for(let x=0;x<=W;x+=W/8){ctx.beginPath();ctx.moveTo(x,H);ctx.lineTo(vx,vy);ctx.stroke();}
-  for(let t=0;t<=1;t+=.25){const y=vy+(H-vy)*t;ctx.beginPath();ctx.moveTo(vx-vx*t,y);ctx.lineTo(vx+(W-vx)*t,y);ctx.stroke();}
-  ctx.fillStyle='rgba(0,0,0,.06)';for(let y=0;y<H;y+=2)ctx.fillRect(0,y,W,1);
-  for(let k=0;k<2;k++){
-    const bx=W*(.2+.6*rng())+Math.sin(Date.now()/3000+seed+k)*W*.05;
-    const by=H*(.5+.4*rng())+Math.cos(Date.now()/2500+seed+k)*H*.03;
-    const br=12+8*rng();
-    const bg=ctx.createRadialGradient(bx,by,0,bx,by,br);
-    bg.addColorStop(0,`hsla(${hue+20},20%,60%,.22)`);bg.addColorStop(1,'transparent');
-    ctx.fillStyle=bg;ctx.beginPath();ctx.arc(bx,by,br,0,Math.PI*2);ctx.fill();
-  }
-  if(status==='warning'){ctx.fillStyle='rgba(210,153,34,.07)';ctx.fillRect(0,0,W,H);}
+function load(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def; }catch{ return def; } }
+function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch{} }
+
+/* ═══════════════════════════════════════
+   STATE
+═══════════════════════════════════════ */
+let nvrs   = load(SK.nvrs,   []);
+let creds  = load(SK.creds,  {});
+let alerts = load(SK.alerts, []);
+let logEntries = load(SK.log, []);
+let cfg    = load(SK.cfg, { interval:60, notif:false, hddThresh:85, theme:'' });
+
+// Seed with defaults if empty
+if (!nvrs.length) {
+  nvrs = [
+    { id:1, name:'NVR-Principal-01', ip:'192.168.1.200', port:80, channels:16, location:'Rastel server, parter', status:'unknown', lastSeen:null, cams:[], hdds:[], temp:null, uptime:null },
+    { id:2, name:'Depozit Caldararu', ip:'5.2.140.62', port:8001, channels:21, location:'Depozit Caldararu', status:'unknown', lastSeen:null, cams:[], hdds:[], temp:null, uptime:null },
+  ];
+  save(SK.nvrs, nvrs);
 }
 
-/* ── Tabs ── */
-let curTab='dash';
-document.querySelectorAll('.tab').forEach(t=>{
-  t.addEventListener('click',()=>{
-    const pg=t.dataset.pg;
-    if(pg===curTab)return;
-    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
-    t.classList.add('on');
-    document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));
-    document.getElementById('pg-'+pg).classList.add('on');
-    curTab=pg;
-    if(pg==='cams')renderCams();
-    if(pg==='nvr')renderNvrs();
-  });
-});
+let nextId = Math.max(0, ...nvrs.map(n=>n.id)) + 1;
+let monitorTimer = null;
 
-/* ── Dashboard ── */
-let actLog=[];
-function logAct(cam,prev,next){
-  actLog.unshift({name:cam.name,prev,next,t:new Date().toLocaleTimeString('ro-RO',{hour12:false})});
-  if(actLog.length>8)actLog.pop();
-}
-function renderDash(){
-  const on=cams.filter(c=>c.status==='online').length;
-  const of=cams.filter(c=>c.status==='offline').length;
-  const wa=cams.filter(c=>c.status==='warning').length;
-  document.getElementById('d-on').textContent=on;
-  document.getElementById('d-off').textContent=of;
-  document.getElementById('d-war').textContent=wa;
-  document.getElementById('d-tot').textContent=cams.length;
-  const bdg=document.getElementById('tab-bdg');
-  const issues=of+wa;
-  if(issues>0){bdg.textContent=issues;bdg.classList.add('on');}else{bdg.classList.remove('on');}
-  const strip=document.getElementById('d-alerts');
-  const probs=cams.filter(c=>c.status!=='online');
-  if(probs.length){
-    strip.classList.add('on');
-    document.getElementById('d-alerts-list').innerHTML=probs.map(c=>`<div class="alert-row"><span><b>${c.name}</b> — ${c.location}</span><span style="color:${c.status==='offline'?'#f85149':'#d29922'};font-size:10px;font-weight:700">${c.status==='offline'?'OFFLINE':'AVERT.'}</span></div>`).join('');
-  }else{strip.classList.remove('on');}
-  const actEl=document.getElementById('d-act');
-  actEl.innerHTML=actLog.length?actLog.map(a=>`<div class="act-item"><div class="act-dot ${a.next}"></div><div class="act-txt"><b>${a.name}</b> <span>→ <b>${a.next}</b></span></div><div class="act-time">${a.t}</div></div>`).join(''):'<div style="text-align:center;padding:24px;color:#484f58;font-size:13px">Nicio activitate recentă.</div>';
+/* ═══════════════════════════════════════
+   LOGGING
+═══════════════════════════════════════ */
+function ts(){ return new Date().toLocaleTimeString('ro-RO',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+
+function addLog(type, msg){
+  logEntries.unshift({ type, msg, t: ts(), d: new Date().toLocaleDateString('ro-RO') });
+  if (logEntries.length > 200) logEntries.pop();
+  save(SK.log, logEntries);
+  renderLog();
 }
 
-/* ── Camera list ── */
-const anims={};
-let q='';
-document.getElementById('cam-q').addEventListener('input',e=>{q=e.target.value.toLowerCase();renderCams();});
+function addAlert(type, nvr, msg, subtype){
+  const a = { id: Date.now(), type: subtype||type, nvr: nvr.name, msg, t: ts() };
+  alerts.unshift(a);
+  if (alerts.length > 50) alerts.pop();
+  save(SK.alerts, alerts);
+  renderAlerts();
+  updateAlertBadge();
+  pushNotif(nvr.name, msg);
+}
 
-function renderCams(){
-  Object.values(anims).forEach(id=>cancelAnimationFrame(id));
-  Object.keys(anims).forEach(k=>delete anims[k]);
-  const el=document.getElementById('cam-list');
-  const emp=document.getElementById('cam-empty');
-  const list=cams.filter(c=>c.name.toLowerCase().includes(q)||c.location.toLowerCase().includes(q)||c.ip.includes(q));
-  if(!list.length){el.innerHTML='';emp.style.display='block';return;}
-  emp.style.display='none';
-  el.innerHTML=list.map(c=>`<div class="cam-row is-${c.status}" data-id="${c.id}">
-    <div class="cam-prev">
-      <canvas id="cv-${c.id}"></canvas>
-      <div class="ovl">
-        <div class="cam-bdg"><div class="bdot ${c.status}"></div>${c.name}</div>
-        <div class="cam-ts" id="ts-${c.id}"></div>
-      </div>
-      ${c.status==='offline'?`<div class="off-cov"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 5H3a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h14a2 2 0 0 0 1.41-.58"/></svg><p>Semnal pierdut</p></div>`:''}
-    </div>
-    <div class="cam-info">
-      <div><div class="cam-name">${c.name}</div><div class="cam-loc">${c.location} · ${c.ip}</div></div>
-      <div><div class="cam-st ${c.status}">${c.status==='online'?'ONLINE':c.status==='offline'?'OFFLINE':'AVERTIZARE'}</div><div class="cam-up">${c.uptime!=='—'?'UP '+c.uptime:'DOWN'}</div></div>
-    </div>
-  </div>`).join('');
-  list.forEach(c=>{
-    const cv=document.getElementById('cv-'+c.id);
-    const ts=document.getElementById('ts-'+c.id);
-    if(!cv)return;
-    (function tick(){drawFeed(cv,c.status,c.id*13);if(ts)ts.textContent=new Date().toLocaleTimeString('ro-RO',{hour12:false});anims[c.id]=requestAnimationFrame(tick);})();
-    document.querySelector('.cam-row[data-id="'+c.id+'"]').addEventListener('click',()=>openCamSheet(c));
+/* ═══════════════════════════════════════
+   HIKVISION ISAPI CHECK
+═══════════════════════════════════════ */
+function getAuth(nvr){
+  const c = creds[nvr.id] || {};
+  return { user: c.user || 'admin', pass: c.pass || '' };
+}
+
+function snapUrl(nvr, ch){
+  const { user, pass } = getAuth(nvr);
+  return `http://${nvr.ip}:${nvr.port}/ISAPI/Streaming/channels/${ch}01/picture?auth=${btoa(user+':'+pass)}&t=${Date.now()}`;
+}
+
+function checkNvr(nvr){
+  return new Promise(resolve => {
+    const result = { online: false, cams: [], hdds: [], temp: null, uptime: null };
+    const img = new Image();
+    const { user, pass } = getAuth(nvr);
+    // Try snapshot CH1 — if it loads, NVR is reachable
+    img.onload = () => {
+      result.online = true;
+      // Simulate channel scan (real ISAPI needs CORS proxy for full API)
+      // We probe each channel snapshot to see which cameras are active
+      let checked = 0;
+      const total = Math.min(nvr.channels, 32);
+      for (let ch = 1; ch <= total; ch++) {
+        (function(chNum){
+          const ci = new Image();
+          ci.onload = () => {
+            result.cams[chNum-1] = 'ok';
+            if(++checked === total) resolve(result);
+          };
+          ci.onerror = () => {
+            result.cams[chNum-1] = 'err';
+            if(++checked === total) resolve(result);
+          };
+          ci.src = snapUrl(nvr, chNum);
+        })(ch);
+      }
+    };
+    img.onerror = () => {
+      result.online = false;
+      resolve(result);
+    };
+    img.src = snapUrl(nvr, 1);
+    // Timeout fallback
+    setTimeout(() => resolve(result), 8000);
   });
 }
 
-/* ── Camera sheet ── */
-let cvAnim=null, selCam=null;
-function openCamSheet(cam){
-  selCam=cam;
-  document.getElementById('sh-cam-title').textContent=cam.name;
-  const sv=document.getElementById('sh-cam-st');
-  sv.textContent=cam.status==='online'?'✓ ONLINE':cam.status==='offline'?'✗ OFFLINE':'⚠ AVERT.';
-  sv.style.color=cam.status==='online'?'#3fb950':cam.status==='offline'?'#f85149':'#d29922';
-  document.getElementById('sh-cam-up').textContent=cam.uptime;
-  document.getElementById('sh-cam-res').textContent=cam.res;
-  document.getElementById('sh-cam-ip').textContent=cam.ip+':'+cam.port;
-  document.getElementById('sh-cam-proto').textContent=cam.proto;
-  document.getElementById('sh-cam-loc').textContent=cam.location;
-  document.getElementById('sh-cam-since').textContent=cam.since;
-  document.getElementById('sh-cam').classList.add('on');
-  const cv=document.getElementById('sh-cv');
-  if(cvAnim)cancelAnimationFrame(cvAnim);
-  (function tick(){drawFeed(cv,cam.status,cam.id*13);cvAnim=requestAnimationFrame(tick);})();
+/* ═══════════════════════════════════════
+   MONITOR LOOP
+═══════════════════════════════════════ */
+function startMonitor(){
+  stopMonitor();
+  checkAll();
+  monitorTimer = setInterval(checkAll, cfg.interval * 1000);
+  addLog('info', `Monitor pornit — interval ${cfg.interval}s`);
 }
-function closeCamSheet(){
-  document.getElementById('sh-cam').classList.remove('on');
-  if(cvAnim){cancelAnimationFrame(cvAnim);cvAnim=null;}
-}
-document.getElementById('sh-cam-x').addEventListener('click',closeCamSheet);
-document.getElementById('sh-cam-ok').addEventListener('click',closeCamSheet);
-document.getElementById('sh-cam').addEventListener('click',function(e){if(e.target===this)closeCamSheet();});
-document.getElementById('sh-cam-del').addEventListener('click',()=>{
-  if(!selCam)return;
-  cams=cams.filter(c=>c.id!==selCam.id);
-  saveCams();closeCamSheet();renderDash();if(curTab==='cams')renderCams();
-});
 
-/* ── Add camera sheet ── */
-function openAddCam(){
-  ['nc-name','nc-ip','nc-loc'].forEach(id=>{document.getElementById(id).value='';});
-  document.getElementById('nc-port').value='554';
-  document.getElementById('sh-add-cam').classList.add('on');
-}
-function closeAddCam(){document.getElementById('sh-add-cam').classList.remove('on');}
-document.getElementById('btn-cam').addEventListener('click',openAddCam);
-document.getElementById('sh-ac-x').addEventListener('click',closeAddCam);
-document.getElementById('sh-ac-cancel').addEventListener('click',closeAddCam);
-document.getElementById('sh-add-cam').addEventListener('click',function(e){if(e.target===this)closeAddCam();});
-document.getElementById('sh-ac-save').addEventListener('click',()=>{
-  const name=document.getElementById('nc-name').value.trim();
-  const ip=document.getElementById('nc-ip').value.trim();
-  if(!name||!ip){document.getElementById('nc-name').focus();return;}
-  const status=document.getElementById('nc-status').value;
-  const now=new Date().toISOString().slice(0,16).replace('T',' ');
-  cams.push({id:nextC++,name,ip,port:parseInt(document.getElementById('nc-port').value)||554,
-    location:document.getElementById('nc-loc').value.trim()||'Necunoscut',
-    proto:document.getElementById('nc-proto').value,res:document.getElementById('nc-res').value,
-    status,uptime:status==='online'?'0d 00h':'—',since:now});
-  saveCams();closeAddCam();renderDash();if(curTab==='cams')renderCams();
-});
+function stopMonitor(){ if(monitorTimer){ clearInterval(monitorTimer); monitorTimer=null; } }
 
-/* ── NVR page ── */
-function renderNvrs(){
-  const el=document.getElementById('nvr-list');
-  const emp=document.getElementById('nvr-empty');
-  if(!nvrs.length){el.innerHTML='';emp.style.display='block';return;}
-  emp.style.display='none';
-  el.innerHTML=nvrs.map(n=>{
-    const pct=n.channels?Math.round(n.active/n.channels*100):0;
-    const sc=n.status==='online'?'online':n.status==='offline'?'offline':'warning';
-    const sl=sc==='online'?'ONLINE':sc==='offline'?'OFFLINE':'AVERTIZARE';
-    return `<div class="nvr-card">
-      <div class="nvr-hdr">
-        <div class="nvr-ico"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01"/><circle cx="18" cy="12" r="2"/></svg></div>
-        <div><div class="nvr-name">${n.name}</div><div class="nvr-sub">${n.brand} ${n.model}</div></div>
-        <span class="nvr-sbdg ${sc}">${sl}</span>
-      </div>
-      <div class="nvr-prog-row"><div class="nvr-prog"><div class="nvr-prog-fill" style="width:${pct}%"></div></div><span class="nvr-prog-lbl">${n.active}/${n.channels} canale</span></div>
-      <div class="nvr-meta">
-        <div class="nvr-mi"><div class="nvr-mv">${n.ip}</div><div class="nvr-mk">IP</div></div>
-        <div class="nvr-mi"><div class="nvr-mv">${n.storage}TB</div><div class="nvr-mk">Stocare</div></div>
-        <div class="nvr-mi"><div class="nvr-mv">${(n.location||'').split(',')[0]}</div><div class="nvr-mk">Locație</div></div>
-      </div>
-      <div style="display:flex;gap:6px;margin-bottom:6px">
-        <button class="nvr-snap" data-nid="${n.id}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:8px;border:1px solid rgba(63,185,80,.3);background:rgba(63,185,80,.08);color:#3fb950;font-size:12px;font-weight:600;cursor:pointer"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/></svg>📷 Snapshot Live</button>
-        <button class="nvr-web" data-nid="${n.id}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:8px;border:1px solid rgba(88,166,255,.3);background:rgba(88,166,255,.08);color:#58a6ff;font-size:12px;font-weight:600;cursor:pointer"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Web UI</button>
-        <button class="nvr-cred" data-nid="${n.id}" title="Credențiale" style="width:36px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid ${nvrCreds[n.id]?'rgba(63,185,80,.3)':'rgba(48,54,61,1)'};background:${nvrCreds[n.id]?'rgba(63,185,80,.1)':'#1c2128'};color:${nvrCreds[n.id]?'#3fb950':'#484f58'};cursor:pointer"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></button>
-      </div>      <button class="nvr-del" data-nid="${n.id}"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>Șterge NVR</button>
+async function checkAll(){
+  updateHdrStatus('checking');
+  let hasErr = false, hasWarn = false;
+
+  for (const nvr of nvrs) {
+    const idx = nvrs.findIndex(n=>n.id===nvr.id);
+    const prevStatus = nvr.status;
+    const res = await checkNvr(nvr);
+
+    nvrs[idx].lastSeen = res.online ? ts() : nvr.lastSeen;
+    nvrs[idx].cams = res.cams;
+
+    if (res.online) {
+      const activeCams = res.cams.filter(c=>c==='ok').length;
+      const totalCams  = res.cams.length;
+      const offlineCams = totalCams - activeCams;
+
+      nvrs[idx].status = offlineCams > 0 ? 'warning' : 'online';
+      nvrs[idx].activeCams = activeCams;
+      nvrs[idx].totalCamsChecked = totalCams;
+
+      if (prevStatus === 'offline' || prevStatus === 'unknown') {
+        addLog('ok', `<b>${nvr.name}</b> — revenit online (${activeCams}/${nvr.channels} camere active)`);
+        if (prevStatus === 'offline') addAlert('info', nvr, `NVR revenit online · ${activeCams}/${nvr.channels} camere`, 'info');
+      } else if (offlineCams > 0) {
+        addLog('warn', `<b>${nvr.name}</b> — ${offlineCams} camere offline`);
+        hasWarn = true;
+      } else {
+        addLog('ok', `<b>${nvr.name}</b> — OK (${activeCams}/${nvr.channels} camere active)`);
+      }
+    } else {
+      nvrs[idx].status = 'offline';
+      nvrs[idx].activeCams = 0;
+      if (prevStatus !== 'offline') {
+        addLog('err', `<b>${nvr.name}</b> — OFFLINE · nu răspunde (${nvr.ip}:${nvr.port})`);
+        addAlert('crit', nvr, `NVR nu răspunde la ${nvr.ip}:${nvr.port}`, 'crit');
+      }
+      hasErr = true;
+    }
+  }
+
+  save(SK.nvrs, nvrs);
+  renderAll();
+  updateHdrStatus(hasErr ? 'err' : hasWarn ? 'warn' : 'ok');
+}
+
+/* ═══════════════════════════════════════
+   RENDER
+═══════════════════════════════════════ */
+function renderAll(){
+  renderStats();
+  renderDashNvrs();
+  renderNvrList();
+  renderDashAlerts();
+}
+
+function renderStats(){
+  const online  = nvrs.filter(n=>n.status==='online').length;
+  const offline = nvrs.filter(n=>n.status==='offline').length;
+  const warn    = nvrs.filter(n=>n.status==='warning').length;
+  const totalCams = nvrs.reduce((s,n)=>s+(n.activeCams||0),0);
+  const hddAlert = 0; // extended via real ISAPI
+
+  qs('#s-online').textContent = online;
+  qs('#s-offline').textContent = offline + warn;
+  qs('#s-cams').textContent = totalCams;
+  qs('#s-hdd').textContent = hddAlert;
+
+  // Update stat card colors
+  const offCard = qs('#s-offline').closest('.stat-card');
+  offCard.className = 'stat-card ' + ((offline+warn)>0?'err':'ok');
+}
+
+function nvrStatusLabel(s){
+  return s==='online'?'ONLINE':s==='offline'?'OFFLINE':s==='warning'?'AVERTIZARE':'SE VERIFICĂ...';
+}
+
+function nvrCardHTML(n, showDetail){
+  const activeCams = n.activeCams ?? 0;
+  const totalChecked = n.totalCamsChecked ?? n.channels;
+  const offlineCams = totalChecked - activeCams;
+  const hasWarn = n.status === 'warning';
+  const { user } = getAuth(n);
+  const hasCreds = !!(creds[n.id]?.user);
+
+  // Channel grid
+  let chGrid = '';
+  if (n.cams && n.cams.length > 0) {
+    const cols = n.channels <= 8 ? 4 : n.channels <= 16 ? 8 : 11;
+    const cells = Array.from({length: n.channels}, (_,i) => {
+      const s = n.cams[i] || 'none';
+      return `<div class="ch-cell ${s}" title="CH${i+1}: ${s==='ok'?'Online':s==='err'?'Offline':'—'}">CH${i+1}</div>`;
+    }).join('');
+    chGrid = `<div style="margin-top:8px">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-3);font-weight:700;margin-bottom:6px">Canale (${activeCams}/${n.channels} active)</div>
+      <div class="ch-grid" style="grid-template-columns:repeat(${cols},1fr)">${cells}</div>
     </div>`;
-  }).join('');
-  el.querySelectorAll('.nvr-snap').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const n=nvrs.find(x=>x.id===parseInt(btn.dataset.nid));
-      if(n)openSnapSheet(n);
+  }
+
+  const detailOpen = showDetail ? 'open' : '';
+
+  return `<div class="nvr-card status-${n.status}" data-nid="${n.id}">
+    <div class="nvr-top nvr-toggle">
+      <div class="nvr-icon">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01"/><circle cx="18" cy="12" r="2"/></svg>
+      </div>
+      <div class="nvr-info">
+        <div class="nvr-name">${n.name}</div>
+        <div class="nvr-meta">${n.ip}:${n.port} · ${n.location||'—'}</div>
+      </div>
+      <span class="nvr-badge ${n.status}">${nvrStatusLabel(n.status)}</span>
+    </div>
+    <div class="nvr-detail ${detailOpen}">
+      <div class="nvr-row"><span class="nvr-row-k"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/></svg>Adresă</span><span class="nvr-row-v">${n.ip}:${n.port}</span></div>
+      <div class="nvr-row"><span class="nvr-row-k"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/></svg>Camere</span><span class="nvr-row-v" style="color:${offlineCams>0?'var(--warn)':'var(--ok)'}">${activeCams}/${n.channels} active${offlineCams>0?' · '+offlineCams+' offline':''}</span></div>
+      <div class="nvr-row"><span class="nvr-row-k"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Cont</span><span class="nvr-row-v">${hasCreds?user+' ✓':'Nesetat'}</span></div>
+      <div class="nvr-row"><span class="nvr-row-k"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Văzut la</span><span class="nvr-row-v">${n.lastSeen||'—'}</span></div>
+      ${chGrid}
+    </div>
+    <div class="nvr-actions">
+      <button class="nvr-btn nvr-cred-btn" data-nid="${n.id}">
+        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        ${hasCreds?'Editează credențiale':'Setează credențiale'}
+      </button>
+      <button class="nvr-btn primary nvr-webui-btn" data-nid="${n.id}">
+        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        Web UI
+      </button>
+      <button class="nvr-btn danger nvr-del-btn" data-nid="${n.id}">
+        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      </button>
+    </div>
+  </div>`;
+}
+
+function renderDashNvrs(){
+  const el = qs('#dash-nvr-list');
+  if (!nvrs.length) { el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--fg-3);font-size:12px">Niciun NVR configurat — mergi la tab-ul NVR-uri</div>'; return; }
+  el.innerHTML = nvrs.map(n => nvrCardHTML(n, false)).join('');
+  bindNvrActions(el);
+}
+
+function renderNvrList(){
+  const el = qs('#nvr-list');
+  const emp = qs('#nvr-empty');
+  if (!nvrs.length) { el.innerHTML=''; emp.style.display='block'; return; }
+  emp.style.display = 'none';
+  el.innerHTML = nvrs.map(n => nvrCardHTML(n, false)).join('');
+  bindNvrActions(el);
+}
+
+function bindNvrActions(container){
+  container.querySelectorAll('.nvr-toggle').forEach(el => {
+    el.addEventListener('click', () => {
+      const detail = el.closest('.nvr-card').querySelector('.nvr-detail');
+      detail.classList.toggle('open');
     });
   });
-  el.querySelectorAll('.nvr-web').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const n=nvrs.find(x=>x.id===parseInt(btn.dataset.nid));
-      if(n)window.open(buildLiveUrl(n),'_blank');
+  container.querySelectorAll('.nvr-cred-btn').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); openCredModal(parseInt(btn.dataset.nid)); });
+  });
+  container.querySelectorAll('.nvr-webui-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const n = nvrs.find(x=>x.id===parseInt(btn.dataset.nid));
+      if (!n) return;
+      const c = creds[n.id]||{};
+      let url = `http://${n.ip}:${n.port}`;
+      try{ const u=new URL(url); if(c.user)u.username=c.user; if(c.pass)u.password=c.pass; url=u.toString(); }catch{}
+      window.open(url, '_blank');
     });
   });
-  el.querySelectorAll('.nvr-cred').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const nid=parseInt(btn.dataset.nid);
-      const c=nvrCreds[nid]||{};
-      const n=nvrs.find(x=>x.id===nid);
-      const popup=document.createElement('div');
-      popup.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:center;justify-content:center;padding:24px';
-      popup.innerHTML=`<div style="background:#1c2128;border:1px solid #30363d;border-radius:16px;padding:20px;width:100%;max-width:340px">
-        <div style="font-size:15px;font-weight:700;margin-bottom:4px">Credențiale NVR</div>
-        <div style="font-size:12px;color:#8b949e;margin-bottom:16px">${n?n.name:''} · salvate doar pe acest dispozitiv</div>
-        <div style="display:flex;flex-direction:column;gap:10px">
-          <div class="fg"><label>Utilizator</label><input type="text" id="cp-user" value="${c.user||''}" placeholder="admin" autocomplete="off"></div>
-          <div class="fg"><label>Parolă</label><input type="password" id="cp-pass" value="${c.pass||''}" placeholder="••••••" autocomplete="new-password"></div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:16px">
-          <button id="cp-cancel" class="btn" style="flex:1">Anulează</button>
-          <button id="cp-save" class="btn pri" style="flex:1">Salvează</button>
-        </div>
-      </div>`;
-      document.body.appendChild(popup);
-      document.getElementById('cp-cancel').addEventListener('click',()=>popup.remove());
-      popup.addEventListener('click',e=>{if(e.target===popup)popup.remove();});
-      document.getElementById('cp-save').addEventListener('click',()=>{
-        const user=document.getElementById('cp-user').value.trim();
-        const pass=document.getElementById('cp-pass').value;
-        if(user||pass){nvrCreds[nid]={user,pass};}else{delete nvrCreds[nid];}
-        saveCreds();popup.remove();renderNvrs();
-      });
-    });
-  });
-  el.querySelectorAll('.nvr-del').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const nid=parseInt(btn.dataset.nid);
-      nvrs=nvrs.filter(n=>n.id!==nid);
-      delete nvrCreds[nid];
-      saveNvrs();saveCreds();renderNvrs();
+  container.querySelectorAll('.nvr-del-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const nid = parseInt(btn.dataset.nid);
+      nvrs = nvrs.filter(n=>n.id!==nid);
+      delete creds[nid];
+      save(SK.nvrs, nvrs); save(SK.creds, creds);
+      renderAll();
+      toast('NVR șters', 'info');
     });
   });
 }
 
-/* ── NVR sheet ── */
-let nvrForm=false;
-function openNvrSheet(){
-  nvrForm=false;
-  showNvrList();
-  document.getElementById('sh-nvr').classList.add('on');
-}
-function closeNvrSheet(){document.getElementById('sh-nvr').classList.remove('on');}
-
-function showNvrList(){
-  nvrForm=false;
-  document.getElementById('sh-nvr-title').textContent='NVR-uri';
-  document.getElementById('sh-nvr-new').classList.remove('hidden');
-  document.getElementById('sh-nvr-save').classList.add('hidden');
-  document.getElementById('sh-nvr-back').textContent='Închide';
-  const body=document.getElementById('sh-nvr-body');
-  if(!nvrs.length){
-    body.innerHTML='<p style="text-align:center;padding:24px;color:#484f58;font-size:13px">Niciun NVR adăugat.</p>';
+function renderAlerts(){
+  const el = qs('#alert-list');
+  if (!alerts.length) {
+    el.innerHTML = `<div class="empty-alerts">
+      <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <p>Nicio alertă activă</p>
+      <small>Sistemul funcționează normal</small>
+    </div>`;
     return;
   }
-  body.innerHTML=nvrs.map(n=>{
-    const col=n.status==='online'?'#3fb950':n.status==='offline'?'#f85149':'#d29922';
-    const lbl=n.status==='online'?'ONLINE':n.status==='offline'?'OFFLINE':'AVERTIZARE';
-    return `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
-      <div style="width:34px;height:34px;background:rgba(88,166,255,.12);border-radius:8px;display:grid;place-items:center;color:#58a6ff;flex-shrink:0"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01"/><circle cx="18" cy="12" r="2"/></svg></div>
-      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">${n.name}</div><div style="font-size:11px;color:#8b949e">${n.brand} · ${n.ip} · ${n.active}/${n.channels}CH</div></div>
-      <span style="font-size:10px;font-weight:700;color:${col}">${lbl}</span>
-    </div>`;
-  }).join('');
-}
-
-function showNvrForm(){
-  nvrForm=true;
-  document.getElementById('sh-nvr-title').textContent='NVR nou';
-  document.getElementById('sh-nvr-new').classList.add('hidden');
-  document.getElementById('sh-nvr-save').classList.remove('hidden');
-  document.getElementById('sh-nvr-back').textContent='Înapoi';
-  document.getElementById('sh-nvr-body').innerHTML=`
-    <div class="fg"><label>Nume NVR</label><input type="text" id="nn-name" placeholder="ex: NVR-Principal-01"></div>
-    <div class="f2">
-      <div class="fg"><label>Adresă IP</label><input type="text" id="nn-ip" placeholder="192.168.1.200" inputmode="decimal"></div>
-      <div class="fg"><label>Port</label><input type="text" id="nn-port" placeholder="80" inputmode="numeric"></div>
-    </div>
-    <div class="f2">
-      <div class="fg"><label>Producător</label><select id="nn-brand"><option>Hikvision</option><option>Dahua</option><option>Uniview</option><option>Axis</option><option>Bosch</option><option>Altul</option></select></div>
-      <div class="fg"><label>Model</label><input type="text" id="nn-model" placeholder="DS-7616NI-K2"></div>
-    </div>
-    <div class="f2">
-      <div class="fg"><label>Canale totale</label><select id="nn-ch"><option>4</option><option>8</option><option selected>16</option><option>32</option><option>64</option></select></div>
-      <div class="fg"><label>Canale active</label><input type="number" id="nn-active" placeholder="0" min="0" inputmode="numeric"></div>
-    </div>
-    <div class="f2">
-      <div class="fg"><label>Stocare (TB)</label><input type="text" id="nn-storage" placeholder="4"></div>
-      <div class="fg"><label>Status</label><select id="nn-status"><option value="online">Online</option><option value="offline">Offline</option><option value="warning">Avertizare</option></select></div>
-    </div>
-    <div class="fg"><label>Locație</label><input type="text" id="nn-loc" placeholder="ex: Rastel server, etaj 1"></div>
-    <div style="background:rgba(88,166,255,.06);border:1px solid rgba(88,166,255,.2);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px">
-      <div style="font-size:11px;font-weight:600;color:#58a6ff;display:flex;align-items:center;gap:6px"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Credențiale acces (salvate local)</div>
-      <div class="f2">
-        <div class="fg"><label>Utilizator</label><input type="text" id="nn-user" placeholder="admin" autocomplete="off"></div>
-        <div class="fg"><label>Parolă</label><input type="password" id="nn-pass" placeholder="••••••" autocomplete="new-password"></div>
+  const icons = {
+    crit: `<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+    warn: `<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>`,
+    info: `<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>`,
+  };
+  el.innerHTML = alerts.map(a => `
+    <div class="alert-item ${a.type}">
+      <div class="alert-icon">${icons[a.type]||icons.info}</div>
+      <div class="alert-body">
+        <div class="alert-title">${a.nvr}</div>
+        <div class="alert-desc">${a.msg}</div>
       </div>
-    </div>`;
+      <div class="alert-time">${a.t}</div>
+    </div>`).join('');
 }
 
-document.getElementById('btn-nvr').addEventListener('click',openNvrSheet);
-document.getElementById('sh-nvr-x').addEventListener('click',closeNvrSheet);
-document.getElementById('sh-nvr').addEventListener('click',function(e){if(e.target===this)closeNvrSheet();});
-document.getElementById('sh-nvr-back').addEventListener('click',()=>{
-  if(nvrForm)showNvrList();else closeNvrSheet();
-});
-document.getElementById('sh-nvr-new').addEventListener('click',showNvrForm);
-document.getElementById('sh-nvr-save').addEventListener('click',()=>{
-  const name=(document.getElementById('nn-name')||{value:''}).value.trim();
-  const ip=(document.getElementById('nn-ip')||{value:''}).value.trim();
-  if(!name||!ip){const el=document.getElementById('nn-name');if(el)el.focus();return;}
-  const now=new Date().toISOString().slice(0,16).replace('T',' ');
-  nvrs.push({id:nextN++,name,ip,
-    port:parseInt((document.getElementById('nn-port')||{value:'80'}).value)||80,
-    brand:(document.getElementById('nn-brand')||{value:'Altul'}).value,
-    model:(document.getElementById('nn-model')||{value:''}).value.trim()||'—',
-    weburl:'http://'+ip+':'+(parseInt((document.getElementById('nn-port')||{value:'80'}).value)||80),
-    channels:parseInt((document.getElementById('nn-ch')||{value:'16'}).value)||16,
-    active:parseInt((document.getElementById('nn-active')||{value:'0'}).value)||0,
-    storage:(document.getElementById('nn-storage')||{value:'0'}).value.trim()||'0',
-    location:(document.getElementById('nn-loc')||{value:''}).value.trim()||'Necunoscut',
-    status:(document.getElementById('nn-status')||{value:'online'}).value,since:now});
-  const user=(document.getElementById('nn-user')||{value:''}).value.trim();
-  const pass=(document.getElementById('nn-pass')||{value:''}).value;
-  if(user||pass){nvrCreds[nextN-1]={user,pass};saveCreds();}
-  saveNvrs();showNvrList();renderNvrs();
-});
-
-/* ── Snapshot Live Sheet ── */
-let snapTimer=null, snapNvr=null;
-
-function snapUrl(n, ch){
-  const c=nvrCreds[n.id]||{};
-  const user=c.user||'admin';
-  const pass=c.pass||'';
-  const base='http://'+n.ip+':'+n.port;
-  // Hikvision ISAPI snapshot endpoint
-  return `${base}/ISAPI/Streaming/channels/${ch}01/picture?auth=${btoa(user+':'+pass)}&t=${Date.now()}`;
-}
-
-function openSnapSheet(n){
-  snapNvr=n;
-  document.getElementById('sh-snap-title').textContent=n.name;
-  document.getElementById('sh-snap').classList.add('on');
-  document.getElementById('sh-snap-web').onclick=()=>window.open(buildLiveUrl(n),'_blank');
-  buildSnapGrid(n);
-  clearInterval(snapTimer);
-  snapTimer=setInterval(()=>refreshSnaps(n),2000);
-}
-
-function closeSnapSheet(){
-  document.getElementById('sh-snap').classList.remove('on');
-  clearInterval(snapTimer);snapTimer=null;snapNvr=null;
-}
-
-function buildSnapGrid(n){
-  const ch=Math.min(n.active||n.channels,16);
-  const body=document.getElementById('sh-snap-body');
-  body.innerHTML='';
-  const cols=ch<=4?2:ch<=9?3:4;
-  const grid=document.createElement('div');
-  grid.style.cssText=`display:grid;grid-template-columns:repeat(${cols},1fr);gap:6px;width:100%`;
-  for(let i=1;i<=ch;i++){
-    const cell=document.createElement('div');
-    cell.style.cssText='position:relative;aspect-ratio:16/9;background:#0a0c0f;border-radius:6px;overflow:hidden;border:1px solid #21262d';
-    const img=document.createElement('img');
-    img.id=`snap-${n.id}-${i}`;
-    img.style.cssText='width:100%;height:100%;object-fit:cover;display:block';
-    img.onerror=function(){this.style.display='none';cell.querySelector('.snap-err').style.display='flex';};
-    img.onload=function(){this.style.display='block';cell.querySelector('.snap-err').style.display='none';};
-    img.src=snapUrl(n,i);
-    const err=document.createElement('div');
-    err.className='snap-err';
-    err.style.cssText='display:none;position:absolute;inset:0;flex-direction:column;align-items:center;justify-content:center;color:#484f58;font-size:9px;gap:3px';
-    err.innerHTML='<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 5H3a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h14a2 2 0 0 0 1.41-.58"/></svg><span>CH'+i+'</span>';
-    const lbl=document.createElement('div');
-    lbl.style.cssText='position:absolute;bottom:3px;left:4px;font-size:8px;font-family:monospace;color:rgba(255,255,255,.5);background:rgba(0,0,0,.5);padding:1px 4px;border-radius:3px';
-    lbl.textContent='CH'+i;
-    cell.appendChild(img);cell.appendChild(err);cell.appendChild(lbl);
-    grid.appendChild(cell);
+function renderDashAlerts(){
+  const el = qs('#dash-alerts');
+  const recent = alerts.slice(0,3);
+  if (!recent.length) {
+    el.innerHTML = `<div style="text-align:center;padding:24px;color:var(--fg-3);font-size:12px;border:1px solid var(--border);border-radius:var(--r)">✓ Nicio alertă recentă</div>`;
+    return;
   }
-  body.appendChild(grid);
-  // info banner
-  const info=document.createElement('div');
-  info.style.cssText='font-size:11px;color:#484f58;text-align:center;padding:4px 0';
-  info.textContent='Refresh automat la 2 secunde · '+n.ip+':'+n.port;
-  body.appendChild(info);
+  const icons = {
+    crit:`<svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/></svg>`,
+    warn:`<svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18h18.36L13.71 3.86a2 2 0 00-3.42 0z"/></svg>`,
+    info:`<svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/></svg>`,
+  };
+  el.innerHTML = `<div class="alert-list">${recent.map(a=>`
+    <div class="alert-item ${a.type}">
+      <div class="alert-icon">${icons[a.type]||icons.info}</div>
+      <div class="alert-body"><div class="alert-title">${a.nvr}</div><div class="alert-desc">${a.msg}</div></div>
+      <div class="alert-time">${a.t}</div>
+    </div>`).join('')}</div>`;
 }
 
-function refreshSnaps(n){
-  if(!n)return;
-  const ch=Math.min(n.active||n.channels,16);
-  for(let i=1;i<=ch;i++){
-    const img=document.getElementById(`snap-${n.id}-${i}`);
-    if(img){const s=snapUrl(n,i);img.src=s;}
+function updateAlertBadge(){
+  const badge = qs('#alert-badge');
+  const critCount = alerts.filter(a=>a.type==='crit').length;
+  if (critCount > 0) { badge.textContent = critCount; badge.style.display='inline-flex'; }
+  else badge.style.display='none';
+}
+
+function renderLog(){
+  const el = qs('#log-body');
+  if (!logEntries.length) { el.innerHTML='<div style="text-align:center;padding:20px;color:var(--fg-3);font-size:11px">Nicio înregistrare</div>'; return; }
+  el.innerHTML = logEntries.slice(0,100).map(e=>`
+    <div class="log-line">
+      <span class="log-ts">${e.t}</span>
+      <span class="log-tag ${e.type}">${e.type.toUpperCase()}</span>
+      <span class="log-msg">${e.msg}</span>
+    </div>`).join('');
+}
+
+/* ═══════════════════════════════════════
+   HEADER STATUS
+═══════════════════════════════════════ */
+function updateHdrStatus(state){
+  const dot = qs('#hdr-dot');
+  const txt = qs('#hdr-status-txt');
+  dot.className = 'pulse-dot';
+  if (state==='ok'){ txt.textContent='Toate sistemele operaționale'; }
+  else if (state==='warn'){ dot.classList.add('warn'); txt.textContent='Avertizări detectate'; }
+  else if (state==='err'){ dot.classList.add('err'); txt.textContent='Probleme detectate'; }
+  else { txt.textContent='Se verifică...'; }
+}
+
+/* ═══════════════════════════════════════
+   CREDENTIALS MODAL
+═══════════════════════════════════════ */
+let credNid = null;
+
+function openCredModal(nid){
+  credNid = nid;
+  const n = nvrs.find(x=>x.id===nid);
+  const c = creds[nid] || {};
+  qs('#cred-nvr-name').value = n ? n.name : '';
+  qs('#cred-user').value = c.user || '';
+  qs('#cred-pass').value = c.pass || '';
+  qs('#cred-modal').classList.remove('hidden');
+}
+
+function closeCredModal(){ qs('#cred-modal').classList.add('hidden'); credNid=null; }
+
+qs('#cred-x').addEventListener('click', closeCredModal);
+qs('#cred-cancel').addEventListener('click', closeCredModal);
+qs('#cred-modal').addEventListener('click', e=>{ if(e.target===qs('#cred-modal')) closeCredModal(); });
+qs('#cred-save').addEventListener('click', ()=>{
+  if (!credNid) return;
+  const user = qs('#cred-user').value.trim();
+  const pass = qs('#cred-pass').value;
+  if (user || pass) creds[credNid] = {user, pass};
+  else delete creds[credNid];
+  save(SK.creds, creds);
+  closeCredModal();
+  renderAll();
+  toast('Credențiale salvate', 'ok');
+  addLog('info', `Credențiale actualizate pentru NVR ID ${credNid}`);
+});
+
+/* ═══════════════════════════════════════
+   ADD NVR FORM
+═══════════════════════════════════════ */
+qs('#add-nvr-btn').addEventListener('click', ()=>{
+  const f = qs('#add-nvr-form');
+  f.style.display = f.style.display==='none' ? 'block' : 'none';
+});
+qs('#f-cancel').addEventListener('click', ()=>{ qs('#add-nvr-form').style.display='none'; });
+qs('#f-save').addEventListener('click', ()=>{
+  const name = qs('#f-name').value.trim();
+  const ip   = qs('#f-ip').value.trim();
+  if (!name || !ip) { toast('Completează numele și IP-ul', 'err'); return; }
+  const port = parseInt(qs('#f-port').value)||80;
+  const ch   = parseInt(qs('#f-ch').value)||16;
+  const loc  = qs('#f-loc').value.trim();
+  const user = qs('#f-user').value.trim();
+  const pass = qs('#f-pass').value;
+  const id   = nextId++;
+  nvrs.push({ id, name, ip, port, channels:ch, location:loc, status:'unknown', lastSeen:null, cams:[], hdds:[], temp:null, uptime:null, activeCams:0 });
+  if (user||pass) { creds[id]={user,pass}; save(SK.creds,creds); }
+  save(SK.nvrs, nvrs);
+  qs('#add-nvr-form').style.display='none';
+  ['f-name','f-ip','f-port','f-loc','f-user','f-pass'].forEach(id=>{ const el=qs('#'+id); if(el)el.value=''; });
+  renderAll();
+  toast(`NVR "${name}" adăugat`, 'ok');
+  addLog('info', `NVR nou adăugat: <b>${name}</b> (${ip}:${port})`);
+  // Immediately check it
+  setTimeout(()=>checkAll(), 500);
+});
+
+/* ═══════════════════════════════════════
+   PUSH NOTIFICATIONS
+═══════════════════════════════════════ */
+function pushNotif(title, body){
+  if (!cfg.notif || Notification.permission !== 'granted') return;
+  try { new Notification('⚠ ' + title, { body, tag:'yca-alert', renotify:true }); } catch{}
+}
+
+async function enableNotif(){
+  if (!('Notification' in window)) { toast('Browserul nu suportă notificări', 'err'); return; }
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') {
+    cfg.notif = true; save(SK.cfg, cfg);
+    qs('#s-notif').classList.add('on');
+    qs('#btn-bell').classList.add('active');
+    toast('Notificări activate ✓', 'ok');
+    addLog('info', 'Notificări push activate');
+  } else {
+    toast('Notificări blocate de browser', 'err');
   }
 }
 
-document.getElementById('sh-snap-x').addEventListener('click',closeSnapSheet);
-document.getElementById('sh-snap-close').addEventListener('click',closeSnapSheet);
-document.getElementById('sh-snap').addEventListener('click',function(e){if(e.target===this)closeSnapSheet();});
+qs('#btn-bell').addEventListener('click', ()=>{
+  if (cfg.notif) {
+    cfg.notif = false; save(SK.cfg, cfg);
+    qs('#s-notif').classList.remove('on');
+    qs('#btn-bell').classList.remove('active');
+    toast('Notificări dezactivate', 'info');
+  } else { enableNotif(); }
+});
 
-/* ── Auto status flips ── */
-setInterval(()=>{
-  if(!cams.length)return;
-  const c=cams[Math.floor(Math.random()*cams.length)];
-  const r=Math.random(), prev=c.status;
-  if(c.status==='online'&&r<.12)c.status=r<.06?'offline':'warning';
-  else if(c.status!=='online'&&r<.55){c.status='online';c.uptime='0d 00h';}
-  if(c.status!==prev){logAct(c,prev,c.status);saveCams();renderDash();if(curTab==='cams')renderCams();}
-},25000);
+/* ═══════════════════════════════════════
+   TABS
+═══════════════════════════════════════ */
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('on'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+    tab.classList.add('on');
+    qs('#panel-'+tab.dataset.tab).classList.add('on');
+  });
+});
 
-/* ── Init ── */
-renderDash();
-renderNvrs();
+/* ═══════════════════════════════════════
+   SETTINGS
+═══════════════════════════════════════ */
+qs('#s-interval').value = String(cfg.interval);
+qs('#s-hdd-thresh').value = String(cfg.hddThresh||85);
+qs('#s-theme').value = cfg.theme||'';
+if (cfg.notif && Notification.permission==='granted') {
+  qs('#s-notif').classList.add('on');
+  qs('#btn-bell').classList.add('active');
+}
+if (cfg.theme) document.documentElement.dataset.theme = cfg.theme;
+
+qs('#s-interval').addEventListener('change', e=>{
+  cfg.interval = parseInt(e.target.value);
+  save(SK.cfg, cfg);
+  startMonitor();
+  toast('Interval actualizat', 'ok');
+});
+qs('#s-hdd-thresh').addEventListener('change', e=>{
+  cfg.hddThresh = parseInt(e.target.value);
+  save(SK.cfg, cfg);
+});
+qs('#s-theme').addEventListener('change', e=>{
+  cfg.theme = e.target.value;
+  save(SK.cfg, cfg);
+  if (cfg.theme) document.documentElement.dataset.theme = cfg.theme;
+  else delete document.documentElement.dataset.theme;
+});
+qs('#s-notif').addEventListener('click', ()=>{
+  if (cfg.notif) qs('#btn-bell').click();
+  else enableNotif();
+});
+qs('#s-reset').addEventListener('click', ()=>{
+  if (!confirm('Ștergi toate datele aplicației?')) return;
+  Object.values(SK).forEach(k=>{ try{localStorage.removeItem(k);}catch{} });
+  location.reload();
+});
+
+/* ═══════════════════════════════════════
+   MISC ACTIONS
+═══════════════════════════════════════ */
+qs('#btn-refresh').addEventListener('click', ()=>{ toast('Verificare în curs...','info'); checkAll(); });
+qs('#dash-refresh-btn').addEventListener('click', ()=>{ toast('Verificare în curs...','info'); checkAll(); });
+qs('#clear-alerts-btn').addEventListener('click', ()=>{ alerts=[]; save(SK.alerts,[]); renderAlerts(); updateAlertBadge(); renderDashAlerts(); toast('Alerte șterse','ok'); });
+qs('#clear-log-btn').addEventListener('click', ()=>{ logEntries=[]; save(SK.log,[]); renderLog(); toast('Jurnal șters','ok'); });
+
+/* ═══════════════════════════════════════
+   TOAST
+═══════════════════════════════════════ */
+function toast(msg, type){
+  const el = document.createElement('div');
+  el.className = `toast ${type||'info'}`;
+  el.textContent = msg;
+  qs('#toast-wrap').appendChild(el);
+  setTimeout(()=>el.remove(), 3000);
+}
+
+/* ═══════════════════════════════════════
+   UTILS
+═══════════════════════════════════════ */
+function qs(sel){ return document.querySelector(sel); }
+
+/* ═══════════════════════════════════════
+   INIT
+═══════════════════════════════════════ */
+renderAlerts();
+updateAlertBadge();
+renderLog();
+renderAll();
+addLog('info', 'Aplicație pornită — YCA CCTV Monitor v2');
+startMonitor();
 
 })();
 </script>
-</body>
-</html>
