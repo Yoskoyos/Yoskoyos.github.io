@@ -559,6 +559,13 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
         </div>
         <div class="form-row" style="flex-direction:column;align-items:flex-start;gap:8px">
           <div>
+            <div class="form-label">Proxy URL</div>
+            <div class="form-hint">Adresa proxy-ului HTTPS pentru NVR-uri</div>
+          </div>
+          <input class="form-input" id="s-proxy-url" type="text" placeholder="https://proxy.supraveghere24h.ro" style="width:100%;max-width:420px">
+        </div>
+        <div class="form-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+          <div>
             <div class="form-label">Resetare date</div>
             <div class="form-hint">Șterge toate NVR-urile și alertele</div>
           </div>
@@ -648,7 +655,7 @@ let nvrs   = load(SK.nvrs,   []);
 let creds  = load(SK.creds,  {});
 let alerts = load(SK.alerts, []);
 let logEntries = load(SK.log, []);
-let cfg    = load(SK.cfg, { interval:60, notif:false, hddThresh:85, theme:'', tgToken:'', tgChatId:'', tgEnabled:false, proxyUrl:'http://2.31.113.25:3000', soundEnabled:true, dailyReport:false, dailyReportTime:'08:00' });
+let cfg    = load(SK.cfg, { interval:60, notif:false, hddThresh:85, theme:'', tgToken:'', tgChatId:'', tgEnabled:false, proxyUrl:'https://proxy.supraveghere24h.ro', soundEnabled:true, dailyReport:false, dailyReportTime:'08:00' });
 
 // No defaults — user adds their own NVRs
 
@@ -1447,6 +1454,12 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
 qs('#s-interval').value = String(cfg.interval);
 qs('#s-hdd-thresh').value = String(cfg.hddThresh||85);
 qs('#s-theme').value = cfg.theme||'';
+qs('#s-proxy-url').value = cfg.proxyUrl||'';
+qs('#s-proxy-url').addEventListener('change', e=>{
+  cfg.proxyUrl = e.target.value.trim().replace(/\/$/,'');
+  save(SK.cfg, cfg);
+  toast('Proxy URL salvat', 'ok');
+});
 if (cfg.notif && Notification.permission==='granted') {
   qs('#s-notif').classList.add('on');
   qs('#btn-bell').classList.add('active');
