@@ -852,79 +852,76 @@ function checkNvr(nvr){
         const ipPromise = proxyFetch('/ISAPI/ContentMgmt/InputProxy/channels/status', 6000).then(async ipR => {
           if (ipR.status !== 200) return;
           const ipXml = await ipR.text();
-          const onlineMatches = [...ipXml.matchAll(/<online>(true|false)<\/online>/g)];
-          result.realOnlineCams = onlineMatches.filter(m => m[1] === 'true').length;
+          // parse per-channel: <InputProxyChannelStatus><id>1</id><online>true</online>...
+          const chBlocks = [...ipXml.matchAll(/<InputProxyChannelStatus>([\s\S]*?)<\/InputProxyChannelStatus>/g)];
+          result._ipPerCh = {};
+          let onlineCnt = 0;
+          for (const b of chBlocks) {
+            const txt = b[1];
+            const idM = txt.match(/<id>(\d+)<\/id>/);
+            const onM = txt.match(/<online>(true|false)<\/online>/);
+            if (idM && onM) {
+              const ch = parseInt(idM[1]);
+              const online = onM[1] === 'true';
+              result._ipPerCh[ch] = online;
+              if (online) onlineCnt++;
+            }
+          }
+          // fallback if no blocks parsed: count all <online> tags
+          if (chBlocks.length === 0) {
+            const onlineMatches = [...ipXml.matchAll(/<online>(true|false)<\/online>/g)];
+            onlineCnt = onlineMatches.filter(m => m[1] === 'true').length;
+          }
+          result.realOnlineCams = onlineCnt;
         }).catch(() => {});
 
-        // Step 2: probe each channel snapshot + recording status via proxy
+        // Step 2: get rec status + HDD in parallel (no per-channel snapshot polling)
+        // Camera online/offline comes from ipPromise (InputProxy) already in flight
         const total = Math.min(nvr.channels || 0, 32);
-        if (total === 0) { resolve(result); return; }
 
-        let resolved = false;
-        const safeDone = () => {
-          if (!resolved) {
-            resolved = true;
-            // wait for sys+ip data (already in flight), then resolve
-            Promise.allSettled([sysPromise, ipPromise]).then(() => resolve(result));
+        const recPromise = proxyFetch('/ISAPI/ContentMgmt/record/control/manual/status/tracks', 6000).then(async recR => {
+          if (recR.status !== 200) return;
+          const recXml = await recR.text();
+          const matches = [...recXml.matchAll(/<TrackStatus>[\s\S]*?<id>(\d+)<\/id>[\s\S]*?<enabled>(true|false)<\/enabled>[\s\S]*?<\/TrackStatus>/g)];
+          result.rec = {};
+          for (const m of matches) {
+            const ch = Math.floor(parseInt(m[1]) / 100);
+            if (ch >= 1 && ch <= total) result.rec[ch] = m[2] === 'true';
           }
-        };
+        }).catch(() => {});
 
-        // Step 2a: get recording status for all channels at once
-        let recStatus = {}; // chNum -> true/false
-        try {
-          const recR = await proxyFetch('/ISAPI/ContentMgmt/record/control/manual/status/tracks', 6000);
-          if (recR.status === 200) {
-            const recXml = await recR.text();
-            // parse <TrackStatus><id>101</id><enabled>true</enabled>...
-            const matches = [...recXml.matchAll(/<TrackStatus>[\s\S]*?<id>(\d+)<\/id>[\s\S]*?<enabled>(true|false)<\/enabled>[\s\S]*?<\/TrackStatus>/g)];
-            for (const m of matches) {
-              const trackId = parseInt(m[1]);
-              const ch = Math.floor(trackId / 100); // 101 -> ch1, 201 -> ch2
-              if (ch >= 1 && ch <= total) recStatus[ch] = m[2] === 'true';
-            }
+        const hddPromise = proxyFetch('/ISAPI/ContentMgmt/Storage/hdd', 6000).then(async hddR => {
+          if (hddR.status !== 200) return;
+          const hddXml = await hddR.text();
+          const hddBlocks = [...hddXml.matchAll(/<hdd>([\s\S]*?)<\/hdd>/g)];
+          result.hdds = hddBlocks.map(b => {
+            const txt = b[1];
+            const get = tag => { const m = txt.match(new RegExp(`<${tag}>([^<]*)</${tag}>`)); return m ? m[1].trim() : null; };
+            return { id: get('id')||'?', name: get('hddName')||get('name')||'HDD',
+              capacity: parseInt(get('capacity')||'0'), freeSpace: parseInt(get('freeSpace')||'0'),
+              status: (get('status')||'unknown').toLowerCase() };
+          }).filter(h => h.status !== 'notexist' && h.capacity > 0);
+        }).catch(() => {});
+
+        // Wait for all parallel requests, then build cams[] from InputProxy data
+        await Promise.allSettled([sysPromise, ipPromise, recPromise, hddPromise]);
+
+        // Build cams[] from InputProxy per-channel status (already parsed into result.realOnlineCams)
+        // Re-parse ipXml per channel for individual ok/err — re-fetch avoided by storing per-ch data in ipPromise
+        // Instead: mark all channels as ok/err based on snapshot fallback for grid colors
+        // Use a single fast probe per channel via HEAD-like snap (already have realOnlineCams count)
+        // Simplest: build cams[] from InputProxy inline data stored during ipPromise
+        if (result._ipPerCh) {
+          for (let ch = 1; ch <= total; ch++) {
+            result.cams[ch - 1] = result._ipPerCh[ch] ? 'ok' : 'err';
           }
-        } catch {}
-
-        // Step 2b: get HDD status from /ISAPI/ContentMgmt/Storage/hdd
-        try {
-          const hddR = await proxyFetch('/ISAPI/ContentMgmt/Storage/hdd', 6000);
-          if (hddR.status === 200) {
-            const hddXml = await hddR.text();
-            // parse each <hdd> block: id, hddName, capacity, freeSpace, status
-            const hddBlocks = [...hddXml.matchAll(/<hdd>([\s\S]*?)<\/hdd>/g)];
-            result.hdds = hddBlocks.map(b => {
-              const txt = b[1];
-              const get = tag => { const m = txt.match(new RegExp(`<${tag}>([^<]*)</${tag}>`)); return m ? m[1].trim() : null; };
-              return {
-                id:        get('id') || '?',
-                name:      get('hddName') || get('name') || 'HDD',
-                capacity:  parseInt(get('capacity') || '0'),   // MB
-                freeSpace: parseInt(get('freeSpace') || '0'),  // MB
-                status:    (get('status') || 'unknown').toLowerCase(), // ok / error / unformatted / notexist / idle
-              };
-            }).filter(h => h.status !== 'notexist' && h.capacity > 0);
-          }
-        } catch {}
-
-        let pending = total;
-        for (let ch = 1; ch <= total; ch++) {
-          (async function(chNum) {
-            try {
-              const snap = await proxyFetch(`/ISAPI/Streaming/channels/${chNum}01/picture?t=${Date.now()}`, 7000);
-              // 200 = got image, 401 = cam exists needs auth → both mean cam is alive
-              result.cams[chNum - 1] = (snap.status === 200 || snap.status === 401) ? 'ok' : 'err';
-            } catch {
-              result.cams[chNum - 1] = 'err';
-            }
-            // recording status: true=recording, false=stopped, undefined=unknown
-            result.rec = result.rec || {};
-            result.rec[chNum] = recStatus[chNum]; // true/false/undefined
-            if (--pending === 0) safeDone();
-          })(ch);
+          delete result._ipPerCh;
+        } else {
+          // fallback: mark all as ok if NVR responded
+          for (let ch = 1; ch <= total; ch++) result.cams[ch - 1] = result.cams[ch-1] || 'err';
         }
 
-        // Safety resolve after 20s in case some channels hang
-        setTimeout(safeDone, 20000);
+        resolve(result);
 
       } else {
         // e.g. 403, 500 — proxy reached NVR but got unexpected status
