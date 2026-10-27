@@ -177,11 +177,13 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 
 /* channel grid */
 .ch-grid{display:grid;gap:4px;margin:8px 0}
-.ch-cell{aspect-ratio:1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;font-weight:600;cursor:pointer;transition:opacity .15s}
-.ch-cell:hover{opacity:.75}
+.ch-cell{aspect-ratio:16/9;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;font-weight:600;cursor:pointer;transition:opacity .15s;overflow:hidden;position:relative}
+.ch-cell:hover{opacity:.85}
 .ch-cell.ok{background:var(--ok-dim);color:var(--ok)}
 .ch-cell.err{background:var(--err-dim);color:var(--err)}
 .ch-cell.none{background:var(--bg-3);color:var(--fg-3)}
+.ch-cell img.ch-thumb{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;border-radius:4px}
+.ch-cell .ch-lbl{position:absolute;bottom:2px;left:3px;font-size:7px;font-family:var(--mono);font-weight:700;color:#fff;text-shadow:0 0 4px #000,0 0 4px #000;pointer-events:none;z-index:1}
 
 /* HDD */
 .hdd-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
@@ -1071,7 +1073,7 @@ function nvrCardHTML(n, showDetail){
         ? (recVal === true  ? ' · Înregistrează' : recVal === false ? ' · Înregistrare oprită!' : '')
         : '';
       const recClass = recVal === false && s === 'ok' ? 'rec-stopped' : '';
-      return `<div class="ch-cell ${s} ${recClass}" title="CH${ch}: ${s==='ok'?'Online':s==='err'?'Offline':'—'}${recTitle}">${recIcon}CH${ch}</div>`;
+      return `<div class="ch-cell ${s} ${recClass}" title="CH${ch}: ${s==='ok'?'Online':s==='err'?'Offline':'—'}${recTitle}" data-nch="${ch}">${recIcon}CH${ch}</div>`;
     }).join('');
     const stoppedRec = Object.entries(recMap).filter(([ch,v]) => v===false && n.cams[+ch-1]==='ok').length;
     chGrid = `<div style="margin-top:8px">
@@ -1146,11 +1148,29 @@ function nvrCardHTML(n, showDetail){
   </div>`;
 }
 
+function loadChThumbs(container){
+  const proxy = (cfg.proxyUrl||'https://proxy.supraveghere24h.ro').replace(/\/$/,'');
+  if (!proxy) return;
+  container.querySelectorAll('.ch-cell.ok[data-nch]').forEach(cell => {
+    const card = cell.closest('[data-nid]');
+    if (!card) return;
+    const nvrId = parseInt(card.dataset.nid);
+    const nvr = nvrs.find(n=>n.id===nvrId);
+    if (!nvr) return;
+    const ch = parseInt(cell.dataset.nch);
+    const {user, pass} = getNvrCreds(nvr);
+    const snapUrl = `${proxy}?url=${encodeURIComponent('http://'+encodeURIComponent(user)+':'+encodeURIComponent(pass)+'@'+nvr.ip+':'+nvr.port+'/ISAPI/Streaming/channels/'+ch+'01/picture?t='+Date.now())}`;
+    // remove existing label text, inject img + label
+    cell.innerHTML = `<img class="ch-thumb" src="${snapUrl}" onerror="this.remove()"><span class="ch-lbl">CH${ch}</span>`;
+  });
+}
+
 function renderDashNvrs(){
   const el = qs('#dash-nvr-list');
   if (!nvrs.length) { el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--fg-3);font-size:12px">Niciun NVR configurat — mergi la tab-ul NVR-uri</div>'; return; }
   el.innerHTML = nvrs.map(n => nvrCardHTML(n, false)).join('');
   bindNvrActions(el);
+  loadChThumbs(el);
 }
 
 function renderNvrList(){
@@ -1160,13 +1180,16 @@ function renderNvrList(){
   emp.style.display = 'none';
   el.innerHTML = nvrs.map(n => nvrCardHTML(n, false)).join('');
   bindNvrActions(el);
+  loadChThumbs(el);
 }
 
 function bindNvrActions(container){
   container.querySelectorAll('.nvr-toggle').forEach(el => {
     el.addEventListener('click', () => {
-      const detail = el.closest('.nvr-card').querySelector('.nvr-detail');
+      const card = el.closest('.nvr-card');
+      const detail = card.querySelector('.nvr-detail');
       detail.classList.toggle('open');
+      if (detail.classList.contains('open')) loadChThumbs(card);
     });
   });
   container.querySelectorAll('.nvr-edit-btn').forEach(btn => {
