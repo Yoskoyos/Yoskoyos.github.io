@@ -826,51 +826,48 @@ function checkNvr(nvr){
           } catch {}
         }
 
-        // Step 1b: fetch system status (uptime, RAM, device time)
-        try {
-          const sysR = await proxyFetch('/ISAPI/System/status', 6000);
-          if (sysR.status === 200) {
-            const sysXml = await sysR.text();
-            const getS = tag => { const m = sysXml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`)); return m ? m[1] : null; };
-            // uptime in seconds
-            const uptimeSec = parseInt(getS('deviceUpTime') || '0');
-            if (uptimeSec > 0) {
-              const d = Math.floor(uptimeSec / 86400);
-              const h = Math.floor((uptimeSec % 86400) / 3600);
-              const mn = Math.floor((uptimeSec % 3600) / 60);
-              result.uptime = d > 0 ? `${d}z ${h}h ${mn}m` : h > 0 ? `${h}h ${mn}m` : `${mn}m`;
-            }
-            // RAM: memoryUsage in KB
-            const memUsed = parseInt(getS('memoryUsage') || '0');
-            const memAvail = parseInt(getS('memoryAvailable') || '0');
-            if (memUsed > 0 || memAvail > 0) {
-              const total = memUsed + memAvail;
-              const pct = total > 0 ? Math.round(memUsed * 100 / total) : 0;
-              result.ram = `${Math.round(memUsed/1024)}MB / ${Math.round(total/1024)}MB (${pct}%)`;
-            }
-            // device time
-            const dt = getS('currentDeviceTime');
-            if (dt) result.deviceTime = dt.replace('T', ' ').replace(/\+.*$/, '').replace(/\.\d+$/, '');
+        // Step 1b+1c: fetch system status + InputProxy IN PARALLEL (non-blocking)
+        const sysPromise = proxyFetch('/ISAPI/System/status', 6000).then(async sysR => {
+          if (sysR.status !== 200) return;
+          const sysXml = await sysR.text();
+          const getS = tag => { const m = sysXml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`)); return m ? m[1] : null; };
+          const uptimeSec = parseInt(getS('deviceUpTime') || '0');
+          if (uptimeSec > 0) {
+            const d = Math.floor(uptimeSec / 86400);
+            const h = Math.floor((uptimeSec % 86400) / 3600);
+            const mn = Math.floor((uptimeSec % 3600) / 60);
+            result.uptime = d > 0 ? `${d}z ${h}h ${mn}m` : h > 0 ? `${h}h ${mn}m` : `${mn}m`;
           }
-        } catch {}
+          const memUsed = parseInt(getS('memoryUsage') || '0');
+          const memAvail = parseInt(getS('memoryAvailable') || '0');
+          if (memUsed > 0 || memAvail > 0) {
+            const tot = memUsed + memAvail;
+            const pct = tot > 0 ? Math.round(memUsed * 100 / tot) : 0;
+            result.ram = `${memUsed}MB / ${tot}MB (${pct}%)`;
+          }
+          const dt = getS('currentDeviceTime');
+          if (dt) result.deviceTime = dt.replace('T', ' ').replace(/\+.*$/, '').replace(/\.\d+$/, '');
+        }).catch(() => {});
 
-        // Step 1c: fetch real camera online/offline from InputProxy
-        try {
-          const ipR = await proxyFetch('/ISAPI/ContentMgmt/InputProxy/channels/status', 6000);
-          if (ipR.status === 200) {
-            const ipXml = await ipR.text();
-            const onlineMatches = [...ipXml.matchAll(/<online>(true|false)<\/online>/g)];
-            const onlineCnt = onlineMatches.filter(m => m[1] === 'true').length;
-            result.realOnlineCams = onlineCnt;
-          }
-        } catch {}
+        const ipPromise = proxyFetch('/ISAPI/ContentMgmt/InputProxy/channels/status', 6000).then(async ipR => {
+          if (ipR.status !== 200) return;
+          const ipXml = await ipR.text();
+          const onlineMatches = [...ipXml.matchAll(/<online>(true|false)<\/online>/g)];
+          result.realOnlineCams = onlineMatches.filter(m => m[1] === 'true').length;
+        }).catch(() => {});
 
         // Step 2: probe each channel snapshot + recording status via proxy
         const total = Math.min(nvr.channels || 0, 32);
         if (total === 0) { resolve(result); return; }
 
         let resolved = false;
-        const safeDone = () => { if (!resolved) { resolved = true; resolve(result); } };
+        const safeDone = () => {
+          if (!resolved) {
+            resolved = true;
+            // wait for sys+ip data (already in flight), then resolve
+            Promise.allSettled([sysPromise, ipPromise]).then(() => resolve(result));
+          }
+        };
 
         // Step 2a: get recording status for all channels at once
         let recStatus = {}; // chNum -> true/false
@@ -926,8 +923,8 @@ function checkNvr(nvr){
           })(ch);
         }
 
-        // Safety resolve after 12s in case some channels hang
-        setTimeout(safeDone, 12000);
+        // Safety resolve after 20s in case some channels hang
+        setTimeout(safeDone, 20000);
 
       } else {
         // e.g. 403, 500 — proxy reached NVR but got unexpected status
