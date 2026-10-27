@@ -1160,7 +1160,7 @@ function nvrCardHTML(n, showDetail){
         <div class="nvr-name">${n.name}</div>
         <div class="nvr-meta">${n.ip}:${n.port} · ${n.location||'—'}</div>
       </div>
-      <span class="nvr-badge ${n.status}">${nvrStatusLabel(n.status)}</span>
+      <span class="nvr-badge ${n.status}" title="${n.status==='warning' ? offlineCams+' camere offline' : n.status==='offline' ? 'NVR nu răspunde' : ''}">${nvrStatusLabel(n.status)}${n.status==='warning'&&offlineCams>0?' · '+offlineCams+' cam offline':''}</span>
     </div>
     <div class="nvr-detail ${detailOpen}">
       <div class="nvr-row"><span class="nvr-row-k"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/></svg>Adresă</span><span class="nvr-row-v">${n.ip}:${n.port}</span></div>
