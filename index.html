@@ -846,7 +846,43 @@ function checkNvr(nvr){
             result.ram = `${memUsed}MB / ${tot}MB (${pct}%)`;
           }
           const dt = getS('currentDeviceTime');
-          if (dt) result.deviceTime = dt.replace('T', ' ').replace(/\+.*$/, '').replace(/\.\d+$/, '');
+          if (dt) {
+            result.deviceTime = dt.replace('T', ' ').replace(/\+.*$/, '').replace(/\.\d+$/, '');
+            // Auto-sync NVR time to Romania (Europe/Bucharest) if drift > 2 minutes
+            try {
+              const nvrMs = new Date(dt).getTime();
+              const nowMs = Date.now();
+              const driftSec = Math.abs(nowMs - nvrMs) / 1000;
+              if (driftSec > 120) {
+                // Format current time as NVR expects: 2026-10-27T17:25:00+03:00
+                const now = new Date();
+                const tzOffset = now.toLocaleString('en', {timeZone:'Europe/Bucharest', timeZoneName:'shortOffset'})
+                  .match(/GMT([+-]\d+)/)?.[1] || '+2';
+                const pad = n => String(n).padStart(2,'0');
+                // Get local time in Bucharest
+                const buch = new Date(now.toLocaleString('en-US', {timeZone:'Europe/Bucharest'}));
+                const isoLocal = `${buch.getFullYear()}-${pad(buch.getMonth()+1)}-${pad(buch.getDate())}T${pad(buch.getHours())}:${pad(buch.getMinutes())}:${pad(buch.getSeconds())}`;
+                // Proper offset calculation for Bucharest (+02 winter, +03 summer)
+                const localDate = new Date(now.toLocaleString('en-US', {timeZone:'Europe/Bucharest'}));
+                const utcDate = new Date(now.toLocaleString('en-US', {timeZone:'UTC'}));
+                const offsetHours = Math.round((localDate - utcDate) / 3600000);
+                const offsetStr = (offsetHours >= 0 ? '+' : '-') + pad(Math.abs(offsetHours)) + ':00';
+                const timeXml = `<Time><timeMode>manual</timeMode><localTime>${isoLocal}${offsetStr}</localTime><timeZone>CST-2:00:00DST01:00:00,M3.5.0/2,M10.5.0/3</timeZone></Time>`;
+                const ctrl2 = new AbortController();
+                const tid2 = setTimeout(() => ctrl2.abort(), 5000);
+                const authBase = `http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${nvr.ip}:${nvr.port}`;
+                fetch(`${proxy}/?url=${encodeURIComponent(authBase + '/ISAPI/System/time')}`, {
+                  method: 'PUT',
+                  headers: {'Content-Type':'application/xml'},
+                  body: timeXml,
+                  signal: ctrl2.signal
+                }).then(r => {
+                  clearTimeout(tid2);
+                  if (r.ok) addLog('info', `<b>${nvr.name}</b> — oră sincronizată (derivă ${Math.round(driftSec)}s)`);
+                }).catch(() => { clearTimeout(tid2); });
+              }
+            } catch {}
+          }
         }).catch(() => {});
 
         const ipPromise = proxyFetch('/ISAPI/ContentMgmt/InputProxy/channels/status', 6000).then(async ipR => {
