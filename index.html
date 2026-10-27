@@ -1734,17 +1734,16 @@ function loadSnapModal(nvr, ch) {
 
   const { user, pass } = getAuth(nvr);
   const proxy = (cfg.proxyUrl || 'https://proxy.supraveghere24h.ro').replace(/\/$/, '');
-  const nvrBase = `http://${nvr.ip}:${nvr.port}`;
+  // Includem credențialele direct în URL (Hikvision acceptă user:pass@ în URL)
+  const nvrBase = `http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${nvr.ip}:${nvr.port}`;
   const snapPath = `/ISAPI/Streaming/channels/${ch}01/picture?t=${Date.now()}`;
   const url = `${proxy}?url=${encodeURIComponent(nvrBase + snapPath)}`;
 
-  fetch(url, {
-    headers: { 'Authorization': 'Basic ' + btoa(user + ':' + pass) }
-  })
+  fetch(url)
   .then(async r => {
-    if (!r.ok && r.status !== 401) throw new Error(`HTTP ${r.status}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const blob = await r.blob();
-    if (!blob.type.startsWith('image/')) throw new Error('Răspuns invalid');
+    if (!blob.size || !blob.type.startsWith('image/')) throw new Error('Răspuns invalid');
     const objUrl = URL.createObjectURL(blob);
     img.onload = () => {
       spinner.style.display = 'none';
