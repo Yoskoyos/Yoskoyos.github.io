@@ -683,7 +683,7 @@ function addAlert(type, nvr, msg, subtype){
   updateAlertBadge();
   pushNotif(nvr.name, msg);
   playAlertSound();
-  const emoji = subtype==='crit'?'🔴':'🟡';
+  const emoji = subtype==='crit'?'🔴':subtype==='info'?'🟢':'🟡';
   sendTelegram(`${emoji} <b>YCA CCTV Monitor</b>\n<b>${nvr.name}</b>\n${msg}\n🕐 ${new Date().toLocaleString('ro-RO')}`);
 }
 
@@ -886,12 +886,28 @@ async function checkAll(){
 
       if (prevStatus === 'offline' || prevStatus === 'unknown') {
         addLog('ok', `<b>${nvr.name}</b> — revenit online (${activeCams}/${nvr.channels} camere active)`);
-        if (prevStatus === 'offline') addAlert('info', nvr, `NVR revenit online · ${activeCams}/${nvr.channels} camere`, 'info');
-      } else if (offlineCams > 0) {
-        addLog('warn', `<b>${nvr.name}</b> — ${offlineCams} camere offline`);
-        hasWarn = true;
+        addAlert('info', nvr, `✅ NVR revenit online · ${activeCams}/${nvr.channels} camere active`, 'info');
       } else {
-        addLog('ok', `<b>${nvr.name}</b> — OK (${activeCams}/${nvr.channels} camere active)`);
+        // detectare schimbări per cameră (doar dacă NVR era deja online)
+        const prevCams = nvr.cams || [];
+        for (let i = 0; i < res.cams.length; i++) {
+          const ch = i + 1;
+          const prev = prevCams[i];
+          const curr = res.cams[i];
+          if (curr === 'err' && prev === 'ok') {
+            addLog('warn', `<b>${nvr.name}</b> CH${ch} — cameră offline`);
+            addAlert('crit', nvr, `CH${ch} — cameră offline`, 'crit');
+            hasWarn = true;
+          } else if (curr === 'ok' && prev === 'err') {
+            addLog('ok', `<b>${nvr.name}</b> CH${ch} — cameră revenită online`);
+            addAlert('info', nvr, `✅ CH${ch} — cameră revenită online`, 'info');
+          }
+        }
+        if (offlineCams > 0) {
+          hasWarn = true;
+        } else {
+          addLog('ok', `<b>${nvr.name}</b> — OK (${activeCams}/${nvr.channels} camere active)`);
+        }
       }
     } else {
       nvrs[idx].status = 'offline';
