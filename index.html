@@ -1437,7 +1437,7 @@ async function loadSnaps(){
   grid.innerHTML = Array.from({length:total},(_,i)=>{
     const ch = i+1;
     const url = proxy
-      ? `${proxy}/?url=${encodeURIComponent(`http://${nvr.ip}:${nvr.port}/ISAPI/Streaming/channels/${ch}01/picture?t=${Date.now()}`)}`
+      ? `${proxy}?url=${encodeURIComponent(`http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${nvr.ip}:${nvr.port}/ISAPI/Streaming/channels/${ch}01/picture?t=${Date.now()}`)}`
       : `http://${nvr.ip}:${nvr.port}/ISAPI/Streaming/channels/${ch}01/picture?t=${Date.now()}`;
     return `<div class="snap-card" id="sc-${ch}">
       <img src="${url}" alt="CH${ch}"
