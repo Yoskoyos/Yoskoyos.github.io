@@ -781,20 +781,20 @@ function addAlert(type, nvr, msg, subtype){
 /* ═══════════════════════════════════════
    HIKVISION ISAPI CHECK
 ═══════════════════════════════════════ */
-function getAuth(nvr){
+function getNvrCreds(nvr){
   const c = creds[nvr.id] || {};
   return { user: c.user || 'admin', pass: c.pass || '' };
 }
 
 function snapUrl(nvr, ch){
-  const { user, pass } = getAuth(nvr);
+  const { user, pass } = getNvrCreds(nvr);
   return `http://${nvr.ip}:${nvr.port}/ISAPI/Streaming/channels/${ch}01/picture?auth=${btoa(user+':'+pass)}&t=${Date.now()}`;
 }
 
 function checkNvr(nvr){
   return new Promise(async resolve => {
     const result = { online: false, cams: [], hdds: [], temp: null, uptime: null };
-    const { user, pass } = getAuth(nvr);
+    const { user, pass } = getNvrCreds(nvr);
     const base = `http://${nvr.ip}:${nvr.port}`;
     const proxy = (cfg.proxyUrl || 'https://yca-nvr-proxy.dima-florin1987.workers.dev').replace(/\/$/, '');
     const authHeader = { 'Authorization': 'Basic ' + btoa(user + ':' + pass) };
@@ -1052,7 +1052,7 @@ function nvrCardHTML(n, showDetail){
   const totalChecked = n.totalCamsChecked ?? n.channels;
   const offlineCams = totalChecked - activeCams;
   const hasWarn = n.status === 'warning';
-  const { user } = getAuth(n);
+  const { user } = getNvrCreds(n);
   const hasCreds = !!(creds[n.id]?.user);
 
   // Channel grid
@@ -1433,7 +1433,7 @@ async function loadSnaps(){
   empty.style.display = 'none';
   const total = nvr.channels || 0;
   const proxy = (cfg.proxyUrl||'').replace(/\/$/,'');
-  const { user, pass } = getAuth(nvr);
+  const { user, pass } = getNvrCreds(nvr);
   grid.innerHTML = Array.from({length:total},(_,i)=>{
     const ch = i+1;
     const url = proxy
@@ -1732,7 +1732,7 @@ function loadSnapModal(nvr, ch) {
   spinner.style.display = 'flex';
   errEl.style.display = 'none';
 
-  const { user, pass } = getAuth(nvr);
+  const { user, pass } = getNvrCreds(nvr);
   const proxy = (cfg.proxyUrl || 'https://proxy.supraveghere24h.ro').replace(/\/$/, '');
   // Includem credențialele direct în URL (Hikvision acceptă user:pass@ în URL)
   const nvrBase = `http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${nvr.ip}:${nvr.port}`;
