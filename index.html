@@ -177,7 +177,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 
 /* channel grid */
 .ch-grid{display:grid;gap:4px;margin:8px 0}
-.ch-cell{aspect-ratio:1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;font-weight:600;cursor:default}
+.ch-cell{aspect-ratio:1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;font-weight:600;cursor:pointer;transition:opacity .15s}
+.ch-cell:hover{opacity:.75}
 .ch-cell.ok{background:var(--ok-dim);color:var(--ok)}
 .ch-cell.err{background:var(--err-dim);color:var(--err)}
 .ch-cell.none{background:var(--bg-3);color:var(--fg-3)}
@@ -626,6 +627,33 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
     </div>
 
   </main>
+</div>
+
+<!-- Snapshot modal -->
+<div class="overlay hidden" id="snap-modal">
+  <div class="modal" style="max-width:720px;width:95vw">
+    <div class="modal-hdr">
+      <div class="modal-title" id="snap-modal-title">Snapshot</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+        <button class="btn sm" id="snap-modal-prev" title="Canal anterior">‹</button>
+        <button class="btn sm" id="snap-modal-next" title="Canal următor">›</button>
+        <button class="btn sm primary" id="snap-modal-refresh">↻ Refresh</button>
+        <div class="modal-x" id="snap-modal-x">✕</div>
+      </div>
+    </div>
+    <div style="background:#000;position:relative;min-height:200px;display:flex;align-items:center;justify-content:center">
+      <img id="snap-modal-img" src="" alt="snapshot" style="width:100%;max-height:70vh;object-fit:contain;display:block">
+      <div id="snap-modal-spinner" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);font-size:12px;color:#fff;font-family:var(--mono)">Se încarcă...</div>
+      <div id="snap-modal-err" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:8px;background:rgba(0,0,0,.8);color:var(--err);font-size:12px;font-family:var(--mono)">
+        <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+        <span id="snap-modal-err-txt">Nu s-a putut încărca imaginea</span>
+      </div>
+    </div>
+    <div style="padding:10px 16px;font-size:11px;color:var(--fg-2);font-family:var(--mono);display:flex;justify-content:space-between;background:var(--bg-2);border-top:1px solid var(--border)">
+      <span id="snap-modal-info">—</span>
+      <span id="snap-modal-time" style="color:var(--fg-3)">—</span>
+    </div>
+  </div>
 </div>
 
 <!-- Edit NVR modal -->
@@ -1655,6 +1683,123 @@ function toast(msg, type){
    UTILS
 ═══════════════════════════════════════ */
 function qs(sel){ return document.querySelector(sel); }
+
+/* ═══════════════════════════════════════
+   SNAPSHOT MODAL
+═══════════════════════════════════════ */
+let snapState = { nvrId: null, ch: null };
+
+function openSnapModal(nvrId, ch) {
+  const nvr = nvrs.find(n => n.id === nvrId);
+  if (!nvr) return;
+  snapState = { nvrId, ch };
+  qs('#snap-modal').classList.remove('hidden');
+  loadSnapModal(nvr, ch);
+}
+
+function loadSnapModal(nvr, ch) {
+  const img     = qs('#snap-modal-img');
+  const spinner = qs('#snap-modal-spinner');
+  const errEl   = qs('#snap-modal-err');
+  const errTxt  = qs('#snap-modal-err-txt');
+  const info    = qs('#snap-modal-info');
+  const timeEl  = qs('#snap-modal-time');
+  const title   = qs('#snap-modal-title');
+
+  const camStatus = nvr.cams && nvr.cams[ch-1];
+  title.textContent = `${nvr.name} — CH${ch}`;
+  info.textContent  = `${nvr.ip}:${nvr.port} · CH${ch}`;
+  timeEl.textContent = '';
+  img.src = '';
+  img.style.display = 'none';
+  spinner.style.display = 'flex';
+  errEl.style.display = 'none';
+
+  const { user, pass } = getAuth(nvr);
+  const proxy = (cfg.proxyUrl || 'https://proxy.supraveghere24h.ro').replace(/\/$/, '');
+  const nvrBase = `http://${nvr.ip}:${nvr.port}`;
+  const snapPath = `/ISAPI/Streaming/channels/${ch}01/picture?t=${Date.now()}`;
+  const url = `${proxy}?url=${encodeURIComponent(nvrBase + snapPath)}`;
+
+  fetch(url, {
+    headers: { 'Authorization': 'Basic ' + btoa(user + ':' + pass) }
+  })
+  .then(async r => {
+    if (!r.ok && r.status !== 401) throw new Error(`HTTP ${r.status}`);
+    const blob = await r.blob();
+    if (!blob.type.startsWith('image/')) throw new Error('Răspuns invalid');
+    const objUrl = URL.createObjectURL(blob);
+    img.onload = () => {
+      spinner.style.display = 'none';
+      img.style.display = 'block';
+      timeEl.textContent = new Date().toLocaleTimeString('ro-RO');
+    };
+    img.onerror = () => {
+      spinner.style.display = 'none';
+      errEl.style.display = 'flex';
+      errTxt.textContent = 'Imagine invalidă';
+    };
+    img.src = objUrl;
+  })
+  .catch(e => {
+    spinner.style.display = 'none';
+    errEl.style.display = 'flex';
+    errTxt.textContent = camStatus === 'err' ? 'Camera offline' : (e.message || 'Eroare conexiune');
+  });
+}
+
+// Close
+qs('#snap-modal-x').addEventListener('click', () => {
+  qs('#snap-modal').classList.add('hidden');
+  qs('#snap-modal-img').src = '';
+});
+qs('#snap-modal').addEventListener('click', e => {
+  if (e.target === qs('#snap-modal')) { qs('#snap-modal').classList.add('hidden'); qs('#snap-modal-img').src = ''; }
+});
+
+// Refresh
+qs('#snap-modal-refresh').addEventListener('click', () => {
+  const nvr = nvrs.find(n => n.id === snapState.nvrId);
+  if (nvr) loadSnapModal(nvr, snapState.ch);
+});
+
+// Prev / Next channel
+qs('#snap-modal-prev').addEventListener('click', () => {
+  const nvr = nvrs.find(n => n.id === snapState.nvrId);
+  if (!nvr) return;
+  const newCh = snapState.ch > 1 ? snapState.ch - 1 : nvr.channels;
+  snapState.ch = newCh;
+  loadSnapModal(nvr, newCh);
+});
+qs('#snap-modal-next').addEventListener('click', () => {
+  const nvr = nvrs.find(n => n.id === snapState.nvrId);
+  if (!nvr) return;
+  const newCh = snapState.ch < nvr.channels ? snapState.ch + 1 : 1;
+  snapState.ch = newCh;
+  loadSnapModal(nvr, newCh);
+});
+
+// Keyboard nav
+document.addEventListener('keydown', e => {
+  if (qs('#snap-modal').classList.contains('hidden')) return;
+  if (e.key === 'Escape') { qs('#snap-modal').classList.add('hidden'); qs('#snap-modal-img').src = ''; }
+  if (e.key === 'ArrowLeft')  qs('#snap-modal-prev').click();
+  if (e.key === 'ArrowRight') qs('#snap-modal-next').click();
+  if (e.key === 'r' || e.key === 'R') qs('#snap-modal-refresh').click();
+});
+
+// Click pe ch-cell din NVR card
+document.addEventListener('click', e => {
+  const cell = e.target.closest('.ch-cell');
+  if (!cell) return;
+  const card = cell.closest('[data-nid]');
+  if (!card) return;
+  const nvrId = parseInt(card.dataset.nid);
+  const txt = cell.textContent.replace(/[^0-9]/g,'');
+  const ch = parseInt(txt);
+  if (!ch || !nvrId) return;
+  openSnapModal(nvrId, ch);
+});
 
 function applyTheme(t) {
   if (t) document.documentElement.dataset.theme = t;
