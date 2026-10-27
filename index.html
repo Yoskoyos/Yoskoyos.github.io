@@ -629,6 +629,23 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   </main>
 </div>
 
+<!-- Login modal -->
+<div class="overlay" id="login-modal" style="z-index:200;background:rgba(0,0,0,.85)">
+  <div class="modal" style="max-width:360px;width:90vw">
+    <div style="padding:28px 28px 24px;display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="width:44px;height:44px;border:1.5px solid var(--accent);border-radius:8px;display:grid;place-items:center;margin-bottom:8px">
+        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="var(--accent)" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01"/><circle cx="18" cy="12" r="2"/></svg>
+      </div>
+      <div style="font-family:var(--mono);font-weight:700;font-size:15px;letter-spacing:.04em">YCA CCTV Monitor</div>
+      <div style="font-size:12px;color:var(--fg-2);margin-bottom:16px">Autentifică-te pentru a continua</div>
+      <input class="form-input" id="lm-user" type="text" placeholder="Utilizator" autocomplete="username" style="width:100%;margin-bottom:10px">
+      <input class="form-input" id="lm-pass" type="password" placeholder="Parolă" autocomplete="current-password" style="width:100%;margin-bottom:14px">
+      <button class="btn primary" id="lm-btn" style="width:100%;height:40px;font-size:14px">Intră</button>
+      <div id="lm-err" style="font-size:12px;color:var(--err);min-height:18px;margin-top:4px"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Snapshot modal -->
 <div class="overlay hidden" id="snap-modal">
   <div class="modal" style="max-width:720px;width:95vw">
@@ -1941,11 +1958,53 @@ async function authChangePassword() {
   }
 }
 
+// ── Login modal la start ──────────────────────────────────────────────
+async function loginModalSubmit() {
+  const username = qs('#lm-user').value.trim();
+  const password = qs('#lm-pass').value;
+  const errEl    = qs('#lm-err');
+  const btn      = qs('#lm-btn');
+  errEl.textContent = '';
+  if (!username || !password) { errEl.textContent = 'Completează datele'; return; }
+  btn.textContent = 'Se conectează...';
+  btn.disabled = true;
+  try {
+    const r = await fetch(getProxyBase() + '/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ username, password })
+    });
+    const data = await r.json();
+    if (!r.ok) { errEl.textContent = data.error || 'Date incorecte'; btn.textContent='Intră'; btn.disabled=false; return; }
+    saveAuth({ token: data.token, username: data.username });
+    qs('#lm-pass').value = '';
+    qs('#login-modal').classList.add('hidden');
+    renderAuthUI();
+    toast('Bun venit, ' + data.username + '!', 'ok');
+    await authDownloadConfig();
+  } catch(e) {
+    errEl.textContent = 'Eroare conexiune la server';
+    btn.textContent = 'Intră'; btn.disabled = false;
+  }
+}
+
+qs('#lm-btn').addEventListener('click', loginModalSubmit);
+qs('#lm-user').addEventListener('keydown', e => { if(e.key==='Enter') qs('#lm-pass').focus(); });
+qs('#lm-pass').addEventListener('keydown', e => { if(e.key==='Enter') loginModalSubmit(); });
+
+// Arată/ascunde login modal
+if (getAuth()) {
+  qs('#login-modal').classList.add('hidden');
+} else {
+  // deja vizibil, focus pe user
+  setTimeout(() => qs('#lm-user').focus(), 100);
+}
+
 // Event listeners auth
 qs('#auth-login-btn').addEventListener('click', authLogin);
 qs('#auth-username').addEventListener('keydown', e=>{ if(e.key==='Enter') qs('#auth-password').focus(); });
 qs('#auth-password').addEventListener('keydown', e=>{ if(e.key==='Enter') authLogin(); });
-qs('#auth-logout-btn').addEventListener('click', ()=>{ clearAuth(); renderAuthUI(); toast('Deconectat','ok'); });
+qs('#auth-logout-btn').addEventListener('click', ()=>{ clearAuth(); renderAuthUI(); qs('#login-modal').classList.remove('hidden'); setTimeout(()=>qs('#lm-user').focus(),100); toast('Deconectat','ok'); });
 qs('#auth-upload-btn').addEventListener('click', authUploadConfig);
 qs('#auth-download-btn').addEventListener('click', authDownloadConfig);
 qs('#auth-change-pass-btn').addEventListener('click', authChangePassword);
