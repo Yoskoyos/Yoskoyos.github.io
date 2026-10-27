@@ -579,9 +579,49 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
         </div>
       </div>
 
+      <div class="settings-section">
+        <div class="settings-section-title">Cont &amp; sincronizare</div>
+        <div id="auth-logged-out">
+          <div style="padding:12px 0;color:var(--fg-2);font-size:13px">Nu ești autentificat. Autentifică-te pentru a salva configurația pe server și a o accesa de pe orice dispozitiv.</div>
+          <div class="form-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+            <div class="form-label">Utilizator</div>
+            <input class="form-input" id="auth-username" type="text" placeholder="admin" autocomplete="username" style="width:100%;max-width:300px">
+          </div>
+          <div class="form-row" style="flex-direction:column;align-items:flex-start;gap:8px;margin-top:8px">
+            <div class="form-label">Parolă</div>
+            <input class="form-input" id="auth-password" type="password" placeholder="••••••••" autocomplete="current-password" style="width:100%;max-width:300px">
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+            <button class="btn primary" id="auth-login-btn">Autentifică-te</button>
+            <span id="auth-login-err" style="font-size:12px;color:var(--err)"></span>
+          </div>
+        </div>
+        <div id="auth-logged-in" style="display:none">
+          <div class="form-row" style="margin-bottom:8px">
+            <div>
+              <div class="form-label">Autentificat ca</div>
+              <div class="form-hint" id="auth-user-display" style="color:var(--ok)">—</div>
+            </div>
+            <button class="btn sm" id="auth-logout-btn">Deconectare</button>
+          </div>
+          <div class="form-row" style="gap:8px;margin-bottom:8px">
+            <button class="btn sm primary" id="auth-upload-btn">⬆ Salvează config pe server</button>
+            <button class="btn sm" id="auth-download-btn">⬇ Restaurează config</button>
+          </div>
+          <div class="form-row" style="flex-direction:column;align-items:flex-start;gap:8px;margin-top:8px">
+            <div class="form-label">Schimbă parola</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <input class="form-input" id="auth-new-pass" type="password" placeholder="Parolă nouă" style="width:160px">
+              <button class="btn sm" id="auth-change-pass-btn">Schimbă</button>
+              <span id="auth-pass-msg" style="font-size:12px"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div style="text-align:center;padding:20px;font-size:10px;color:var(--fg-3);font-family:var(--mono)">
         YCA Solutions CCTV Monitor v2.0 · Hikvision ISAPI<br>
-        Date stocate local pe acest dispozitiv
+        <span id="footer-sync-status">Date stocate local pe acest dispozitiv</span>
       </div>
     </div>
 
@@ -1615,6 +1655,158 @@ function toast(msg, type){
    UTILS
 ═══════════════════════════════════════ */
 function qs(sel){ return document.querySelector(sel); }
+
+function applyTheme(t) {
+  if (t) document.documentElement.dataset.theme = t;
+  else delete document.documentElement.dataset.theme;
+  try { qs('#s-theme').value = t||''; } catch {}
+}
+
+/* ═══════════════════════════════════════
+   AUTH & CONFIG SYNC
+═══════════════════════════════════════ */
+const AUTH_KEY = 'yca_auth_v1';
+
+function getAuth() {
+  try { return JSON.parse(localStorage.getItem(AUTH_KEY)) || null; } catch { return null; }
+}
+function saveAuth(data) {
+  try { localStorage.setItem(AUTH_KEY, JSON.stringify(data)); } catch {}
+}
+function clearAuth() {
+  try { localStorage.removeItem(AUTH_KEY); } catch {}
+}
+
+function getProxyBase() {
+  return (cfg.proxyUrl || 'https://proxy.supraveghere24h.ro').replace(/\/$/, '');
+}
+
+function renderAuthUI() {
+  const auth = getAuth();
+  const loggedOut = qs('#auth-logged-out');
+  const loggedIn  = qs('#auth-logged-in');
+  const footer    = qs('#footer-sync-status');
+  if (auth && auth.token) {
+    loggedOut.style.display = 'none';
+    loggedIn.style.display  = '';
+    qs('#auth-user-display').textContent = auth.username;
+    if (footer) footer.textContent = `Sincronizat ca ${auth.username}`;
+  } else {
+    loggedOut.style.display = '';
+    loggedIn.style.display  = 'none';
+    if (footer) footer.textContent = 'Date stocate local pe acest dispozitiv';
+  }
+}
+
+async function authLogin() {
+  const username = qs('#auth-username').value.trim();
+  const password = qs('#auth-password').value;
+  const errEl    = qs('#auth-login-err');
+  errEl.textContent = '';
+  if (!username || !password) { errEl.textContent = 'Completează utilizatorul și parola'; return; }
+  try {
+    const r = await fetch(getProxyBase() + '/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ username, password })
+    });
+    const data = await r.json();
+    if (!r.ok) { errEl.textContent = data.error || 'Eroare autentificare'; return; }
+    saveAuth({ token: data.token, username: data.username });
+    qs('#auth-password').value = '';
+    renderAuthUI();
+    toast('Autentificat ✓', 'ok');
+    // Auto-descarcă config după login
+    await authDownloadConfig();
+  } catch(e) {
+    errEl.textContent = 'Eroare conexiune la server';
+  }
+}
+
+async function authUploadConfig() {
+  const auth = getAuth();
+  if (!auth) { toast('Nu ești autentificat', 'err'); return; }
+  const payload = {
+    nvrs:   nvrs,
+    creds:  creds,
+    alerts: alerts,
+    log:    logEntries,
+    cfg:    cfg,
+  };
+  try {
+    const r = await fetch(getProxyBase() + '/config', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+auth.token},
+      body: JSON.stringify(payload)
+    });
+    if (r.status === 401) { clearAuth(); renderAuthUI(); toast('Sesiune expirată, reconnectează-te','err'); return; }
+    if (!r.ok) throw new Error('Server error');
+    toast('Configurație salvată pe server ✓', 'ok');
+  } catch(e) {
+    toast('Eroare la salvare: ' + e.message, 'err');
+  }
+}
+
+async function authDownloadConfig() {
+  const auth = getAuth();
+  if (!auth) { toast('Nu ești autentificat', 'err'); return; }
+  try {
+    const r = await fetch(getProxyBase() + '/config', {
+      headers: {'Authorization':'Bearer '+auth.token}
+    });
+    if (r.status === 401) { clearAuth(); renderAuthUI(); toast('Sesiune expirată, reconnectează-te','err'); return; }
+    if (!r.ok) throw new Error('Server error');
+    const data = await r.json();
+    if (!data || !data.nvrs) { toast('Nu există config salvată pe server','warn'); return; }
+    // Restaurează
+    nvrs       = data.nvrs       || [];
+    creds      = data.creds      || {};
+    alerts     = data.alerts     || [];
+    logEntries = data.log        || [];
+    cfg        = { interval:60, notif:false, hddThresh:85, theme:'', tgToken:'', tgChatId:'', tgEnabled:false, proxyUrl:'https://proxy.supraveghere24h.ro', soundEnabled:true, dailyReport:false, dailyReportTime:'08:00', ...(data.cfg||{}) };
+    save(SK.nvrs, nvrs); save(SK.creds, creds); save(SK.alerts, alerts); save(SK.log, logEntries); save(SK.cfg, cfg);
+    nextId = Math.max(0, ...nvrs.map(n=>n.id)) + 1;
+    renderAll(); renderAlerts(); renderLog(); updateAlertBadge();
+    applyTheme(cfg.theme);
+    toast('Configurație restaurată ✓', 'ok');
+    addLog('ok', 'Config restaurată din server');
+  } catch(e) {
+    toast('Eroare la restaurare: ' + e.message, 'err');
+  }
+}
+
+async function authChangePassword() {
+  const auth = getAuth();
+  if (!auth) return;
+  const pass = qs('#auth-new-pass').value;
+  const msgEl = qs('#auth-pass-msg');
+  if (!pass || pass.length < 4) { msgEl.style.color='var(--err)'; msgEl.textContent='Minim 4 caractere'; return; }
+  try {
+    const r = await fetch(getProxyBase() + '/auth/change-password', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+auth.token},
+      body: JSON.stringify({ password: pass })
+    });
+    if (!r.ok) throw new Error();
+    qs('#auth-new-pass').value = '';
+    msgEl.style.color='var(--ok)'; msgEl.textContent='Parolă schimbată ✓';
+    setTimeout(()=>{ msgEl.textContent=''; }, 3000);
+  } catch {
+    msgEl.style.color='var(--err)'; msgEl.textContent='Eroare';
+  }
+}
+
+// Event listeners auth
+qs('#auth-login-btn').addEventListener('click', authLogin);
+qs('#auth-username').addEventListener('keydown', e=>{ if(e.key==='Enter') qs('#auth-password').focus(); });
+qs('#auth-password').addEventListener('keydown', e=>{ if(e.key==='Enter') authLogin(); });
+qs('#auth-logout-btn').addEventListener('click', ()=>{ clearAuth(); renderAuthUI(); toast('Deconectat','ok'); });
+qs('#auth-upload-btn').addEventListener('click', authUploadConfig);
+qs('#auth-download-btn').addEventListener('click', authDownloadConfig);
+qs('#auth-change-pass-btn').addEventListener('click', authChangePassword);
+
+// Render auth UI on load
+renderAuthUI();
 
 /* ═══════════════════════════════════════
    INIT
