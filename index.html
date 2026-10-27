@@ -799,14 +799,13 @@ function checkNvr(nvr){
     const { user, pass } = getNvrCreds(nvr);
     const base = `http://${nvr.ip}:${nvr.port}`;
     const proxy = (cfg.proxyUrl || 'https://yca-nvr-proxy.dima-florin1987.workers.dev').replace(/\/$/, '');
-    const authHeader = { 'Authorization': 'Basic ' + btoa(user + ':' + pass) };
-
-    // Helper: fetch through Cloudflare Worker proxy (bypasses HTTPS mixed-content block)
+    // Helper: fetch through proxy — credentials embedded in URL (works with VPS proxy + Cloudflare Worker)
     function proxyFetch(path, timeoutMs = 8000) {
       const ctrl = new AbortController();
       const tid = setTimeout(() => ctrl.abort(), timeoutMs);
-      const url = `${proxy}/?url=${encodeURIComponent(base + path)}`;
-      return fetch(url, { signal: ctrl.signal, headers: authHeader })
+      const authBase = `http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${nvr.ip}:${nvr.port}`;
+      const url = `${proxy}/?url=${encodeURIComponent(authBase + path)}`;
+      return fetch(url, { signal: ctrl.signal })
         .finally(() => clearTimeout(tid));
     }
 
