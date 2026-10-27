@@ -1747,6 +1747,7 @@ function loadSnapModal(nvr, ch) {
     const objUrl = URL.createObjectURL(blob);
     img.onload = () => {
       spinner.style.display = 'none';
+      errEl.style.display = 'none';
       img.style.display = 'block';
       timeEl.textContent = new Date().toLocaleTimeString('ro-RO');
     };
