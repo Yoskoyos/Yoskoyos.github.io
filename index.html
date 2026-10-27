@@ -948,6 +948,7 @@ function startMonitor(){
 
 function stopMonitor(){ if(monitorTimer){ clearInterval(monitorTimer); monitorTimer=null; } }
 
+const _checking = new Set();
 async function checkAll(){
   updateHdrStatus('checking');
   let hasErr = false, hasWarn = false;
@@ -955,7 +956,10 @@ async function checkAll(){
   for (const nvr of nvrs) {
     const idx = nvrs.findIndex(n=>n.id===nvr.id);
     const prevStatus = nvr.status;
+    if (_checking.has(nvr.id)) continue; // skip if previous check still running
+    _checking.add(nvr.id);
     const res = await checkNvr(nvr);
+    _checking.delete(nvr.id);
 
     nvrs[idx].lastSeen = res.online ? ts() : nvr.lastSeen;
     nvrs[idx].cams = res.cams;
