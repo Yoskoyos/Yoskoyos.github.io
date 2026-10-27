@@ -1148,6 +1148,9 @@ function nvrCardHTML(n, showDetail){
   </div>`;
 }
 
+// Live refresh timers per cell: key = "nvrId-ch", value = intervalId
+const _liveTimers = {};
+
 function loadChThumbs(container){
   const proxy = (cfg.proxyUrl||'https://proxy.supraveghere24h.ro').replace(/\/$/,'');
   if (!proxy) return;
@@ -1158,10 +1161,40 @@ function loadChThumbs(container){
     const nvr = nvrs.find(n=>n.id===nvrId);
     if (!nvr) return;
     const ch = parseInt(cell.dataset.nch);
+    const key = nvrId+'-'+ch;
     const {user, pass} = getNvrCreds(nvr);
-    const snapUrl = `${proxy}?url=${encodeURIComponent('http://'+encodeURIComponent(user)+':'+encodeURIComponent(pass)+'@'+nvr.ip+':'+nvr.port+'/ISAPI/Streaming/channels/'+ch+'01/picture?t='+Date.now())}`;
-    // remove existing label text, inject img + label
-    cell.innerHTML = `<img class="ch-thumb" src="${snapUrl}" onerror="this.remove()"><span class="ch-lbl">CH${ch}</span>`;
+    const baseUrl = 'http://'+encodeURIComponent(user)+':'+encodeURIComponent(pass)+'@'+nvr.ip+':'+nvr.port+'/ISAPI/Streaming/channels/'+ch+'01/picture';
+
+    function refreshCell(){
+      if (!document.body.contains(cell)) { clearInterval(_liveTimers[key]); delete _liveTimers[key]; return; }
+      const snapUrl = `${proxy}?url=${encodeURIComponent(baseUrl+'?t='+Date.now())}`;
+      const img = new Image();
+      img.className = 'ch-thumb';
+      img.onload = () => {
+        if (!document.body.contains(cell)) return;
+        // first time: build structure
+        if (!cell.querySelector('img.ch-thumb')) {
+          cell.innerHTML = '';
+          const lbl = document.createElement('span'); lbl.className='ch-lbl'; lbl.textContent='CH'+ch;
+          cell.appendChild(img); cell.appendChild(lbl);
+        } else {
+          cell.querySelector('img.ch-thumb').src = img.src;
+        }
+      };
+      img.onerror = () => {
+        if (!cell.querySelector('img.ch-thumb')) {
+          cell.classList.remove('ok'); cell.classList.add('none');
+          cell.innerHTML = `<span style="font-size:7px;color:var(--fg-3);text-align:center;line-height:1.3">No<br>Camera</span>`;
+          clearInterval(_liveTimers[key]); delete _liveTimers[key];
+        }
+      };
+      img.src = snapUrl;
+    }
+
+    // stop any previous timer for this cell
+    if (_liveTimers[key]) { clearInterval(_liveTimers[key]); delete _liveTimers[key]; }
+    refreshCell();
+    _liveTimers[key] = setInterval(refreshCell, 2500);
   });
 }
 
