@@ -1761,13 +1761,44 @@ function qs(sel){ return document.querySelector(sel); }
    SNAPSHOT MODAL
 ═══════════════════════════════════════ */
 let snapState = { nvrId: null, ch: null };
+let _modalLiveTimer = null;
+
+function stopModalLive() {
+  if (_modalLiveTimer) { clearInterval(_modalLiveTimer); _modalLiveTimer = null; }
+}
 
 function openSnapModal(nvrId, ch) {
   const nvr = nvrs.find(n => n.id === nvrId);
   if (!nvr) return;
+  stopModalLive();
   snapState = { nvrId, ch };
   qs('#snap-modal').classList.remove('hidden');
   loadSnapModal(nvr, ch);
+  // Auto-refresh la 2.5s cât timp modalul e deschis
+  _modalLiveTimer = setInterval(() => {
+    if (qs('#snap-modal').classList.contains('hidden')) { stopModalLive(); return; }
+    const n = nvrs.find(x => x.id === snapState.nvrId);
+    if (n) loadSnapModalSilent(n, snapState.ch);
+  }, 2500);
+}
+
+// Refresh silențios (fără spinner, înlocuiește imaginea direct)
+function loadSnapModalSilent(nvr, ch) {
+  const img   = qs('#snap-modal-img');
+  const timeEl = qs('#snap-modal-time');
+  const { user, pass } = getNvrCreds(nvr);
+  const proxy = (cfg.proxyUrl || 'https://proxy.supraveghere24h.ro').replace(/\/$/, '');
+  const nvrBase = `http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${nvr.ip}:${nvr.port}`;
+  const url = `${proxy}?url=${encodeURIComponent(nvrBase+'/ISAPI/Streaming/channels/'+ch+'01/picture?t='+Date.now())}`;
+  fetch(url).then(async r => {
+    if (!r.ok) return;
+    const blob = await r.blob();
+    if (!blob.size || !blob.type.startsWith('image/')) return;
+    const objUrl = URL.createObjectURL(blob);
+    const tmp = new Image();
+    tmp.onload = () => { img.src = objUrl; timeEl.textContent = new Date().toLocaleTimeString('ro-RO'); };
+    tmp.src = objUrl;
+  }).catch(()=>{});
 }
 
 function loadSnapModal(nvr, ch) {
@@ -1823,11 +1854,12 @@ function loadSnapModal(nvr, ch) {
 
 // Close
 qs('#snap-modal-x').addEventListener('click', () => {
+  stopModalLive();
   qs('#snap-modal').classList.add('hidden');
   qs('#snap-modal-img').src = '';
 });
 qs('#snap-modal').addEventListener('click', e => {
-  if (e.target === qs('#snap-modal')) { qs('#snap-modal').classList.add('hidden'); qs('#snap-modal-img').src = ''; }
+  if (e.target === qs('#snap-modal')) { stopModalLive(); qs('#snap-modal').classList.add('hidden'); qs('#snap-modal-img').src = ''; }
 });
 
 // Refresh
@@ -1855,7 +1887,7 @@ qs('#snap-modal-next').addEventListener('click', () => {
 // Keyboard nav
 document.addEventListener('keydown', e => {
   if (qs('#snap-modal').classList.contains('hidden')) return;
-  if (e.key === 'Escape') { qs('#snap-modal').classList.add('hidden'); qs('#snap-modal-img').src = ''; }
+  if (e.key === 'Escape') { stopModalLive(); qs('#snap-modal').classList.add('hidden'); qs('#snap-modal-img').src = ''; }
   if (e.key === 'ArrowLeft')  qs('#snap-modal-prev').click();
   if (e.key === 'ArrowRight') qs('#snap-modal-next').click();
   if (e.key === 'r' || e.key === 'R') qs('#snap-modal-refresh').click();
