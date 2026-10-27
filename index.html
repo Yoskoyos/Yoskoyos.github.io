@@ -906,20 +906,16 @@ function checkNvr(nvr){
         // Wait for all parallel requests, then build cams[] from InputProxy data
         await Promise.allSettled([sysPromise, ipPromise, recPromise, hddPromise]);
 
-        // Build cams[] from InputProxy per-channel status (already parsed into result.realOnlineCams)
-        // Re-parse ipXml per channel for individual ok/err — re-fetch avoided by storing per-ch data in ipPromise
-        // Instead: mark all channels as ok/err based on snapshot fallback for grid colors
-        // Use a single fast probe per channel via HEAD-like snap (already have realOnlineCams count)
-        // Simplest: build cams[] from InputProxy inline data stored during ipPromise
-        if (result._ipPerCh) {
-          for (let ch = 1; ch <= total; ch++) {
+        // Build cams[] from InputProxy per-channel data
+        for (let ch = 1; ch <= total; ch++) {
+          if (result._ipPerCh && ch in result._ipPerCh) {
             result.cams[ch - 1] = result._ipPerCh[ch] ? 'ok' : 'err';
+          } else {
+            // InputProxy didn't return this channel — default ok (NVR is alive)
+            result.cams[ch - 1] = 'ok';
           }
-          delete result._ipPerCh;
-        } else {
-          // fallback: mark all as ok if NVR responded
-          for (let ch = 1; ch <= total; ch++) result.cams[ch - 1] = result.cams[ch-1] || 'err';
         }
+        delete result._ipPerCh;
 
         resolve(result);
 
