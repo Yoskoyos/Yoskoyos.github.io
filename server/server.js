@@ -639,7 +639,7 @@ const server = http.createServer(async (req, res) => {
       const conf = ctx.db.configs[ctx.user.username] || {};
       const list = (conf.nvrs || []).map(n => {
         const st = monState.nvr[ctx.user.username + ':' + n.id] || {};
-        return { id: n.id, name: n.name, status: st.status || 'unknown', camsOk: st.camsOk ?? null, camsTotal: st.camsTotal ?? null, lastCheck: st.lastCheck || null, since: st.since || null };
+        return { id: n.id, name: n.name, status: st.status || 'unknown', camsOk: st.camsOk != null ? st.camsOk : null, camsTotal: st.camsTotal != null ? st.camsTotal : null, lastCheck: st.lastCheck || null, since: st.since || null };
       });
       return sendJson(res, 200, { enabled: MONITOR_ENABLED, lastRun: monLastRun, telegram: !!(conf.cfg && conf.cfg.tgEnabled && conf.cfg.tgToken && conf.cfg.tgChatId), nvrs: list });
     }
