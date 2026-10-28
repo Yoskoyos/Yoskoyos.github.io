@@ -505,6 +505,8 @@ html:not(.unlocked) .app{display:none}
 .acct-pass .btn{align-self:flex-start}
 .acct-msg{font-size:12px;min-height:0;color:var(--fg-2)}
 .acct-msg.ok{color:var(--ok)}.acct-msg.err{color:var(--err)}
+.mon-note{justify-content:flex-start!important;flex-direction:row!important;align-items:flex-start!important;gap:12px;background:var(--ok-dim)}
+.mon-dot{width:10px;height:10px;border-radius:50%;background:var(--ok);margin-top:4px;flex-shrink:0;box-shadow:0 0 0 4px rgba(34,197,94,.18)}
 .ls-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:10px;color:var(--fg-3);padding:0 4px}
 .ls-lock{display:inline-flex;align-items:center;gap:5px}
 @media (prefers-reduced-motion: reduce){.ls-card.shake{animation:none}.ls-spin{animation-duration:1.6s}}
@@ -704,6 +706,13 @@ html:not(.unlocked) .app{display:none}
 
       <div class="settings-section">
         <div class="settings-section-title">Telegram Alertă</div>
+        <div class="form-row mon-note" id="s-monitor-note" hidden>
+          <div class="mon-dot" aria-hidden="true"></div>
+          <div>
+            <div class="form-label">Monitorizare 24/7 pe server — activă</div>
+            <div class="form-hint" id="s-monitor-hint">Serverul verifică NVR-urile în fiecare minut și trimite alertele pe Telegram, chiar dacă aplicația e închisă.</div>
+          </div>
+        </div>
         <div class="form-row">
           <div>
             <div class="form-label">Bot Token</div>
@@ -1053,7 +1062,10 @@ const SK = {
 };
 
 function load(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def; }catch{ return def; } }
-function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch{} }
+function save(key, val){
+  try{ localStorage.setItem(key, JSON.stringify(val)); }catch{}
+  if (key === SK.nvrs || key === SK.creds || key === SK.cfg) { try { markSettingsChanged(); } catch {} }
+}
 
 /* ═══════════════════════════════════════
    STATE
@@ -1997,13 +2009,14 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     if (tab.dataset.tab === 'snapshots'){ renderSnapSelect(); loadSnaps(); }
     if (tab.dataset.tab === 'dashboard') setTimeout(()=>loadChThumbs(qs('#dash-nvr-list')), 0);
     if (tab.dataset.tab === 'nvrs')      setTimeout(()=>loadChThumbs(qs('#nvr-list')), 0);
+    if (tab.dataset.tab === 'settings' && serverMonitors()) refreshMonitorHint();
   });
 });
 
 /* ═══════════════════════════════════════
    RAPORT ZILNIC TELEGRAM
 ═══════════════════════════════════════ */
-function sendDailyReport(){
+function sendDailyReport(force){
   if (!cfg.tgEnabled || !cfg.tgToken || !cfg.tgChatId) return;
   const online  = nvrs.filter(n=>n.status==='online').length;
   const offline = nvrs.filter(n=>n.status==='offline').length;
@@ -2019,7 +2032,8 @@ function sendDailyReport(){
     const icon = n.status==='online'?'🟢':n.status==='offline'?'🔴':'🟡';
     lines.push(`${icon} ${n.name} — ${n.status.toUpperCase()} · ${n.activeCams||0}/${n.totalCamsChecked||n.channels} cam`);
   });
-  sendTelegram(lines.join('\n'));
+  if (serverMonitors() && !force) return;   // raportul zilnic îl trimite serverul
+  sendTelegram(lines.join('\n'), force);
   addLog('info', 'Raport zilnic trimis pe Telegram');
 }
 
@@ -2042,10 +2056,11 @@ function pushNotif(title, body){
   try { new Notification('⚠ ' + title, { body, tag:'yca-alert', renotify:true }); } catch{}
 }
 
-async function sendTelegram(text){
+async function sendTelegram(text, force){
   const token = cfg.tgToken;
   const chatId = cfg.tgChatId;
   if (!token || !chatId || !cfg.tgEnabled) return;
+  if (serverMonitors() && !force) return;   // alertele pleacă de pe server, 24/7 — evităm mesajele duble
   try {
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
@@ -2201,7 +2216,7 @@ qs('#s-daily-time').addEventListener('change', e=>{
 });
 qs('#s-tg-daily-report').addEventListener('click', ()=>{
   if (!cfg.tgEnabled || !cfg.tgToken || !cfg.tgChatId){ toast('Activează Telegram mai întâi','err'); return; }
-  sendDailyReport(); toast('Raport trimis ✓','ok');
+  sendDailyReport(true); toast('Raport trimis ✓','ok');
 });
 
 // PWA Service Worker
@@ -2560,6 +2575,8 @@ async function authDownloadConfig(opts) {
     logEntries = data.log        || [];
     cfg        = { interval:60, notif:false, hddThresh:85, theme:'', tgToken:'', tgChatId:'', tgEnabled:false, proxyUrl:'https://proxy.supraveghere24h.ro', soundEnabled:true, dailyReport:false, dailyReportTime:'08:00', ...(data.cfg||{}) };
     save(SK.nvrs, nvrs); save(SK.creds, creds); save(SK.alerts, alerts); save(SK.log, logEntries); save(SK.cfg, cfg);
+    try { localStorage.setItem(SYNC_MTIME_KEY, String(Number(data.updatedAt) || 0)); } catch {}
+    _settingsSig = JSON.stringify(settingsPayload());
     nextId = Math.max(0, ...nvrs.map(n=>n.id)) + 1;
     renderAll(); renderAlerts(); renderLog(); updateAlertBadge();
     applyTheme(cfg.theme);
@@ -2575,6 +2592,70 @@ function setMsg(el, text, kind) {
   el.textContent = text || '';
 }
 
+/* ── Monitorizare pe server + sincronizare automată a setărilor ── */
+const SYNC_MTIME_KEY = 'yca_settings_mtime';
+function serverMonitors(){ const a = getAuth(); return !!(a && a.monitor); }
+function renderMonitorNote(){ const el = qs('#s-monitor-note'); if (el) el.hidden = !serverMonitors(); }
+async function refreshMonitorHint(){
+  const auth = getAuth(); if (!auth) return;
+  try {
+    const r = await fetch(getProxyBase() + '/monitor', { headers: { 'Authorization': 'Bearer ' + auth.token } });
+    if (!r.ok) return;
+    const d = await readJsonSafe(r);
+    const hint = qs('#s-monitor-hint'); if (!hint) return;
+    const n = (d.nvrs || []).length;
+    const last = d.lastRun ? new Date(d.lastRun).toLocaleTimeString('ro-RO', { hour:'2-digit', minute:'2-digit' }) : '—';
+    hint.textContent = `Serverul verifică ${n} NVR-uri în fiecare minut (ultima verificare: ${last}) și trimite alertele pe Telegram, chiar dacă aplicația e închisă.` +
+      (d.telegram ? '' : ' ⚠ Telegram nu e configurat — completează Token și Chat ID mai jos.');
+  } catch {}
+}
+// Setările care contează pentru server (fără starea live a NVR-urilor)
+function settingsPayload(){
+  return {
+    nvrs: nvrs.map(n => ({ id: n.id, name: n.name, ip: n.ip, port: n.port, channels: n.channels, location: n.location || '' })),
+    creds, cfg,
+  };
+}
+let _settingsSig = null, _syncTimer = null;
+function markSettingsChanged(){
+  const sig = JSON.stringify(settingsPayload());
+  if (_settingsSig === null) { _settingsSig = sig; return; }   // prima dată: doar reținem
+  if (sig === _settingsSig) return;                               // s-a schimbat doar starea live
+  _settingsSig = sig;
+  try { localStorage.setItem(SYNC_MTIME_KEY, String(Date.now())); } catch {}
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(pushSettings, 1500);
+}
+async function pushSettings(){
+  const auth = getAuth(); if (!auth) return false;
+  let t = 0; try { t = Number(localStorage.getItem(SYNC_MTIME_KEY)) || 0; } catch {}
+  try {
+    const r = await fetch(getProxyBase() + '/config', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + auth.token },
+      body: JSON.stringify({ ...settingsPayload(), updatedAt: t || Date.now() })
+    });
+    if (r.status === 401) { sessionExpired(); return false; }
+    return r.ok;
+  } catch { return false; }   // fără internet: se reîncearcă la următoarea modificare / pornire
+}
+// La pornire: dacă setările locale sunt mai noi decât cele de pe server (sau serverul nu are nimic), le trimitem
+async function reconcileSettings(){
+  const auth = getAuth(); if (!auth) return;
+  try {
+    const r = await fetch(getProxyBase() + '/config', { headers: { 'Authorization': 'Bearer ' + auth.token } });
+    if (!r.ok) return;
+    const d = await readJsonSafe(r);
+    let localT = 0; try { localT = Number(localStorage.getItem(SYNC_MTIME_KEY)) || 0; } catch {}
+    const serverT = Number(d.updatedAt) || 0;
+    const serverHas = Array.isArray(d.nvrs) && d.nvrs.length > 0;
+    if (!nvrs.length) return;                                   // nu suprascriem serverul cu o listă goală
+    if (!serverHas || localT > serverT || (!localT && !serverT)) {
+      if (await pushSettings()) { addLog('info', 'Setările NVR au fost trimise serverului (monitorizare 24/7)'); refreshMonitorHint(); }
+    }
+  } catch {}
+}
+
 // Datele contului (email, rol) de la server
 async function refreshMe() {
   const auth = getAuth();
@@ -2585,8 +2666,10 @@ async function refreshMe() {
     if (!r.ok) return null;
     const d = await readJsonSafe(r);
     if (d.username) {
-      saveAuth({ token: auth.token, username: d.username, role: d.role, email: d.email || '', mail: d.mail }, auth.remember);
+      saveAuth({ token: auth.token, username: d.username, role: d.role, email: d.email || '', mail: d.mail, monitor: !!d.monitor }, auth.remember);
       renderAuthUI();
+      renderMonitorNote();
+      if (d.monitor) refreshMonitorHint();
     }
     return d;
   } catch { return null; }
@@ -2705,7 +2788,7 @@ async function loginScreenSubmit(e) {
   qs('#ls-pass').value = '';
   await authDownloadConfig({ silent: true });
   unlockApp();
-  refreshMe();
+  refreshMe().then(() => reconcileSettings());
   toast('Bun venit, ' + (res.data.username || username) + '!', 'ok');
 }
 
@@ -2799,7 +2882,8 @@ async function bootAuth() {
   if (!auth) { lockApp(); return; }
   unlockApp();
   const me = await refreshMe();          // fără internet → rămânem logați local
-  if (me === 401) sessionExpired();
+  if (me === 401) { sessionExpired(); return; }
+  if (me) reconcileSettings();
 }
 
 // Event listeners auth (Setări)
@@ -2817,6 +2901,8 @@ qs('#auth-email').addEventListener('keydown', e=>{ if(e.key==='Enter') authSaveE
    INIT
 ═══════════════════════════════════════ */
 function startApp() {
+  _settingsSig = JSON.stringify(settingsPayload());
+  renderMonitorNote();
   renderAlerts();
   updateAlertBadge();
   renderLog();
