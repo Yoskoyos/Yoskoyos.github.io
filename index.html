@@ -2175,7 +2175,7 @@ function sendDailyReport(force){
     const icon = n.status==='online'?'🟢':n.status==='offline'?'🔴':'🟡';
     lines.push(`${icon} ${n.name} — ${n.status.toUpperCase()} · ${n.activeCams||0}/${n.totalCamsChecked||n.channels} cam`);
   });
-  if (serverMonitors() && !force) return;   // raportul zilnic îl trimite serverul
+  if (!force) return;   // raportul zilnic automat îl trimite serverul
   sendTelegram(lines.join('\n'), force);
   addLog('info', 'Raport zilnic trimis pe Telegram');
 }
@@ -2203,7 +2203,7 @@ async function sendTelegram(text, force){
   const token = cfg.tgToken;
   const chatId = cfg.tgChatId;
   if (!token || !chatId || !cfg.tgEnabled) return;
-  if (serverMonitors() && !force) return;   // alertele pleacă de pe server, 24/7 — evităm mesajele duble
+  if (!force) return;   // alertele automate pleacă DOAR de pe server (24/7, cu confirmare); aplicația trimite doar testele manuale
   try {
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
