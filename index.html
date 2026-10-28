@@ -284,6 +284,14 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .modal-x{width:28px;height:28px;border-radius:50%;background:var(--bg-3);border:1px solid var(--border);color:var(--fg-2);display:grid;place-items:center;cursor:pointer}
 .modal-body{padding:20px;display:flex;flex-direction:column;gap:14px;max-height:70vh;overflow-y:auto}
 .modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px}
+.btn.danger{background:var(--err);border-color:var(--err);color:#fff;font-weight:700}
+.btn.danger:hover{background:#dc2626;border-color:#dc2626}
+.cf-modal{max-width:380px}
+.cf-body{padding:26px 22px 20px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px}
+.cf-icon{width:52px;height:52px;border-radius:50%;background:var(--err-dim);color:var(--err);display:grid;place-items:center;margin-bottom:6px}
+.cf-title{font-size:16px;font-weight:700;color:var(--fg)}
+.cf-text{font-size:13px;line-height:1.55;color:var(--fg-2)}
+.cf-text b{color:var(--fg);font-weight:600}
 
 /* ── Toast ── */
 #toast-wrap{position:fixed;top:calc(env(safe-area-inset-top,0px) + 64px);left:50%;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
@@ -896,6 +904,23 @@ html:not(.unlocked) .app{display:none}
   </div>
 </div>
 
+<!-- Confirm modal -->
+<div class="overlay hidden" id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+  <div class="modal cf-modal">
+    <div class="cf-body">
+      <div class="cf-icon" aria-hidden="true">
+        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      </div>
+      <div class="cf-title" id="confirm-title">Ești sigur?</div>
+      <div class="cf-text" id="confirm-text"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="confirm-cancel" type="button">Anulează</button>
+      <button class="btn danger" id="confirm-ok" type="button">Șterge</button>
+    </div>
+  </div>
+</div>
+
 <!-- Snapshot modal -->
 <div class="overlay hidden" id="snap-modal">
   <div class="modal" style="max-width:720px;width:95vw">
@@ -1469,7 +1494,7 @@ function nvrCardHTML(n, showDetail){
         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
         Web UI
       </button>
-      <button class="nvr-btn danger nvr-del-btn" data-nid="${n.id}">
+      <button class="nvr-btn danger nvr-del-btn" data-nid="${n.id}" title="Șterge NVR" aria-label="Șterge NVR">
         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
       </button>
     </div>
@@ -1575,14 +1600,23 @@ function bindNvrActions(container){
     });
   });
   container.querySelectorAll('.nvr-del-btn').forEach(btn => {
-    btn.addEventListener('click', e => {
+    btn.addEventListener('click', async e => {
       e.stopPropagation();
       const nid = parseInt(btn.dataset.nid);
-      nvrs = nvrs.filter(n=>n.id!==nid);
+      const n = nvrs.find(x=>x.id===nid);
+      if (!n) return;
+      const ok = await confirmDialog({
+        title: 'Ștergi acest NVR?',
+        html: `<b>${escapeHtml(n.name)}</b><br>${escapeHtml(n.ip)}:${escapeHtml(n.port)}${n.location ? ' · ' + escapeHtml(n.location) : ''}<br><br>NVR-ul va fi șters din aplicație, împreună cu credențialele lui. Acțiunea nu poate fi anulată.`,
+        okLabel: 'Da, șterge',
+      });
+      if (!ok) return;
+      nvrs = nvrs.filter(x=>x.id!==nid);
       delete creds[nid];
       save(SK.nvrs, nvrs); save(SK.creds, creds);
       renderAll();
-      toast('NVR șters', 'info');
+      addLog('warn', `NVR șters: <b>${escapeHtml(n.name)}</b> (${escapeHtml(n.ip)}:${escapeHtml(n.port)})`);
+      toast(`NVR „${n.name}” șters`, 'info');
     });
   });
 }
@@ -2087,6 +2121,44 @@ function toast(msg, type){
    UTILS
 ═══════════════════════════════════════ */
 function qs(sel){ return document.querySelector(sel); }
+function escapeHtml(v){ return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// Fereastră de confirmare (returnează true/false). Implicit focus pe „Anulează”.
+function confirmDialog({ title = 'Ești sigur?', html = '', okLabel = 'Confirmă', cancelLabel = 'Anulează' } = {}) {
+  return new Promise(resolve => {
+    const ov = qs('#confirm-modal'), okB = qs('#confirm-ok'), noB = qs('#confirm-cancel');
+    const prevFocus = document.activeElement;
+    qs('#confirm-title').textContent = title;
+    qs('#confirm-text').innerHTML = html;
+    okB.textContent = okLabel;
+    noB.textContent = cancelLabel;
+    ov.classList.remove('hidden');
+    setTimeout(() => noB.focus(), 30);
+    const done = val => {
+      ov.classList.add('hidden');
+      okB.removeEventListener('click', onOk);
+      noB.removeEventListener('click', onNo);
+      ov.removeEventListener('click', onBg);
+      document.removeEventListener('keydown', onKey, true);
+      try { prevFocus && prevFocus.focus(); } catch {}
+      resolve(val);
+    };
+    const onOk = () => done(true);
+    const onNo = () => done(false);
+    const onBg = e => { if (e.target === ov) done(false); };
+    const onKey = e => {
+      if (e.key === 'Escape') { e.stopPropagation(); done(false); }
+      if (e.key === 'Tab') { // ține focusul în fereastră
+        e.preventDefault();
+        (document.activeElement === noB ? okB : noB).focus();
+      }
+    };
+    okB.addEventListener('click', onOk);
+    noB.addEventListener('click', onNo);
+    ov.addEventListener('click', onBg);
+    document.addEventListener('keydown', onKey, true);
+  });
+}
 
 /* ═══════════════════════════════════════
    SNAPSHOT MODAL
