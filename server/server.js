@@ -28,7 +28,7 @@ const MAX_BODY       = 5 * 1024 * 1024;   // 5 MB (config sincronizată)
 const MIN_PASS_LEN   = 6;
 const MAIL_FILE      = path.join(BASE_DIR, 'mail.json');
 const RESET_TTL_MS   = 30 * 60 * 1000;     // linkul de resetare e valabil 30 minute
-const DEFAULT_APP_URL = 'https://yoskoyos.github.io/';
+const DEFAULT_APP_URL = 'https://app.supraveghere24h.ro/';
 
 /* ───────────── Secret JWT (generat o singură dată, nu stă în cod) ───────────── */
 function loadSecret() {
