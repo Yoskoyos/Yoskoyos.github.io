@@ -456,6 +456,20 @@ html:not(.unlocked) .app{display:none}
 .ls-btn.busy .ls-spin{display:block}
 @keyframes ls-rot{to{transform:rotate(360deg)}}
 .ls-err{min-height:18px;font-size:12.5px;color:var(--err);text-align:center;line-height:1.4}
+.ls-link{align-self:center;background:none;border:0;color:var(--fg-2);font-family:var(--sans);font-size:13px;cursor:pointer;padding:6px 8px;border-radius:6px;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--border-2)}
+.ls-link:hover{color:var(--accent);text-decoration-color:currentColor}
+.ls-mode-title{font-size:15px;font-weight:700;color:var(--fg);text-align:center}
+.ls-mode-text{font-size:13px;line-height:1.5;color:var(--fg-2);text-align:center;margin:-6px 0 2px}
+.ls-err.ok{color:var(--ok)}
+.acct-block{flex-direction:column;align-items:stretch!important;gap:10px}
+.acct-head{display:flex;flex-direction:column}
+.acct-line{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.acct-line .form-input{flex:1;min-width:200px;max-width:320px;width:auto}
+.acct-pass{display:flex;flex-direction:column;gap:8px;max-width:320px}
+.acct-pass .form-input{width:100%}
+.acct-pass .btn{align-self:flex-start}
+.acct-msg{font-size:12px;min-height:0;color:var(--fg-2)}
+.acct-msg.ok{color:var(--ok)}.acct-msg.err{color:var(--err)}
 .ls-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:10px;color:var(--fg-3);padding:0 4px}
 .ls-lock{display:inline-flex;align-items:center;gap:5px}
 @media (prefers-reduced-motion: reduce){.ls-card.shake{animation:none}.ls-spin{animation-duration:1.6s}}
@@ -773,19 +787,36 @@ html:not(.unlocked) .app{display:none}
             <button class="btn sm primary" id="auth-upload-btn">⬆ Salvează config pe server</button>
             <button class="btn sm" id="auth-download-btn">⬇ Restaurează config</button>
           </div>
-          <div class="form-row" style="flex-direction:column;align-items:flex-start;gap:8px;margin-top:8px">
-            <div class="form-label">Schimbă parola</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-              <input class="form-input" id="auth-new-pass" type="password" placeholder="Parolă nouă" style="width:160px">
-              <button class="btn sm" id="auth-change-pass-btn">Schimbă</button>
-              <span id="auth-pass-msg" style="font-size:12px"></span>
+          <div class="form-row acct-block">
+            <div class="acct-head">
+              <div class="form-label">Email pentru resetarea parolei</div>
+              <div class="form-hint">Dacă uiți parola, primești aici un link de resetare</div>
             </div>
+            <div class="acct-line">
+              <input class="form-input" id="auth-email" type="email" inputmode="email" autocomplete="email" placeholder="nume@exemplu.ro">
+              <button class="btn sm" id="auth-email-btn">Salvează</button>
+            </div>
+            <div class="acct-msg" id="auth-email-msg"></div>
+          </div>
+          <div class="form-row acct-block">
+            <div class="acct-head">
+              <div class="form-label">Schimbă parola</div>
+              <div class="form-hint">Minim 6 caractere. Celelalte dispozitive vor fi delogate.</div>
+            </div>
+            <form class="acct-pass" id="auth-pass-form" autocomplete="on" novalidate>
+              <input type="text" name="username" autocomplete="username" id="auth-pass-user" hidden>
+              <input class="form-input" id="auth-cur-pass" type="password" autocomplete="current-password" placeholder="Parola actuală">
+              <input class="form-input" id="auth-new-pass" type="password" autocomplete="new-password" placeholder="Parola nouă">
+              <input class="form-input" id="auth-new-pass2" type="password" autocomplete="new-password" placeholder="Confirmă parola nouă">
+              <button class="btn sm primary" id="auth-change-pass-btn" type="submit">Schimbă parola</button>
+            </form>
+            <div class="acct-msg" id="auth-pass-msg"></div>
           </div>
         </div>
       </div>
 
       <div style="text-align:center;padding:20px;font-size:10px;color:var(--fg-3);font-family:var(--mono)">
-        YCA Solutions CCTV Monitor v3.0 · Hikvision ISAPI<br>
+        YCA Solutions CCTV Monitor v3.1 · Hikvision ISAPI<br>
         <span id="footer-sync-status">Date stocate local pe acest dispozitiv</span>
       </div>
     </div>
@@ -827,6 +858,35 @@ html:not(.unlocked) .app{display:none}
         </label>
         <button id="ls-btn" class="ls-btn" type="submit"><span class="ls-btn-txt">Intră în cont</span><span class="ls-spin" aria-hidden="true"></span></button>
         <div id="ls-err" class="ls-err" role="alert" aria-live="polite"></div>
+        <button type="button" class="ls-link" id="ls-to-forgot">Ai uitat parola?</button>
+      </form>
+
+      <form id="ls-forgot" class="ls-form" novalidate hidden>
+        <div class="ls-mode-title">Resetează parola</div>
+        <p class="ls-mode-text">Scrie utilizatorul sau emailul contului. Îți trimitem pe mail un link valabil 30 de minute.</p>
+        <label class="ls-field">
+          <span>Utilizator sau email</span>
+          <input id="ls-f-login" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ex. admin">
+        </label>
+        <button id="ls-f-btn" class="ls-btn" type="submit"><span class="ls-btn-txt">Trimite linkul</span><span class="ls-spin" aria-hidden="true"></span></button>
+        <div id="ls-f-msg" class="ls-err" role="alert" aria-live="polite"></div>
+        <button type="button" class="ls-link" data-ls-back>← Înapoi la autentificare</button>
+      </form>
+
+      <form id="ls-reset" class="ls-form" novalidate hidden>
+        <div class="ls-mode-title">Parolă nouă</div>
+        <p class="ls-mode-text">Alege o parolă nouă pentru contul tău (minim 6 caractere).</p>
+        <label class="ls-field">
+          <span>Parola nouă</span>
+          <input id="ls-r-pass" type="password" autocomplete="new-password" placeholder="••••••••">
+        </label>
+        <label class="ls-field">
+          <span>Confirmă parola</span>
+          <input id="ls-r-pass2" type="password" autocomplete="new-password" placeholder="••••••••">
+        </label>
+        <button id="ls-r-btn" class="ls-btn" type="submit"><span class="ls-btn-txt">Salvează parola</span><span class="ls-spin" aria-hidden="true"></span></button>
+        <div id="ls-r-msg" class="ls-err" role="alert" aria-live="polite"></div>
+        <button type="button" class="ls-link" data-ls-back>← Înapoi la autentificare</button>
       </form>
     </div>
     <div class="ls-foot">
@@ -2225,6 +2285,15 @@ function renderAuthUI() {
     loggedIn.style.display  = '';
     qs('#auth-user-display').textContent = auth.username + (auth.role === 'admin' ? ' · administrator' : '');
     if (footer) footer.textContent = `Sincronizat ca ${auth.username}`;
+    const em = qs('#auth-email');
+    if (em && document.activeElement !== em) em.value = auth.email || '';
+    qs('#auth-pass-user').value = auth.username || '';
+    const emMsg = qs('#auth-email-msg');
+    if (emMsg && !emMsg.dataset.sticky) {
+      if (auth.mail === false) { emMsg.className = 'acct-msg'; emMsg.textContent = 'Trimiterea mailurilor nu e încă configurată pe server.'; }
+      else if (!auth.email) { emMsg.className = 'acct-msg'; emMsg.textContent = 'Fără email setat nu poți reseta parola dacă o uiți.'; }
+      else emMsg.textContent = '';
+    }
   } else {
     loggedOut.style.display = '';
     loggedIn.style.display  = 'none';
@@ -2316,26 +2385,82 @@ async function authDownloadConfig(opts) {
   }
 }
 
-async function authChangePassword() {
+function setMsg(el, text, kind) {
+  el.className = el.className.replace(/\b(ok|err)\b/g, '').trim() + (kind ? ' ' + kind : '');
+  el.textContent = text || '';
+}
+
+// Datele contului (email, rol) de la server
+async function refreshMe() {
+  const auth = getAuth();
+  if (!auth) return null;
+  try {
+    const r = await fetch(getProxyBase() + '/auth/me', { headers: { 'Authorization': 'Bearer ' + auth.token } });
+    if (r.status === 401) return 401;
+    if (!r.ok) return null;
+    const d = await readJsonSafe(r);
+    if (d.username) {
+      saveAuth({ token: auth.token, username: d.username, role: d.role, email: d.email || '', mail: d.mail }, auth.remember);
+      renderAuthUI();
+    }
+    return d;
+  } catch { return null; }
+}
+
+async function authSaveEmail() {
   const auth = getAuth();
   if (!auth) return;
+  const email = qs('#auth-email').value.trim();
+  const msgEl = qs('#auth-email-msg');
+  msgEl.dataset.sticky = '1';
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { setMsg(msgEl, 'Adresă de email invalidă', 'err'); return; }
+  try {
+    const r = await fetch(getProxyBase() + '/auth/email', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+auth.token},
+      body: JSON.stringify({ email })
+    });
+    if (r.status === 401) { sessionExpired(); return; }
+    const data = await readJsonSafe(r);
+    if (!r.ok) throw new Error(data.error || 'Eroare la salvare');
+    saveAuth({ ...auth, email }, auth.remember);
+    setMsg(msgEl, email ? 'Email salvat ✓' : 'Email șters', 'ok');
+  } catch(e) {
+    setMsg(msgEl, e.message === 'Failed to fetch' ? 'Nu mă pot conecta la server' : e.message, 'err');
+  }
+  setTimeout(() => { delete msgEl.dataset.sticky; }, 4000);
+}
+
+async function authChangePassword(e) {
+  if (e) e.preventDefault();
+  const auth = getAuth();
+  if (!auth) return;
+  const cur  = qs('#auth-cur-pass').value;
   const pass = qs('#auth-new-pass').value;
+  const pass2 = qs('#auth-new-pass2').value;
   const msgEl = qs('#auth-pass-msg');
-  if (!pass || pass.length < 6) { msgEl.style.color='var(--err)'; msgEl.textContent='Minim 6 caractere'; return; }
+  const btn = qs('#auth-change-pass-btn');
+  if (!cur)                 { setMsg(msgEl, 'Introdu parola actuală', 'err'); qs('#auth-cur-pass').focus(); return; }
+  if (pass.length < 6)      { setMsg(msgEl, 'Parola nouă trebuie să aibă minim 6 caractere', 'err'); qs('#auth-new-pass').focus(); return; }
+  if (pass !== pass2)       { setMsg(msgEl, 'Parolele noi nu coincid', 'err'); qs('#auth-new-pass2').focus(); return; }
+  btn.disabled = true;
   try {
     const r = await fetch(getProxyBase() + '/auth/change-password', {
       method: 'POST',
       headers: {'Content-Type':'application/json','Authorization':'Bearer '+auth.token},
-      body: JSON.stringify({ password: pass })
+      body: JSON.stringify({ oldPassword: cur, password: pass, remember: auth.remember })
     });
     if (r.status === 401) { sessionExpired(); return; }
     const data = await readJsonSafe(r);
     if (!r.ok) throw new Error(data.error || 'Eroare');
-    qs('#auth-new-pass').value = '';
-    msgEl.style.color='var(--ok)'; msgEl.textContent='Parolă schimbată ✓';
-    setTimeout(()=>{ msgEl.textContent=''; }, 3000);
-  } catch(e) {
-    msgEl.style.color='var(--err)'; msgEl.textContent = e.message || 'Eroare';
+    if (data.token) saveAuth({ ...auth, token: data.token }, auth.remember);
+    ['#auth-cur-pass','#auth-new-pass','#auth-new-pass2'].forEach(id => qs(id).value = '');
+    setMsg(msgEl, 'Parolă schimbată ✓ Celelalte dispozitive vor cere din nou autentificarea.', 'ok');
+    toast('Parolă schimbată ✓', 'ok');
+  } catch(err) {
+    setMsg(msgEl, err.message === 'Failed to fetch' ? 'Nu mă pot conecta la server' : err.message, 'err');
+  } finally {
+    btn.disabled = false;
   }
 }
 
@@ -2348,9 +2473,10 @@ function lockApp(message) {
   stopMonitor();
   document.documentElement.classList.remove('unlocked');
   qs('#login-screen').hidden = false;
+  setLsMode('login');
+  qs('#ls-err').className = 'ls-err';
   qs('#ls-err').textContent = message || '';
   qs('#ls-checking').hidden = true;
-  qs('#ls-form').hidden = false;
   let last = '';
   try { last = localStorage.getItem(LAST_USER_KEY) || ''; } catch {}
   if (last && !qs('#ls-user').value) qs('#ls-user').value = last;
@@ -2394,6 +2520,7 @@ async function loginScreenSubmit(e) {
   qs('#ls-pass').value = '';
   await authDownloadConfig({ silent: true });
   unlockApp();
+  refreshMe();
   toast('Bun venit, ' + (res.data.username || username) + '!', 'ok');
 }
 
@@ -2408,19 +2535,86 @@ qs('#ls-eye').addEventListener('click', () => {
 });
 try { qs('#ls-logo').src = qs('#brand-logo').src; } catch {}
 
+// Moduri ecran login: login / forgot / reset
+let resetToken = null;
+function setLsMode(mode) {
+  qs('#ls-form').hidden   = mode !== 'login';
+  qs('#ls-forgot').hidden = mode !== 'forgot';
+  qs('#ls-reset').hidden  = mode !== 'reset';
+  const focusEl = mode === 'forgot' ? '#ls-f-login' : mode === 'reset' ? '#ls-r-pass' : null;
+  if (focusEl) setTimeout(() => qs(focusEl).focus(), 60);
+}
+qs('#ls-to-forgot').addEventListener('click', () => {
+  qs('#ls-f-login').value = qs('#ls-user').value.trim();
+  setMsg(qs('#ls-f-msg'), '');
+  setLsMode('forgot');
+});
+document.querySelectorAll('[data-ls-back]').forEach(b => b.addEventListener('click', () => {
+  resetToken = null;
+  setLsMode('login');
+  setTimeout(() => (qs('#ls-user').value ? qs('#ls-pass') : qs('#ls-user')).focus(), 60);
+}));
+
+async function postJson(path, body) {
+  const r = await fetch(getProxyBase() + path, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  return { r, data: await readJsonSafe(r) };
+}
+
+qs('#ls-forgot').addEventListener('submit', async e => {
+  e.preventDefault();
+  const login = qs('#ls-f-login').value.trim();
+  const msg = qs('#ls-f-msg'), btn = qs('#ls-f-btn');
+  if (!login) { setMsg(msg, 'Scrie utilizatorul sau emailul', 'err'); return; }
+  btn.disabled = true; btn.classList.add('busy');
+  try {
+    const { r, data } = await postJson('/auth/forgot', { login });
+    if (!r.ok) setMsg(msg, data.error || 'Eroare server', 'err');
+    else setMsg(msg, data.message || 'Verifică-ți emailul.', 'ok');
+  } catch { setMsg(msg, 'Nu mă pot conecta la server. Verifică internetul.', 'err'); }
+  btn.disabled = false; btn.classList.remove('busy');
+});
+
+qs('#ls-reset').addEventListener('submit', async e => {
+  e.preventDefault();
+  const p1 = qs('#ls-r-pass').value, p2 = qs('#ls-r-pass2').value;
+  const msg = qs('#ls-r-msg'), btn = qs('#ls-r-btn');
+  if (p1.length < 6) { setMsg(msg, 'Parola trebuie să aibă minim 6 caractere', 'err'); return; }
+  if (p1 !== p2)     { setMsg(msg, 'Parolele nu coincid', 'err'); return; }
+  btn.disabled = true; btn.classList.add('busy');
+  try {
+    const { r, data } = await postJson('/auth/reset', { token: resetToken, password: p1 });
+    if (!r.ok) { setMsg(msg, data.error || 'Eroare server', 'err'); }
+    else {
+      resetToken = null;
+      clearAuth(); renderAuthUI();
+      qs('#ls-r-pass').value = qs('#ls-r-pass2').value = '';
+      if (data.username) qs('#ls-user').value = data.username;
+      lockApp();
+      setMsg(qs('#ls-err'), 'Parola a fost schimbată ✓ Acum te poți autentifica.', 'ok');
+    }
+  } catch { setMsg(msg, 'Nu mă pot conecta la server. Verifică internetul.', 'err'); }
+  btn.disabled = false; btn.classList.remove('busy');
+});
+
+// Link din mail: ?reset=<token>
+try {
+  const u = new URL(location.href);
+  const t = u.searchParams.get('reset');
+  if (t) {
+    resetToken = t;
+    u.searchParams.delete('reset');
+    history.replaceState(null, '', u.pathname + (u.search || '') + u.hash);
+  }
+} catch {}
+
 // La pornire: dacă există sesiune o folosim imediat și o verificăm în fundal
 async function bootAuth() {
+  if (resetToken) { lockApp(); setLsMode('reset'); return; }
   const auth = getAuth();
   if (!auth) { lockApp(); return; }
   unlockApp();
-  try {
-    const r = await fetch(getProxyBase() + '/auth/me', { headers: { 'Authorization': 'Bearer ' + auth.token } });
-    if (r.status === 401) { sessionExpired(); return; }
-    if (r.ok) {
-      const d = await readJsonSafe(r);
-      if (d.username) { saveAuth({ token: auth.token, username: d.username, role: d.role }, auth.remember); renderAuthUI(); }
-    }
-  } catch { /* fără internet — rămânem logați local */ }
+  const me = await refreshMe();          // fără internet → rămânem logați local
+  if (me === 401) sessionExpired();
 }
 
 // Event listeners auth (Setări)
@@ -2430,7 +2624,9 @@ qs('#auth-password').addEventListener('keydown', e=>{ if(e.key==='Enter') authLo
 qs('#auth-logout-btn').addEventListener('click', ()=>{ clearAuth(); renderAuthUI(); lockApp(); toast('Deconectat','ok'); });
 qs('#auth-upload-btn').addEventListener('click', authUploadConfig);
 qs('#auth-download-btn').addEventListener('click', ()=>authDownloadConfig());
-qs('#auth-change-pass-btn').addEventListener('click', authChangePassword);
+qs('#auth-pass-form').addEventListener('submit', authChangePassword);
+qs('#auth-email-btn').addEventListener('click', authSaveEmail);
+qs('#auth-email').addEventListener('keydown', e=>{ if(e.key==='Enter') authSaveEmail(); });
 
 /* ═══════════════════════════════════════
    INIT
@@ -2440,7 +2636,7 @@ function startApp() {
   updateAlertBadge();
   renderLog();
   renderAll();
-  addLog('info', 'Aplicație pornită — YCA CCTV Monitor v3');
+  addLog('info', 'Aplicație pornită — YCA CCTV Monitor v3.1');
   if (cfg.dailyReport) scheduleDailyReport();
   startMonitor();
 }
