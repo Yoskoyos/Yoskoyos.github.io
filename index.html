@@ -439,6 +439,87 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   .nvr-btn{font-size:13px;padding:13px 8px}
 }
 
+/* ── Rezumat stare (Dashboard) ── */
+.dash-sum{border-radius:var(--r);margin-bottom:14px;border:1px solid var(--border);background:var(--bg-1);overflow:hidden}
+.dash-sum:empty{display:none}
+.dash-sum.ok,.dash-sum.info{display:flex;align-items:center;gap:12px;padding:14px 16px}
+.dash-sum.ok{background:var(--ok-dim);border-color:rgba(34,197,94,.35)}
+.dash-sum.info{background:var(--blue-dim);border-color:rgba(59,130,246,.3)}
+.dash-sum.bad{background:var(--err-dim);border-color:rgba(239,68,68,.35)}
+.sum-ic{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;color:#fff}
+.dash-sum.ok .sum-ic{background:var(--ok)}.dash-sum.info .sum-ic{background:var(--blue)}.dash-sum.bad .sum-ic{background:var(--err)}
+.sum-title{font-size:15px;font-weight:700;color:var(--fg)}
+.sum-sub{font-size:12px;color:var(--fg-2);margin-top:2px}
+.sum-head{display:flex;align-items:center;gap:12px;padding:12px 16px 4px}
+.sum-list{display:flex;flex-direction:column;padding:2px 8px 8px}
+.sum-row{display:flex;align-items:center;gap:9px;width:100%;padding:11px 8px;border:0;background:transparent;border-radius:8px;text-align:left;font-family:var(--sans);font-size:13px;color:var(--fg-2);cursor:pointer}
+.sum-row b{color:var(--fg);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:48%;flex-shrink:0}
+.sum-row .sum-txt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sum-row:hover,.sum-row:focus-visible{background:rgba(239,68,68,.1);outline:none}
+.sum-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--err)}.sum-dot.warn{background:var(--warn)}
+.sum-row svg{color:var(--fg-3);flex-shrink:0}
+.nvr-card.flash{animation:card-flash 1.4s ease}
+@keyframes card-flash{0%,45%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
+
+/* ── Navigare: iconițe doar pe telefon ── */
+.nav-ic{display:none}
+.lbl-s{display:none}
+
+/* ── Trage în jos pentru reîmprospătare ── */
+.ptr{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 64px);width:38px;height:38px;margin-left:-19px;border-radius:50%;
+  background:var(--bg-1);border:1px solid var(--border-2);box-shadow:0 6px 18px rgba(0,0,0,.18);display:grid;place-items:center;color:var(--fg-3);
+  opacity:0;pointer-events:none;z-index:70}
+.ptr.ready{color:var(--accent)}
+.ptr.spin svg{animation:ls-rot .8s linear infinite}
+
+/* ══════════ TELEFON ══════════ */
+@media(max-width:600px){
+  /* meniu jos, ca în aplicații */
+  .nav{position:fixed;left:0;right:0;bottom:0;z-index:60;display:flex;justify-content:space-around;overflow:visible;
+    padding:0 max(4px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(4px,env(safe-area-inset-left,0px));
+    border-top:1px solid var(--border);box-shadow:0 -8px 24px rgba(0,0,0,.10);background:var(--bg-1)}
+  .nav-tab{flex:1 1 0;min-width:0;flex-direction:column;justify-content:center;gap:3px;height:60px;padding:6px 0 5px;
+    font-size:10.5px;font-weight:600;letter-spacing:0;text-transform:none;border-bottom:0;border-top:2px solid transparent;position:relative}
+  .nav-tab.on{border-top-color:var(--accent);border-bottom-color:transparent}
+  .nav-ic{display:block}
+  .lbl-l{display:none}.lbl-s{display:inline}
+  .nav-tab .badge{position:absolute;top:5px;left:calc(50% + 5px);min-width:17px;height:17px;font-size:9.5px;border:2px solid var(--bg-1)}
+  .main{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px))}
+  #toast-wrap{top:calc(env(safe-area-inset-top,0px) + 56px)}
+
+  /* statistici compacte pe un rând */
+  .status-bar{grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px}
+  .stat-card{padding:10px 8px 9px;border-radius:10px}
+  .stat-num{font-size:22px;margin-bottom:4px}
+  .stat-label{font-size:8.5px;letter-spacing:.03em;line-height:1.25}
+
+  /* camere: miniaturi mari, fără canalele goale */
+  .ch-grid{grid-template-columns:repeat(3,1fr)!important;gap:5px}
+  .badge-x{display:none}
+  .nvr-name{white-space:normal;overflow-wrap:anywhere;line-height:1.25}
+  .ch-cell{border-radius:6px}
+  .ch-cell.free{display:none}
+  .ch-cell .ch-lbl{font-size:10px;bottom:3px;left:4px}
+  .ch-cell.ok,.ch-cell.err{font-size:11px}
+
+  /* imagine cameră pe tot ecranul */
+  #snap-modal{padding:0;align-items:stretch}
+  #snap-modal .modal{max-width:none!important;width:100vw!important;height:100%;border-radius:0;border:0;display:flex;flex-direction:column}
+  #snap-modal .modal-hdr{padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px;gap:8px}
+  #snap-modal .modal-title{font-size:14px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #snap-modal .snap-stage{flex:1;min-height:0}
+  #snap-modal-refresh{font-size:0!important;width:42px;height:40px;padding:0!important}
+  #snap-modal-refresh::before{content:"↻";font-size:20px;line-height:1}
+  #snap-modal-prev,#snap-modal-next{width:40px;height:40px;padding:0!important;font-size:20px!important}
+  #snap-modal .modal-x{width:40px;height:40px;font-size:16px;flex-shrink:0}
+  #snap-modal #snap-modal-img{max-height:none!important;height:100%}
+  #snap-modal .snap-stage::after{content:"← glisează pentru canalul următor →";position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:11px;color:rgba(255,255,255,.55);pointer-events:none}
+}
+@media(max-width:360px){
+  .nav-tab{font-size:9.5px}
+  .stat-label{font-size:7.5px}
+}
+
 /* ── Ecran de login ── */
 html:not(.unlocked) .app{display:none}
 #login-screen{position:fixed;inset:0;z-index:290;display:flex;overflow-y:auto;background:var(--bg);
@@ -540,12 +621,12 @@ html:not(.unlocked) .app{display:none}
     </div>
    </div>
    <nav class="nav">
-    <div class="nav-tab on" data-tab="dashboard">Dashboard</div>
-    <div class="nav-tab" data-tab="nvrs">NVR-uri</div>
-    <div class="nav-tab" data-tab="snapshots">Snapshots</div>
-    <div class="nav-tab" data-tab="alerts">Alerte <span class="badge" id="alert-badge" style="display:none">0</span></div>
-    <div class="nav-tab" data-tab="log">Jurnal</div>
-    <div class="nav-tab" data-tab="settings">Setări</div>
+    <div class="nav-tab on" data-tab="dashboard"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span class="lbl-l">Dashboard</span><span class="lbl-s">Acasă</span></div>
+    <div class="nav-tab" data-tab="nvrs"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01"/><circle cx="18" cy="12" r="2"/></svg><span class="lbl-l">NVR-uri</span><span class="lbl-s">NVR-uri</span></div>
+    <div class="nav-tab" data-tab="snapshots"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg><span class="lbl-l">Snapshots</span><span class="lbl-s">Camere</span></div>
+    <div class="nav-tab" data-tab="alerts"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg><span class="lbl-l">Alerte</span><span class="lbl-s">Alerte</span> <span class="badge" id="alert-badge" style="display:none">0</span></div>
+    <div class="nav-tab" data-tab="log"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span class="lbl-l">Jurnal</span><span class="lbl-s">Jurnal</span></div>
+    <div class="nav-tab" data-tab="settings"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span class="lbl-l">Setări</span><span class="lbl-s">Setări</span></div>
    </nav>
   </header>
 
@@ -554,6 +635,7 @@ html:not(.unlocked) .app{display:none}
 
     <!-- ── Dashboard ── -->
     <div class="panel on" id="panel-dashboard">
+      <div class="dash-sum" id="dash-summary" aria-live="polite"></div>
       <div class="status-bar" id="stat-bar">
         <div class="stat-card ok"><div class="stat-num" id="s-online">—</div><div class="stat-label">NVR Online</div></div>
         <div class="stat-card err"><div class="stat-num" id="s-offline">—</div><div class="stat-label">NVR Offline</div></div>
@@ -983,7 +1065,7 @@ html:not(.unlocked) .app{display:none}
         <div class="modal-x" id="snap-modal-x">✕</div>
       </div>
     </div>
-    <div style="background:#000;position:relative;min-height:200px;display:flex;align-items:center;justify-content:center">
+    <div class="snap-stage" id="snap-modal-stage" style="background:#000;position:relative;min-height:200px;display:flex;align-items:center;justify-content:center">
       <img id="snap-modal-img" src="" alt="snapshot" style="width:100%;max-height:70vh;object-fit:contain;display:block">
       <div id="snap-modal-spinner" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);font-size:12px;color:#fff;font-family:var(--mono)">Se încarcă...</div>
       <div id="snap-modal-err" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:8px;background:rgba(0,0,0,.8);color:var(--err);font-size:12px;font-family:var(--mono)">
@@ -1438,6 +1520,7 @@ async function checkAll(){
    RENDER
 ═══════════════════════════════════════ */
 function renderAll(){
+  renderSummary();
   renderStats();
   renderDashNvrs();
   renderNvrList();
@@ -1537,7 +1620,7 @@ function nvrCardHTML(n, showDetail){
         <div class="nvr-name">${n.name}</div>
         <div class="nvr-meta">${n.ip}:${n.port} · ${n.location||'—'}${camsArr.length && n.status!=='offline' ? ` · <span class="nvr-cams${offlineCams>0?' warn':''}">${activeCams}/${totalChecked} cam</span>` : ''}</div>
       </div>
-      <span class="nvr-badge ${n.status}" title="${n.status==='warning' ? offlineCams+' camere offline' : n.status==='offline' ? 'NVR nu răspunde' : ''}">${nvrStatusLabel(n.status)}${n.status==='warning'&&offlineCams>0?' · '+offlineCams+' cam offline':''}</span>
+      <span class="nvr-badge ${n.status}" title="${n.status==='warning' ? offlineCams+' camere offline' : n.status==='offline' ? 'NVR nu răspunde' : ''}">${nvrStatusLabel(n.status)}${n.status==='warning'&&offlineCams>0?`<span class="badge-x"> · ${offlineCams} cam offline</span>`:''}</span>
       <svg class="nvr-chev" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
       <button class="nvr-menu-btn" type="button" data-nid="${n.id}" aria-haspopup="menu" aria-label="Acțiuni NVR" title="Acțiuni">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
@@ -1622,10 +1705,56 @@ function loadChThumbs(container){
   });
 }
 
+// Rezumat sus pe Dashboard: „Totul funcționează” sau lista problemelor (atingi → deschide NVR-ul)
+const HDD_FINE = ['ok','idle','unknown','normal','sleep','standby'];
+function renderSummary(){
+  const el = qs('#dash-summary'); if (!el) return;
+  if (!nvrs.length) { el.className = 'dash-sum'; el.innerHTML = ''; return; }
+  if (nvrs.every(n => !n.status || n.status === 'unknown')) {
+    el.className = 'dash-sum info';
+    el.innerHTML = `<div class="sum-ic"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg></div><div><div class="sum-title">Se verifică NVR-urile…</div><div class="sum-sub">${nvrs.length} NVR-uri</div></div>`;
+    return;
+  }
+  const probs = [];
+  for (const n of nvrs) {
+    const camsArr = Array.isArray(n.cams) ? n.cams.slice(0, n.channels) : [];
+    const off = camsArr.filter(c => c === 'err').length;
+    const hddBad = (n.hdds || []).filter(h => !HDD_FINE.includes(h.status)).length;
+    if (n.status === 'offline') probs.push({ n, sev: 0, txt: 'NVR offline' });
+    else {
+      if (off) probs.push({ n, sev: 1, txt: off === 1 ? '1 cameră offline' : `${off} camere offline` });
+      if (hddBad) probs.push({ n, sev: 1, txt: hddBad === 1 ? 'HDD cu eroare' : `${hddBad} HDD-uri cu eroare` });
+    }
+  }
+  if (!probs.length) {
+    const cams = nvrs.reduce((s, n) => s + (n.activeCams || 0), 0);
+    el.className = 'dash-sum ok';
+    el.innerHTML = `<div class="sum-ic"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="sum-title">Totul funcționează</div><div class="sum-sub">${nvrs.length} NVR-uri · ${cams} camere active</div></div>`;
+    return;
+  }
+  probs.sort((a, b) => a.sev - b.sev);
+  el.className = 'dash-sum bad';
+  el.innerHTML = `<div class="sum-head"><div class="sum-ic"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.6"><path d="M12 8v5M12 16.5v.5"/></svg></div><div class="sum-title">${probs.length === 1 ? '1 problemă' : probs.length + ' probleme'}</div></div>
+    <div class="sum-list">${probs.map(p => `<button type="button" class="sum-row" data-nid="${p.n.id}"><span class="sum-dot ${p.sev ? 'warn' : ''}"></span><b>${escapeHtml(p.n.name)}</b><span class="sum-txt">${escapeHtml(p.txt)}</span><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button>`).join('')}</div>`;
+  el.querySelectorAll('.sum-row').forEach(b => b.addEventListener('click', () => focusNvr(parseInt(b.dataset.nid))));
+}
+function focusNvr(nid){
+  _openCards.add('dash-nvr-list:' + nid);
+  renderDashNvrs();
+  const card = qs(`#dash-nvr-list .nvr-card[data-nid="${nid}"]`);
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash');
+}
+// Pe Dashboard, NVR-urile cu probleme apar primele
+const STATUS_ORDER = { offline: 0, warning: 1, unknown: 2, online: 3 };
+const statusRank = n => (n.status in STATUS_ORDER ? STATUS_ORDER[n.status] : 2);
+
 function renderDashNvrs(){
   const el = qs('#dash-nvr-list');
   if (!nvrs.length) { el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--fg-3);font-size:12px">Niciun NVR configurat — mergi la tab-ul NVR-uri</div>'; return; }
-  el.innerHTML = nvrs.map(n => nvrCardHTML(n, _openCards.has('dash-nvr-list:'+n.id))).join('');
+  const ordered = nvrs.map((n, i) => [n, i]).sort((a, b) => statusRank(a[0]) - statusRank(b[0]) || a[1] - b[1]).map(x => x[0]);
+  el.innerHTML = ordered.map(n => nvrCardHTML(n, _openCards.has('dash-nvr-list:'+n.id))).join('');
   bindNvrActions(el);
   loadChThumbs(el);
 }
@@ -2399,21 +2528,70 @@ qs('#snap-modal-refresh').addEventListener('click', () => {
   if (nvr) loadSnapModal(nvr, snapState.ch);
 });
 
-// Prev / Next channel
-qs('#snap-modal-prev').addEventListener('click', () => {
+// Prev / Next channel (sare peste canalele fără cameră)
+function stepChannel(dir){
   const nvr = nvrs.find(n => n.id === snapState.nvrId);
   if (!nvr) return;
-  const newCh = snapState.ch > 1 ? snapState.ch - 1 : nvr.channels;
-  snapState.ch = newCh;
-  loadSnapModal(nvr, newCh);
-});
-qs('#snap-modal-next').addEventListener('click', () => {
-  const nvr = nvrs.find(n => n.id === snapState.nvrId);
-  if (!nvr) return;
-  const newCh = snapState.ch < nvr.channels ? snapState.ch + 1 : 1;
-  snapState.ch = newCh;
-  loadSnapModal(nvr, newCh);
-});
+  const total = nvr.channels || 1;
+  let ch = snapState.ch;
+  for (let i = 0; i < total; i++) {
+    ch = dir > 0 ? (ch < total ? ch + 1 : 1) : (ch > 1 ? ch - 1 : total);
+    if (!(Array.isArray(nvr.cams) && nvr.cams[ch - 1] === 'free')) break;
+  }
+  snapState.ch = ch;
+  loadSnapModal(nvr, ch);
+}
+qs('#snap-modal-prev').addEventListener('click', () => stepChannel(-1));
+qs('#snap-modal-next').addEventListener('click', () => stepChannel(1));
+// Glisare stânga / dreapta pe imagine (telefon)
+(() => {
+  const stage = qs('#snap-modal-stage');
+  let x0 = null, y0 = null;
+  stage.addEventListener('touchstart', e => { if (e.touches.length === 1) { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; } }, { passive: true });
+  stage.addEventListener('touchend', e => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+    x0 = y0 = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) stepChannel(dx < 0 ? 1 : -1);
+  }, { passive: true });
+})();
+
+// Trage în jos (pe telefon) pentru verificare imediată
+(() => {
+  const main = qs('.main');
+  const ind = document.createElement('div');
+  ind.className = 'ptr';
+  ind.innerHTML = '<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>';
+  document.body.appendChild(ind);
+  let y0 = null, pulling = false;
+  main.addEventListener('touchstart', e => { y0 = (main.scrollTop <= 0 && e.touches.length === 1) ? e.touches[0].clientY : null; pulling = false; }, { passive: true });
+  main.addEventListener('touchmove', e => {
+    if (y0 === null) return;
+    const dy = e.touches[0].clientY - y0;
+    if (dy <= 0 || main.scrollTop > 0) { if (pulling) { ind.style.opacity = 0; pulling = false; } return; }
+    pulling = true;
+    const d = Math.min(dy * 0.45, 80);
+    ind.style.transition = 'none';
+    ind.style.transform = `translateY(${d}px) rotate(${d * 4}deg)`;
+    ind.style.opacity = Math.min(d / 55, 1);
+    ind.classList.toggle('ready', d >= 60);
+  }, { passive: true });
+  main.addEventListener('touchend', () => {
+    if (!pulling) { y0 = null; return; }
+    const ready = ind.classList.contains('ready');
+    ind.style.transition = 'transform .3s, opacity .3s';
+    if (ready) {
+      ind.classList.add('spin');
+      ind.style.transform = 'translateY(40px)';
+      checkAll();
+      toast('Verificare în curs...', 'info');
+      setTimeout(() => { ind.classList.remove('spin', 'ready'); ind.style.opacity = 0; ind.style.transform = 'translateY(0)'; }, 1200);
+    } else {
+      ind.style.opacity = 0; ind.style.transform = 'translateY(0)';
+    }
+    y0 = null; pulling = false;
+  });
+})();
 
 // Keyboard nav
 document.addEventListener('keydown', e => {
@@ -2612,7 +2790,7 @@ async function refreshMonitorHint(){
 // Setările care contează pentru server (fără starea live a NVR-urilor)
 function settingsPayload(){
   return {
-    nvrs: nvrs.map(n => ({ id: n.id, name: n.name, ip: n.ip, port: n.port, channels: n.channels, location: n.location || '' })),
+    nvrs: nvrs.map(n => ({ id: n.id, name: n.name, ip: n.ip, port: n.port, channels: n.channels, location: n.location || '', seenCh: n.seenCh || {} })),
     creds, cfg,
   };
 }
