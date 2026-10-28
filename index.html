@@ -187,6 +187,13 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .ch-cell.ok{background:var(--ok-dim);color:var(--ok)}
 .ch-cell.err{background:var(--err-dim);color:var(--err)}
 .ch-cell.none{background:var(--bg-3);color:var(--fg-3)}
+.ch-cell.free{container-type:inline-size;cursor:default;color:var(--fg-3);border:1px dashed var(--border-2);
+  background:repeating-linear-gradient(135deg,transparent 0 7px,var(--bg-3) 7px 8px),var(--bg-2)}
+.ch-cell.free:hover{opacity:1}
+.ch-free{display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.15;text-align:center;padding:0 2px}
+.ch-free b{font-weight:700;color:var(--fg-2)}
+.ch-free span{font-family:var(--sans);font-size:9px;font-weight:600;letter-spacing:.02em}
+@container (max-width:60px){.ch-free span{display:none}}
 .ch-cell img.ch-thumb{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;border-radius:4px}
 .ch-cell .ch-lbl{position:absolute;bottom:2px;left:3px;font-size:7px;font-family:var(--mono);font-weight:700;color:#fff;text-shadow:0 0 4px #000,0 0 4px #000;pointer-events:none;z-index:1}
 
@@ -1215,12 +1222,17 @@ function checkNvr(nvr){
         // Wait for all parallel requests, then build cams[] from InputProxy data
         await Promise.allSettled([sysPromise, ipPromise, recPromise, hddPromise]);
 
-        // Build cams[] from InputProxy per-channel data
+        // Build cams[] from InputProxy per-channel data:
+        //   'ok' = cameră online, 'err' = cameră offline, 'free' = canal fără cameră adăugată
+        const ipKnown = result._ipPerCh && Object.keys(result._ipPerCh).length > 0;
         for (let ch = 1; ch <= total; ch++) {
-          if (result._ipPerCh && ch in result._ipPerCh) {
+          if (ipKnown && ch in result._ipPerCh) {
             result.cams[ch - 1] = result._ipPerCh[ch] ? 'ok' : 'err';
+          } else if (ipKnown) {
+            // NVR-ul a trimis lista camerelor, iar canalul ăsta nu e în ea → neconectat
+            result.cams[ch - 1] = 'free';
           } else {
-            // InputProxy didn't return this channel — default ok (NVR is alive)
+            // fără listă de la NVR (ex. DVR analogic / eroare) — presupunem ok
             result.cams[ch - 1] = 'ok';
           }
         }
@@ -1277,8 +1289,8 @@ async function checkAll(){
 
     if (res.online) {
       const activeCams = res.cams.filter(c=>c==='ok').length;
-      const totalCams  = res.cams.length;
-      const offlineCams = totalCams - activeCams;
+      const totalCams  = res.cams.filter(c=>c!=='free').length;   // doar canalele cu cameră
+      const offlineCams = res.cams.filter(c=>c==='err').length;
 
       // --- Recording status check ---
       const prevRec = nvr.rec || {};
@@ -1325,8 +1337,8 @@ async function checkAll(){
       nvrs[idx].totalCamsChecked = totalCams;
 
       if (prevStatus === 'offline' || prevStatus === 'unknown') {
-        addLog('ok', `<b>${nvr.name}</b> — revenit online (${activeCams}/${nvr.channels} camere active)`);
-        addAlert('info', nvr, `✅ NVR revenit online · ${activeCams}/${nvr.channels} camere active`, 'info');
+        addLog('ok', `<b>${nvr.name}</b> — revenit online (${activeCams}/${totalCams} camere active)`);
+        addAlert('info', nvr, `✅ NVR revenit online · ${activeCams}/${totalCams} camere active`, 'info');
       } else {
         // detectare schimbări per cameră (doar dacă NVR era deja online)
         const prevCams = nvr.cams || [];
@@ -1346,7 +1358,7 @@ async function checkAll(){
         if (offlineCams > 0) {
           hasWarn = true;
         } else {
-          addLog('ok', `<b>${nvr.name}</b> — OK (${activeCams}/${nvr.channels} camere active)`);
+          addLog('ok', `<b>${nvr.name}</b> — OK (${activeCams}/${totalCams} camere active)`);
         }
       }
     } else {
@@ -1399,8 +1411,10 @@ function nvrStatusLabel(s){
 
 function nvrCardHTML(n, showDetail){
   const activeCams = n.activeCams ?? 0;
-  const totalChecked = n.totalCamsChecked ?? n.channels;
-  const offlineCams = totalChecked - activeCams;
+  const camsArr = Array.isArray(n.cams) ? n.cams.slice(0, n.channels) : [];
+  const freeCount = camsArr.filter(c=>c==='free').length;
+  const totalChecked = camsArr.length ? camsArr.length - freeCount : (n.totalCamsChecked ?? n.channels);
+  const offlineCams = camsArr.length ? camsArr.filter(c=>c==='err').length : Math.max(0, totalChecked - activeCams);
   const hasWarn = n.status === 'warning';
   const { user } = getNvrCreds(n);
   const hasCreds = !!(creds[n.id]?.user);
@@ -1421,11 +1435,12 @@ function nvrCardHTML(n, showDetail){
         ? (recVal === true  ? ' · Înregistrează' : recVal === false ? ' · Înregistrare oprită!' : '')
         : '';
       const recClass = recVal === false && s === 'ok' ? 'rec-stopped' : '';
+      if (s === 'free') return `<div class="ch-cell free" title="CH${ch}: nicio cameră conectată pe acest canal"><span class="ch-free"><b>CH${ch}</b><span>Neconectat</span></span></div>`;
       return `<div class="ch-cell ${s} ${recClass}" title="CH${ch}: ${s==='ok'?'Online':s==='err'?'Offline':'—'}${recTitle}" data-nch="${ch}">${recIcon}CH${ch}</div>`;
     }).join('');
     const stoppedRec = Object.entries(recMap).filter(([ch,v]) => v===false && n.cams[+ch-1]==='ok').length;
     chGrid = `<div style="margin-top:8px">
-      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-3);font-weight:700;margin-bottom:6px">Canale (${activeCams}/${n.channels} active${stoppedRec>0?` · <span style="color:var(--err)">${stoppedRec} fără înregistrare</span>`:''})</div>
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-3);font-weight:700;margin-bottom:6px">Canale (${activeCams}/${totalChecked} active${freeCount>0?` · ${freeCount} neconectate`:''}${stoppedRec>0?` · <span style="color:var(--err)">${stoppedRec} fără înregistrare</span>`:''})</div>
       <div class="ch-grid" style="grid-template-columns:repeat(${cols},1fr)">${cells}</div>
     </div>`;
   }
@@ -1470,7 +1485,7 @@ function nvrCardHTML(n, showDetail){
     </div>
     <div class="nvr-detail ${detailOpen}">
       <div class="nvr-row"><span class="nvr-row-k"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/></svg>Adresă</span><span class="nvr-row-v">${n.ip}:${n.port}</span></div>
-      <div class="nvr-row"><span class="nvr-row-k"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/></svg>Camere</span><span class="nvr-row-v" style="color:${offlineCams>0?'var(--warn)':'var(--ok)'}">${activeCams}/${n.channels} active${offlineCams>0?' · '+offlineCams+' offline':''}</span></div>
+      <div class="nvr-row"><span class="nvr-row-k"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/></svg>Camere</span><span class="nvr-row-v" style="color:${offlineCams>0?'var(--warn)':'var(--ok)'}">${activeCams}/${totalChecked} active${offlineCams>0?' · '+offlineCams+' offline':''}</span></div>
       <div class="nvr-row"><span class="nvr-row-k"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Cont</span><span class="nvr-row-v">${hasCreds?user+' ✓':'Nesetat'}</span></div>
       <div class="nvr-row"><span class="nvr-row-k"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Văzut la</span><span class="nvr-row-v">${n.lastSeen||'—'}</span></div>
       ${n.model||n.firmware ? `<div class="nvr-row"><span class="nvr-row-k"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M6 14h.01"/></svg>Model</span><span class="nvr-row-v" style="font-size:10px">${[n.model,n.firmware].filter(Boolean).join(' · ')}</span></div>` : ''}
@@ -1917,7 +1932,7 @@ function sendDailyReport(){
   lines.push(``);
   nvrs.forEach(n=>{
     const icon = n.status==='online'?'🟢':n.status==='offline'?'🔴':'🟡';
-    lines.push(`${icon} ${n.name} — ${n.status.toUpperCase()} · ${n.activeCams||0}/${n.channels} cam`);
+    lines.push(`${icon} ${n.name} — ${n.status.toUpperCase()} · ${n.activeCams||0}/${n.totalCamsChecked||n.channels} cam`);
   });
   sendTelegram(lines.join('\n'));
   addLog('info', 'Raport zilnic trimis pe Telegram');
@@ -2312,7 +2327,7 @@ document.addEventListener('keydown', e => {
 // Click pe ch-cell din NVR card
 document.addEventListener('click', e => {
   const cell = e.target.closest('.ch-cell');
-  if (!cell) return;
+  if (!cell || cell.classList.contains('free')) return;
   const card = cell.closest('[data-nid]');
   if (!card) return;
   const nvrId = parseInt(card.dataset.nid);
