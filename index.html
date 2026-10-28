@@ -2828,6 +2828,7 @@ function markSettingsChanged(){
   _syncTimer = setTimeout(pushSettings, 1500);
 }
 async function pushSettings(){
+  _syncTimer = null;
   const auth = getAuth(); if (!auth) return false;
   let t = 0; try { t = Number(localStorage.getItem(SYNC_MTIME_KEY)) || 0; } catch {}
   try {
@@ -2841,19 +2842,64 @@ async function pushSettings(){
   } catch { return false; }   // fără internet: se reîncearcă la următoarea modificare / pornire
 }
 // La pornire: dacă setările locale sunt mai noi decât cele de pe server (sau serverul nu are nimic), le trimitem
+// Sincronizare în ambele direcții: setările mai noi câștigă (local → server sau server → local)
 async function reconcileSettings(){
   const auth = getAuth(); if (!auth) return;
+  if (_syncTimer) return;                                      // o modificare locală e pe drum spre server
   try {
     const r = await fetch(getProxyBase() + '/config', { headers: { 'Authorization': 'Bearer ' + auth.token } });
+    if (r.status === 401) { sessionExpired(); return; }
     if (!r.ok) return;
     const d = await readJsonSafe(r);
     let localT = 0; try { localT = Number(localStorage.getItem(SYNC_MTIME_KEY)) || 0; } catch {}
     const serverT = Number(d.updatedAt) || 0;
     const serverHas = Array.isArray(d.nvrs) && d.nvrs.length > 0;
+    if (serverHas && serverT > localT) { applyServerSettings(d, serverT); return; }   // alt dispozitiv a modificat ceva
     if (!nvrs.length) return;                                   // nu suprascriem serverul cu o listă goală
     if (!serverHas || localT > serverT || (!localT && !serverT)) {
       if (await pushSettings()) { addLog('info', 'Setările NVR au fost trimise serverului (monitorizare 24/7)'); refreshMonitorHint(); }
     }
+  } catch {}
+}
+
+// Preia setările de pe server (NVR-uri, credențiale, Telegram…) păstrând starea live a NVR-urilor
+function applyServerSettings(d, serverT){
+  const before = JSON.stringify(settingsPayload());
+  const old = new Map(nvrs.map(n => [n.id, n]));
+  const prevInterval = cfg.interval;
+  nvrs = d.nvrs.map(sn => {
+    const o = old.get(sn.id) || { status: 'unknown', cams: [], hdds: [], activeCams: 0 };
+    const seen = { ...(o.seenCh || {}), ...((sn.seenV === 2 && sn.seenCh) || {}) };
+    return { ...o, ...sn, seenCh: seen, seenV: 2 };
+  });
+  creds = d.creds || {};
+  cfg = { ...cfg, ...(d.cfg || {}) };
+  _settingsSig = JSON.stringify(settingsPayload());            // ca să nu le trimitem înapoi
+  save(SK.nvrs, nvrs); save(SK.creds, creds); save(SK.cfg, cfg);
+  try { localStorage.setItem(SYNC_MTIME_KEY, String(serverT)); } catch {}
+  nextId = Math.max(0, ...nvrs.map(n => n.id)) + 1;
+  if (_settingsSig === before) return;                         // nimic vizibil schimbat
+  applyTheme(cfg.theme);
+  refreshSettingsForm();
+  renderAll();
+  if (cfg.interval !== prevInterval && appStarted) startMonitor();
+  addLog('info', 'Setări preluate de pe alt dispozitiv');
+  toast('Actualizat de pe alt dispozitiv ✓', 'info');
+}
+
+// Reîmprospătează câmpurile din Setări după o sincronizare
+function refreshSettingsForm(){
+  try {
+    qs('#s-interval').value = String(cfg.interval);
+    qs('#s-hdd-thresh').value = String(cfg.hddThresh || 85);
+    qs('#s-theme').value = cfg.theme || '';
+    qs('#s-proxy-url').value = cfg.proxyUrl || '';
+    qs('#s-tg-token').value = cfg.tgToken || '';
+    qs('#s-tg-chatid').value = cfg.tgChatId || '';
+    qs('#s-tg-toggle').classList.toggle('on', !!cfg.tgEnabled);
+    qs('#s-sound').classList.toggle('on', !!cfg.soundEnabled);
+    qs('#s-daily-report').classList.toggle('on', !!cfg.dailyReport);
+    qs('#s-daily-time').value = cfg.dailyReportTime || '08:00';
   } catch {}
 }
 
@@ -3103,6 +3149,11 @@ qs('#auth-email').addEventListener('keydown', e=>{ if(e.key==='Enter') authSaveE
 ═══════════════════════════════════════ */
 function startApp() {
   _settingsSig = JSON.stringify(settingsPayload());
+  // preia modificările făcute pe alte dispozitive: la fiecare minut și când revii în aplicație
+  setInterval(() => { if (document.documentElement.classList.contains('unlocked')) reconcileSettings(); }, 60000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && document.documentElement.classList.contains('unlocked')) reconcileSettings();
+  });
   renderMonitorNote();
   renderAlerts();
   updateAlertBadge();
