@@ -1,0 +1,11 @@
+{
+  "name": "nvr-proxy",
+  "version": "4.0.0",
+  "private": true,
+  "main": "server.js",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "jsonwebtoken": "^9.0.3",
+    "nodemailer": "^6.9.16"
+  }
+}
