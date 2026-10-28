@@ -1501,31 +1501,41 @@ function nvrCardHTML(n, showDetail){
   </div>`;
 }
 
-// Live refresh timers per cell: key = "nvrId-ch", value = intervalId
-const _liveTimers = {};
+// Miniaturi live: se încarcă DOAR pentru cardurile deschise din tab-ul vizibil,
+// ca să nu supraîncărcăm proxy-ul (fiecare miniatură = o cerere către NVR).
+const _liveTimers = {};          // key = "listă:nvrId-ch" → intervalId
+const _openCards  = new Set();   // carduri cu detaliile deschise: "listă:nvrId"
+const THUMB_MS    = 6000;        // reîmprospătare miniatură
 
 function loadChThumbs(container){
   const proxy = (cfg.proxyUrl||'https://proxy.supraveghere24h.ro').replace(/\/$/,'');
   if (!proxy) return;
   container.querySelectorAll('.ch-cell.ok[data-nch]').forEach(cell => {
+    if (!cell.offsetParent) return;                 // card închis sau tab ascuns
     const card = cell.closest('[data-nid]');
     if (!card) return;
     const nvrId = parseInt(card.dataset.nid);
     const nvr = nvrs.find(n=>n.id===nvrId);
     if (!nvr) return;
     const ch = parseInt(cell.dataset.nch);
-    const key = nvrId+'-'+ch;
+    const list = (cell.closest('.nvr-grid') || {}).id || 'x';
+    const key = list+':'+nvrId+'-'+ch;
     const {user, pass} = getNvrCreds(nvr);
     const baseUrl = 'http://'+encodeURIComponent(user)+':'+encodeURIComponent(pass)+'@'+nvr.ip+':'+nvr.port+'/ISAPI/Streaming/channels/'+ch+'01/picture';
+    let fails = 0, busy = false, tick = 0;
 
+    const stop = () => { if (_liveTimers[key]) { clearInterval(_liveTimers[key]); delete _liveTimers[key]; } };
     function refreshCell(){
-      if (!document.body.contains(cell)) { clearInterval(_liveTimers[key]); delete _liveTimers[key]; return; }
-      const snapUrl = `${proxy}?url=${encodeURIComponent(baseUrl+'?t='+Date.now())}`;
+      if (!document.body.contains(cell) || !cell.offsetParent) { stop(); return; }
+      if (document.hidden || busy) return;          // aplicația în fundal / cererea anterioară încă rulează
+      if (fails >= 3 && (tick++ % 5)) return;       // după 3 eșecuri încercăm mai rar
+      busy = true;
       const img = new Image();
       img.className = 'ch-thumb';
       img.onload = () => {
+        busy = false; fails = 0;
         if (!document.body.contains(cell)) return;
-        // first time: build structure
+        cell.classList.remove('nothumb');
         if (!cell.querySelector('img.ch-thumb')) {
           cell.innerHTML = '';
           const lbl = document.createElement('span'); lbl.className='ch-lbl'; lbl.textContent='CH'+ch;
@@ -1535,30 +1545,29 @@ function loadChThumbs(container){
         }
       };
       img.onerror = () => {
-        if (!cell.querySelector('img.ch-thumb')) {
-          cell.classList.remove('ok'); cell.classList.add('none');
-          cell.innerHTML = `<span style="font-size:7px;color:var(--fg-3);text-align:center;line-height:1.3">No<br>Camera</span>`;
-          clearInterval(_liveTimers[key]); delete _liveTimers[key];
+        busy = false; fails++;
+        if (fails >= 3 && !cell.querySelector('img.ch-thumb') && !cell.classList.contains('nothumb')) {
+          cell.classList.add('nothumb');
+          cell.innerHTML = `<span style="font-size:7px;color:var(--fg-3);text-align:center;line-height:1.3">Fără<br>imagine</span>`;
         }
+        // nu oprim: reîncercăm (eroarea poate fi temporară)
       };
-      img.src = snapUrl;
+      img.src = `${proxy}?url=${encodeURIComponent(baseUrl+'?t='+Date.now())}`;
     }
 
-    // stop any previous timer for this cell
-    if (_liveTimers[key]) { clearInterval(_liveTimers[key]); delete _liveTimers[key]; }
-    // delay staggered per channel to avoid hammering proxy
-    const delay = (ch - 1) * 300;
+    stop();
     setTimeout(() => {
+      if (!document.body.contains(cell)) return;
       refreshCell();
-      _liveTimers[key] = setInterval(refreshCell, 5000);
-    }, delay);
+      _liveTimers[key] = setInterval(refreshCell, THUMB_MS);
+    }, (ch - 1) * 150);
   });
 }
 
 function renderDashNvrs(){
   const el = qs('#dash-nvr-list');
   if (!nvrs.length) { el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--fg-3);font-size:12px">Niciun NVR configurat — mergi la tab-ul NVR-uri</div>'; return; }
-  el.innerHTML = nvrs.map(n => nvrCardHTML(n, false)).join('');
+  el.innerHTML = nvrs.map(n => nvrCardHTML(n, _openCards.has('dash-nvr-list:'+n.id))).join('');
   bindNvrActions(el);
   loadChThumbs(el);
 }
@@ -1568,7 +1577,7 @@ function renderNvrList(){
   const emp = qs('#nvr-empty');
   if (!nvrs.length) { el.innerHTML=''; emp.style.display='block'; return; }
   emp.style.display = 'none';
-  el.innerHTML = nvrs.map(n => nvrCardHTML(n, false)).join('');
+  el.innerHTML = nvrs.map(n => nvrCardHTML(n, _openCards.has('nvr-list:'+n.id))).join('');
   bindNvrActions(el);
   loadChThumbs(el);
 }
@@ -1579,7 +1588,9 @@ function bindNvrActions(container){
       const card = el.closest('.nvr-card');
       const detail = card.querySelector('.nvr-detail');
       detail.classList.toggle('open');
-      if (detail.classList.contains('open')) loadChThumbs(card);
+      const ok = (card.closest('.nvr-grid') || {}).id + ':' + card.dataset.nid;
+      if (detail.classList.contains('open')) { _openCards.add(ok); loadChThumbs(card); }
+      else _openCards.delete(ok);       // timerele se opresc singure când celulele nu mai sunt vizibile
     });
   });
   container.querySelectorAll('.nvr-edit-btn').forEach(btn => {
@@ -1880,10 +1891,12 @@ function openSnapFull(url, title){
 
 qs('#snap-refresh-btn').addEventListener('click', ()=>{ renderSnapSelect(); loadSnaps(); toast('Snapshots actualizate','ok'); });
 
-// Load snaps when switching to Snapshots tab
+// Load snaps when switching to Snapshots tab; repornește miniaturile la revenirea pe Dashboard / NVR-uri
 document.querySelectorAll('.nav-tab').forEach(tab => {
   tab.addEventListener('click', ()=>{
     if (tab.dataset.tab === 'snapshots'){ renderSnapSelect(); loadSnaps(); }
+    if (tab.dataset.tab === 'dashboard') setTimeout(()=>loadChThumbs(qs('#dash-nvr-list')), 0);
+    if (tab.dataset.tab === 'nvrs')      setTimeout(()=>loadChThumbs(qs('#nvr-list')), 0);
   });
 });
 
