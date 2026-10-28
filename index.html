@@ -1169,13 +1169,14 @@ function checkNvr(nvr){
           if (ipR.status !== 200) return;
           const ipXml = await ipR.text();
           // parse per-channel: <InputProxyChannelStatus><id>1</id><online>true</online>...
-          const chBlocks = [...ipXml.matchAll(/<InputProxyChannelStatus>([\s\S]*?)<\/InputProxyChannelStatus>/g)];
+          // tag-urile pot avea atribute (ex. <InputProxyChannelStatus version="2.0" xmlns="...">)
+          const chBlocks = [...ipXml.matchAll(/<InputProxyChannelStatus\b[^>]*>([\s\S]*?)<\/InputProxyChannelStatus>/g)];
           result._ipPerCh = {};
           let onlineCnt = 0;
           for (const b of chBlocks) {
             const txt = b[1];
-            const idM = txt.match(/<id>(\d+)<\/id>/);
-            const onM = txt.match(/<online>(true|false)<\/online>/);
+            const idM = txt.match(/<id\b[^>]*>\s*(\d+)\s*<\/id>/);
+            const onM = txt.match(/<online\b[^>]*>\s*(true|false)\s*<\/online>/);
             if (idM && onM) {
               const ch = parseInt(idM[1]);
               const online = onM[1] === 'true';
@@ -1185,7 +1186,7 @@ function checkNvr(nvr){
           }
           // fallback if no blocks parsed: count all <online> tags
           if (chBlocks.length === 0) {
-            const onlineMatches = [...ipXml.matchAll(/<online>(true|false)<\/online>/g)];
+            const onlineMatches = [...ipXml.matchAll(/<online\b[^>]*>\s*(true|false)\s*<\/online>/g)];
             onlineCnt = onlineMatches.filter(m => m[1] === 'true').length;
           }
           result.realOnlineCams = onlineCnt;
