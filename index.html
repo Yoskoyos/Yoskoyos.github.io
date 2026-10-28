@@ -1155,6 +1155,11 @@ function save(key, val){
    STATE
 ═══════════════════════════════════════ */
 let nvrs   = load(SK.nvrs,   []);
+// v2: lista „camere văzute online” putea fi greșită (toate canalele marcate) → o reconstruim de la zero
+if (nvrs.some(n => n.seenV !== 2)) {
+  nvrs.forEach(n => { n.seenCh = {}; n.seenV = 2; });
+  try { localStorage.setItem(SK.nvrs, JSON.stringify(nvrs)); } catch {}
+}
 let creds  = load(SK.creds,  {});
 let alerts = load(SK.alerts, []);
 let logEntries = load(SK.log, []);
@@ -1367,6 +1372,7 @@ function checkNvr(nvr){
             result.cams[ch - 1] = 'ok';
           }
         }
+        result.camsKnown = !!ipKnown;   // true doar dacă NVR-ul a trimis efectiv lista camerelor
         delete result._ipPerCh;
 
         resolve(result);
@@ -1414,10 +1420,16 @@ async function checkAll(){
     // Un canal contează ca „cameră” doar dacă a fost văzut online măcar o dată.
     // Canalele configurate în NVR care n-au răspuns niciodată → „Neconectat” (fără avertizare).
     if (res.online && Array.isArray(res.cams)) {
-      const seen = nvrs[idx].seenCh || {};
-      res.cams.forEach((c, i) => { if (c === 'ok') seen[i + 1] = true; });
-      res.cams = res.cams.map((c, i) => (c === 'err' && !seen[i + 1]) ? 'free' : c);
-      nvrs[idx].seenCh = seen;
+      if (!res.camsKnown) {
+        // NVR-ul n-a trimis lista camerelor de data asta → păstrăm starea anterioară a canalelor
+        // (NU le marcăm pe toate ca „văzute online” — asta producea camere căzute false)
+        if (prevCamsSnap.length) res.cams = prevCamsSnap.slice();
+      } else {
+        const seen = nvrs[idx].seenCh || {};
+        res.cams.forEach((c, i) => { if (c === 'ok') seen[i + 1] = true; });
+        res.cams = res.cams.map((c, i) => (c === 'err' && !seen[i + 1]) ? 'free' : c);
+        nvrs[idx].seenCh = seen;
+      }
     }
     nvrs[idx].cams = res.cams;
     if (res.uptime     !== null) nvrs[idx].uptime     = res.uptime;
@@ -2750,6 +2762,7 @@ async function authDownloadConfig(opts) {
     const data = await readJsonSafe(r);
     if (!data || !data.nvrs) { if (!silent) toast('Nu există config salvată pe server','warn'); return; }
     nvrs       = data.nvrs       || [];
+    nvrs.forEach(n => { if (n.seenV !== 2) { n.seenCh = {}; n.seenV = 2; } });   // date vechi, posibil greșite
     creds      = data.creds      || {};
     alerts     = data.alerts     || [];
     logEntries = data.log        || [];
@@ -2792,7 +2805,7 @@ async function refreshMonitorHint(){
 // Setările care contează pentru server (fără starea live a NVR-urilor)
 function settingsPayload(){
   return {
-    nvrs: nvrs.map(n => ({ id: n.id, name: n.name, ip: n.ip, port: n.port, channels: n.channels, location: n.location || '', seenCh: n.seenCh || {} })),
+    nvrs: nvrs.map(n => ({ id: n.id, name: n.name, ip: n.ip, port: n.port, channels: n.channels, location: n.location || '', seenCh: n.seenCh || {}, seenV: 2 })),
     creds, cfg,
   };
 }
