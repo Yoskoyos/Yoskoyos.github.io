@@ -2364,7 +2364,15 @@ qs('#s-tg-daily-report').addEventListener('click', ()=>{
 
 // PWA Service Worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('/service-worker.js').then(r => r.update()).catch(()=>{});
+  // când se instalează o versiune nouă, reîncărcăm o singură dată ca să o folosim imediat
+  let swReloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || swReloaded) return;
+    swReloaded = true;
+    location.reload();
+  });
 }
 
 // raportul zilnic pornește în startApp(), după login
