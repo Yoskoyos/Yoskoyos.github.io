@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#16243b"/><stop offset="1" stop-color="#0a0b0d"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.42" cy="0.45" r="0.5">
+      <stop offset="0" stop-color="#00d9ff" stop-opacity=".22"/><stop offset="1" stop-color="#00d9ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#c9d2e1"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4f7fb"/><stop offset="1" stop-color="#dfe5ef"/>
+    </linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7d889c"/><stop offset="1" stop-color="#a3adbf"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <rect width="512" height="512" fill="url(#glow)"/>
+
+  <g transform="translate(6 24)">
+  <!-- suport de perete -->
+  <rect x="362" y="262" width="50" height="118" rx="12" fill="url(#metal)"/>
+  <circle cx="387" cy="290" r="5" fill="#5d687c"/><circle cx="387" cy="352" r="5" fill="#5d687c"/>
+  <path d="M370 322 L318 262" stroke="url(#metal)" stroke-width="30" stroke-linecap="round"/>
+  <circle cx="314" cy="256" r="22" fill="#8c97ab"/>
+  <circle cx="314" cy="256" r="9" fill="#6b768a"/>
+
+  <!-- corpul camerei, înclinat spre stânga-jos -->
+  <g transform="rotate(16 250 206)">
+    <rect x="118" y="146" width="262" height="30" rx="15" fill="url(#shield)"/>
+    <rect x="146" y="166" width="226" height="96" rx="32" fill="url(#body)"/>
+    <rect x="300" y="166" width="10" height="96" fill="#b7c1d2" opacity=".6"/>
+    <rect x="104" y="162" width="64" height="104" rx="22" fill="#1a2332"/>
+    <circle cx="136" cy="214" r="34" fill="#0a0d14"/>
+    <circle cx="136" cy="214" r="27" fill="none" stroke="#00d9ff" stroke-width="7"/>
+    <circle cx="136" cy="214" r="13" fill="#00d9ff"/>
+    <circle cx="129" cy="207" r="5" fill="#ffffff" opacity=".85"/>
+    <circle cx="340" cy="190" r="9" fill="#ef4444"/>
+    <circle cx="340" cy="190" r="15" fill="#ef4444" opacity=".25"/>
+  </g>
+  </g>
+</svg>
