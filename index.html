@@ -212,6 +212,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .nvr-fix-cred:hover{background:var(--err);color:#fff}
 .ch-cell.err{flex-direction:column;gap:2px;text-align:center}
 #snap-modal-err-txt{max-width:85%;text-align:center;line-height:1.5;font-family:var(--sans);font-size:13px;padding:0 8px}
+.nvr-infobar{padding:9px 16px;border-top:1px solid var(--border);background:var(--blue-dim);font-size:12.5px;color:var(--fg-2);line-height:1.45}
+.nosnap{display:block}
+.nvr-warnbar .nosnap{color:var(--fg-2);margin-top:2px}
 .ch-why{display:block;font-family:var(--sans);font-size:9.5px;font-weight:700;line-height:1.1;padding:0 3px}
 .nvr-badge.checking{background:var(--blue-dim);color:var(--blue)}
 
@@ -1263,16 +1266,21 @@ function snapUrlFor(nvr, ch, mode){
   return `${proxy}/?url=${encodeURIComponent(`http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${nvr.ip}:${nvr.port}${path}?t=${Date.now()}`)}`;
 }
 const _snapDetect = {};
+const NOSNAP_RECHECK_MS = 24 * 3600 * 1000;   // NVR fără capturi → reverificăm o dată pe zi
+function nvrHasNoSnap(nvr){ return nvr && nvr.snapMode === 'none' && (Date.now() - (nvr.snapCheckedAt || 0)) < NOSNAP_RECHECK_MS; }
 function detectSnapMode(nvr, force){
   if (!nvr) return Promise.resolve(null);
-  if (nvr.snapMode && !force) return Promise.resolve(nvr.snapMode);
+  if (nvrHasNoSnap(nvr) && !force) return Promise.resolve('none');
+  if (nvr.snapMode && nvr.snapMode !== 'none' && !force) return Promise.resolve(nvr.snapMode);
   if (_snapDetect[nvr.id] && !force) return _snapDetect[nvr.id];
   const ch = (Array.isArray(nvr.cams) ? nvr.cams.indexOf('ok') : -1) + 1 || 1;
   _snapDetect[nvr.id] = (async () => {
+    let refused = 0;
     for (const m of Object.keys(SNAP_MODES)) {
       try {
         const r = await fetch(snapUrlFor(nvr, ch, m));
         const type = r.headers.get('content-type') || '';
+        if (r.status === 403 || r.status === 404) refused++;
         if (r.ok && type.startsWith('image')) {
           const n = nvrs.find(x => x.id === nvr.id) || nvr;
           if (n.snapMode !== m) {
@@ -1282,6 +1290,14 @@ function detectSnapMode(nvr, force){
           return m;
         }
       } catch {}
+    }
+    // NVR-ul răspunde, dar refuză toate variantele → modelul nu oferă capturi prin rețea
+    if (refused === Object.keys(SNAP_MODES).length) {
+      const n = nvrs.find(x => x.id === nvr.id) || nvr;
+      const first = n.snapMode !== 'none';
+      n.snapMode = 'none'; n.snapCheckedAt = Date.now(); save(SK.nvrs, nvrs);
+      if (first) addLog('info', `<b>${escapeHtml(n.name)}</b> — NVR-ul nu oferă capturi de imagine prin rețea (doar stream video); monitorizarea merge normal`);
+      return 'none';
     }
     return null;
   })();
@@ -1767,8 +1783,10 @@ function nvrCardHTML(n, showDetail){
     ${(() => {
       if (n.status === 'auth') return `<div class="nvr-warnbar"><span>⚠ NVR-ul răspunde, dar <b>refuză utilizatorul sau parola</b>.<small>Dacă parola e sigur corectă: după mai multe încercări greșite, NVR-urile Hikvision blochează accesul temporar (de obicei 30 de minute). Așteaptă sau repornește NVR-ul.</small></span><button type="button" class="nvr-fix-cred" data-nid="${n.id}">Corectează credențialele</button></div>`;
       const probs = camsArr.map((c, i) => c === 'err' ? [i + 1, camReasonLabel((n.camReasons || {})[i + 1])] : null).filter(x => x && x[1]);
-      if (!probs.length || n.status === 'offline') return '';
-      return `<div class="nvr-warnbar">${probs.map(([ch, why]) => { const h = camReasonHint(why); return `<span>⚠ <b>CH${ch}</b> — ${escapeHtml(why)}${h ? `<small>${escapeHtml(h)}</small>` : ''}</span>`; }).join('')}</div>`;
+      const noSnapNote = nvrHasNoSnap(n) && n.status !== 'offline'
+        ? `<span class="nosnap">ℹ Acest NVR nu oferă capturi de imagine prin rețea — vezi starea camerelor aici, iar imaginea în Hik-Connect / iVMS.</span>` : '';
+      if (!probs.length || n.status === 'offline') return noSnapNote ? `<div class="nvr-infobar">${noSnapNote}</div>` : '';
+      return `<div class="nvr-warnbar">${probs.map(([ch, why]) => { const h = camReasonHint(why); return `<span>⚠ <b>CH${ch}</b> — ${escapeHtml(why)}${h ? `<small>${escapeHtml(h)}</small>` : ''}</span>`; }).join('')}${noSnapNote}</div>`;
     })()}
     <div class="nvr-detail ${detailOpen}">
       <div class="nvr-row"><span class="nvr-row-k"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/></svg>Adresă</span><span class="nvr-row-v">${n.ip}:${n.port}</span></div>
@@ -1802,14 +1820,14 @@ function loadChThumbs(container){
     const n = nvrs.find(x => x.id === parseInt(c.dataset.nid));
     if (n && !n.snapMode && c.querySelector('.ch-cell.ok[data-nch]') && c.querySelector('.nvr-detail.open')) pending.add(n);
   });
-  pending.forEach(n => detectSnapMode(n).then(m => { if (m && m !== 'std') loadChThumbs(container); }));
+  pending.forEach(n => detectSnapMode(n).then(m => { if (m === 'none') renderAll(); else if (m && m !== 'std') loadChThumbs(container); }));
   container.querySelectorAll('.ch-cell.ok[data-nch]').forEach(cell => {
     if (!cell.offsetParent) return;                 // card închis sau tab ascuns
     const card = cell.closest('[data-nid]');
     if (!card) return;
     const nvrId = parseInt(card.dataset.nid);
     const nvr = nvrs.find(n=>n.id===nvrId);
-    if (!nvr) return;
+    if (!nvr || nvrHasNoSnap(nvr)) return;   // NVR fără capturi: doar starea canalului
     const ch = parseInt(cell.dataset.nch);
     const list = (cell.closest('.nvr-grid') || {}).id || 'x';
     const key = list+':'+nvrId+'-'+ch;
@@ -2755,8 +2773,12 @@ function loadSnapModal(nvr, ch) {
   const { user, pass } = getNvrCreds(nvr);
   const proxy = (cfg.proxyUrl || 'https://proxy.supraveghere24h.ro').replace(/\/$/, '');
   // Includem credențialele direct în URL (Hikvision acceptă user:pass@ în URL)
-  (nvr.snapMode ? Promise.resolve() : detectSnapMode(nvr))
-  .then(() => fetch(snapUrlFor(nvrs.find(n => n.id === nvr.id) || nvr, ch)))
+  (nvr.snapMode && nvr.snapMode !== 'none' ? Promise.resolve() : detectSnapMode(nvr))
+  .then(m => {
+    if (m === 'none' || nvrHasNoSnap(nvrs.find(n => n.id === nvr.id) || nvr))
+      throw new Error('Acest NVR nu oferă capturi de imagine prin rețea (limitare a modelului). Starea camerelor e monitorizată normal; imaginea o vezi în Hik-Connect / iVMS.');
+    return fetch(snapUrlFor(nvrs.find(n => n.id === nvr.id) || nvr, ch));
+  })
   .then(async r => {
     if (!r.ok) {
       let msg = `HTTP ${r.status}`;
