@@ -1285,6 +1285,20 @@ html:not(.unlocked) .app{display:none}
       </div>
       <div class="fg"><label for="cm-equip">Detalii echipamente</label><textarea id="cm-equip" rows="2" placeholder="Camere, HDD, switch, cabluri…"></textarea></div>
 
+      <div class="f2">
+        <div class="fg"><label for="cm-supplier">Furnizor echipamente</label><input type="text" id="cm-supplier" list="cm-suppliers" placeholder="de unde ai cumpărat" autocomplete="off"><datalist id="cm-suppliers"></datalist></div>
+        <div class="fg"><label for="cm-supinv">Factură furnizor</label><input type="text" id="cm-supinv" placeholder="serie / număr" autocomplete="off"></div>
+      </div>
+      <div class="fg"><label for="cm-purchase">Data achiziției</label><input type="date" id="cm-purchase"></div>
+
+      <div class="cm-sec">Garanții echipamente</div>
+      <div class="cm-files" id="cm-wfiles"></div>
+      <div class="cm-upload">
+        <div class="fg"><label for="cm-wvalid">Garanție valabilă până la</label><input type="date" id="cm-wvalid"></div>
+        <button type="button" class="btn cm-up" data-kind="garantie" style="flex:1 1 100%"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>Încarcă garanție (PDF sau poză)</button>
+      </div>
+      <div class="cm-hint">Certificate de garanție, facturi de la furnizor sau poze cu ele. PDF, JPG sau PNG, maxim 20 MB.</div>
+
       <div class="cm-sec">Abonament</div>
       <label class="cm-check"><input type="checkbox" id="cm-sub-on"> Are abonament lunar</label>
       <div class="cm-subbox">
@@ -1301,8 +1315,8 @@ html:not(.unlocked) .app{display:none}
       <div class="cm-upload">
         <div class="fg"><label for="cm-signed">Semnat la</label><input type="date" id="cm-signed"></div>
         <div class="fg"><label for="cm-valid">Valabil până la</label><input type="date" id="cm-valid"></div>
-        <button type="button" class="btn" id="cm-upload-btn" style="flex:1 1 100%"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>Încarcă contract PDF</button>
-        <input type="file" id="cm-file" accept="application/pdf,.pdf" hidden>
+        <button type="button" class="btn cm-up" data-kind="contract" id="cm-upload-btn" style="flex:1 1 100%"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>Încarcă contract PDF</button>
+        <input type="file" id="cm-file" accept="application/pdf,.pdf" hidden><input type="file" id="cm-wfile" accept="application/pdf,.pdf,image/jpeg,image/png,.jpg,.jpeg,.png" hidden>
       </div>
       <div class="cm-hint">PDF, maxim 20 MB. Contractele se păstrează doar pe serverul tău și se deschid numai după autentificare.</div>
     </div>
@@ -2825,7 +2839,7 @@ function renderClients() {
     : '';
   let rows = clients.slice().sort((a, b) => a.name.localeCompare(b.name, 'ro'));
   if (clFilter === 'due') rows = rows.filter(c => dueList.includes(c));
-  if (q) rows = rows.filter(c => [c.name, c.contact, c.phone, c.email, c.address, c.code, c.equip && c.equip.nvr, c.notes].join(' ').toLowerCase().includes(q));
+  if (q) rows = rows.filter(c => [c.name, c.contact, c.phone, c.email, c.address, c.code, c.equip && c.equip.nvr, c.equip && c.equip.supplier, c.notes].join(' ').toLowerCase().includes(q));
   if (!rows.length) {
     list.innerHTML = `<div class="cl-empty">${!clients.length ? 'Niciun client încă.<br>Apasă <b>Adaugă client</b> ca să începi.' : clFilter === 'due' && !q ? 'Nimic de încasat. Toate plățile sunt la zi.' : 'Niciun client găsit.'}</div>`;
     return;
@@ -2839,11 +2853,13 @@ function renderClients() {
       else pay = `<span class="cl-pay ok">Plătit</span>`;
     }
     const ini = c.name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
-    const nC = (c.contracts || []).length;
+    const nC = (c.contracts || []).filter(f => f.kind !== 'garantie').length;
+    const nW = (c.contracts || []).filter(f => f.kind === 'garantie').length;
     const sub = [
       c.phone ? `<a href="tel:${escapeHtml(c.phone.replace(/[^\d+]/g, ''))}" onclick="event.stopPropagation()">${escapeHtml(c.phone)}</a>` : '',
       c.address ? `<span>${escapeHtml(c.address)}</span>` : '',
       nC ? `<span>📄 ${nC} ${nC === 1 ? 'contract' : 'contracte'}</span>` : '',
+      nW ? `<span>🛡 ${nW} ${nW === 1 ? 'garanție' : 'garanții'}</span>` : '',
     ].filter(Boolean).join('');
     return `<div class="cl-card" role="button" tabindex="0" data-cid="${escapeHtml(c.id)}">
       <div class="cl-av">${escapeHtml(ini || '?')}</div>
@@ -2963,17 +2979,23 @@ function renderCmMonths() {
 }
 
 function renderCmFiles() {
-  const box = qs('#cm-files'); const files = (cmDraft && cmDraft.contracts) || [];
-  if (!files.length) { box.innerHTML = '<div class="cm-hint">Niciun contract încărcat.</div>'; return; }
+  const all = (cmDraft && cmDraft.contracts) || [];
   const auth = getAuth();
-  box.innerHTML = files.map(f => {
+  const row = f => {
     const href = `${getProxyBase()}/clients/${encodeURIComponent(cmDraft.id)}/contracts/${encodeURIComponent(f.id)}?token=${encodeURIComponent(auth ? auth.token : '')}`;
-    const meta = [f.signedAt ? 'semnat ' + fmtDate(f.signedAt) : '', f.validUntil ? 'valabil până ' + fmtDate(f.validUntil) : '', (f.size < 1048576 ? Math.max(1, Math.round(f.size / 1024)) + ' KB' : (f.size / 1048576).toFixed(1) + ' MB')].filter(Boolean).join(' · ');
+    const isW = f.kind === 'garantie';
+    const meta = [f.signedAt ? 'semnat ' + fmtDate(f.signedAt) : '', f.validUntil ? (isW ? 'garanție până ' : 'valabil până ') + fmtDate(f.validUntil) : '', (f.size < 1048576 ? Math.max(1, Math.round(f.size / 1024)) + ' KB' : (f.size / 1048576).toFixed(1) + ' MB')].filter(Boolean).join(' · ');
     const expired = f.validUntil && f.validUntil < todayYmd();
-    return `<div class="cm-file"><svg class="cm-file-ic" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
-      <div class="cm-file-main"><div class="cm-file-name">${escapeHtml(f.name)}</div><div class="cm-file-meta">${escapeHtml(meta)}${expired ? ' · <b style="color:var(--err)">expirat</b>' : ''}</div></div>
-      <a href="${escapeHtml(href)}" target="_blank" rel="noopener">Deschide</a><button type="button" class="del" data-fid="${escapeHtml(f.id)}" aria-label="Șterge contractul">Șterge</button></div>`;
-  }).join('');
+    const icon = (f.ext === 'jpg' || f.ext === 'png')
+      ? '<path d="M21 19V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2z"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>'
+      : '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/>';
+    return `<div class="cm-file"><svg class="cm-file-ic" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" style="${isW ? 'color:var(--ok)' : ''}">${icon}</svg>
+      <div class="cm-file-main"><div class="cm-file-name">${escapeHtml(f.name)}</div><div class="cm-file-meta">${escapeHtml(meta)}${expired ? ' · <b style="color:var(--err)">expirat' + (isW ? 'ă' : '') + '</b>' : ''}</div></div>
+      <a href="${escapeHtml(href)}" target="_blank" rel="noopener">Deschide</a><button type="button" class="del" data-fid="${escapeHtml(f.id)}" aria-label="Șterge">Șterge</button></div>`;
+  };
+  const contracts = all.filter(f => f.kind !== 'garantie'), wars = all.filter(f => f.kind === 'garantie');
+  qs('#cm-files').innerHTML = contracts.length ? contracts.map(row).join('') : '<div class="cm-hint">Niciun contract încărcat.</div>';
+  qs('#cm-wfiles').innerHTML = wars.length ? wars.map(row).join('') : '<div class="cm-hint">Nicio garanție încărcată.</div>';
 }
 
 function openClientModal(c) {
@@ -2987,7 +3009,9 @@ function openClientModal(c) {
   set('#cm-phone', cmDraft.phone); set('#cm-email', cmDraft.email); set('#cm-address', cmDraft.address); set('#cm-notes', cmDraft.notes);
   set('#cm-nvr', e.nvr); set('#cm-cams', e.cams || ''); set('#cm-install', e.installDate); set('#cm-warranty', e.warrantyUntil); set('#cm-equip', e.details);
   qs('#cm-sub-on').checked = !!s.active; set('#cm-amount', s.amount || ''); set('#cm-due', s.dueDay || ''); set('#cm-start', s.start || (c ? '' : ymNow()));
-  set('#cm-signed', ''); set('#cm-valid', '');
+  set('#cm-signed', ''); set('#cm-valid', ''); set('#cm-wvalid', '');
+  set('#cm-supplier', e.supplier); set('#cm-supinv', e.supplierInvoice); set('#cm-purchase', e.purchaseDate);
+  qs('#cm-suppliers').innerHTML = [...new Set((clients || []).map(x => x.equip && x.equip.supplier).filter(Boolean))].sort().map(n => `<option value="${escapeHtml(n)}">`).join('');
   qs('#cm-anaf-msg').hidden = true;
   cmFillNvrSelect(c);
   qs('#cm-delete').style.display = c ? '' : 'none';
@@ -3003,7 +3027,8 @@ function cmCollect() {
   return {
     kind: qs('#cm-kind').value, name: v('#cm-name'), code: v('#cm-code'), contact: v('#cm-contact'), regCom: v('#cm-regcom'),
     phone: v('#cm-phone'), email: v('#cm-email'), address: v('#cm-address'), notes: qs('#cm-notes').value,
-    equip: { nvr: v('#cm-nvr'), cams: v('#cm-cams'), installDate: v('#cm-install'), warrantyUntil: v('#cm-warranty'), details: qs('#cm-equip').value, nvrId: qs('#cm-nvrlink').value },
+    equip: { nvr: v('#cm-nvr'), cams: v('#cm-cams'), installDate: v('#cm-install'), warrantyUntil: v('#cm-warranty'), details: qs('#cm-equip').value, nvrId: qs('#cm-nvrlink').value,
+             supplier: v('#cm-supplier'), supplierInvoice: v('#cm-supinv'), purchaseDate: v('#cm-purchase') },
     sub: { active: qs('#cm-sub-on').checked, amount: v('#cm-amount'), dueDay: v('#cm-due'), start: v('#cm-start'), paid: cmDraft.sub.paid || {} },
   };
 }
@@ -3061,43 +3086,50 @@ qs('#cm-save').addEventListener('click', async () => { if (await cmSave()) close
 qs('#cm-delete').addEventListener('click', async () => {
   if (!cmDraft || !cmDraft.id) return;
   const n = (cmDraft.contracts || []).length;
-  const ok = await confirmDialog({ title: 'Ștergi clientul?', html: `<b>${escapeHtml(cmDraft.name)}</b> va fi șters definitiv${n ? `, împreună cu <b>${n} ${n === 1 ? 'contract' : 'contracte'}</b>` : ''}.`, okLabel: 'Șterge' });
+  const ok = await confirmDialog({ title: 'Ștergi clientul?', html: `<b>${escapeHtml(cmDraft.name)}</b> va fi șters definitiv${n ? `, împreună cu <b>${n} ${n === 1 ? 'document' : 'documente'}</b> (contracte și garanții)` : ''}.`, okLabel: 'Șterge' });
   if (!ok) return;
   try {
     await clApi('/clients/' + encodeURIComponent(cmDraft.id), { method: 'DELETE' });
     clients = clients.filter(x => x.id !== cmDraft.id); closeClientModal(); renderClients(); toast('Client șters', 'ok');
   } catch (e) { toast(e.message, 'err'); }
 });
-qs('#cm-upload-btn').addEventListener('click', () => qs('#cm-file').click());
-qs('#cm-file').addEventListener('change', async e => {
-  const f = e.target.files[0]; e.target.value = '';
+document.querySelectorAll('.cm-up').forEach(b => b.addEventListener('click', () => qs(b.dataset.kind === 'garantie' ? '#cm-wfile' : '#cm-file').click()));
+async function cmUpload(kind, f) {
   if (!f || !cmDraft) return;
-  if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf') return toast('Alege un fișier PDF', 'warn');
+  const isW = kind === 'garantie';
+  const okType = isW ? /\.(pdf|jpe?g|png)$/i.test(f.name) || /^(application\/pdf|image\/(jpeg|png))$/.test(f.type)
+                     : /\.pdf$/i.test(f.name) || f.type === 'application/pdf';
+  if (!okType) return toast(isW ? 'Alege un PDF, JPG sau PNG' : 'Alege un fișier PDF', 'warn');
   if (f.size > 20 * 1048576) return toast('Fișierul e prea mare (maxim 20 MB)', 'warn');
   if (!cmDraft.id && !(await cmSave(true))) return;     // client nou → îl salvăm întâi
-  const btn = qs('#cm-upload-btn'), old = btn.innerHTML;
+  const btn = document.querySelector(`.cm-up[data-kind="${kind}"]`), old = btn.innerHTML;
   btn.disabled = true; btn.textContent = 'Se încarcă…';
   try {
-    const q = `name=${encodeURIComponent(f.name)}&signedAt=${encodeURIComponent(qs('#cm-signed').value)}&validUntil=${encodeURIComponent(qs('#cm-valid').value)}`;
-    const r = await clApi(`/clients/${encodeURIComponent(cmDraft.id)}/contracts?${q}`, { method: 'POST', headers: { 'Content-Type': 'application/pdf' }, body: f });
+    const signed = isW ? '' : qs('#cm-signed').value, valid = isW ? qs('#cm-wvalid').value : qs('#cm-valid').value;
+    const q = `kind=${kind}&name=${encodeURIComponent(f.name)}&signedAt=${encodeURIComponent(signed)}&validUntil=${encodeURIComponent(valid)}`;
+    const r = await clApi(`/clients/${encodeURIComponent(cmDraft.id)}/contracts?${q}`, { method: 'POST', headers: { 'Content-Type': f.type || 'application/octet-stream' }, body: f });
     cmDraft.contracts = r.client.contracts;
     const i = clients.findIndex(x => x.id === r.client.id); if (i >= 0) clients[i].contracts = r.client.contracts;
-    qs('#cm-signed').value = ''; qs('#cm-valid').value = '';
-    renderCmFiles(); renderClients(); toast('Contract încărcat', 'ok');
+    if (isW) qs('#cm-wvalid').value = ''; else { qs('#cm-signed').value = ''; qs('#cm-valid').value = ''; }
+    renderCmFiles(); renderClients(); toast(isW ? 'Garanție încărcată' : 'Contract încărcat', 'ok');
   } catch (err) { toast(err.message, 'err'); }
   finally { btn.disabled = false; btn.innerHTML = old; }
-});
-qs('#cm-files').addEventListener('click', async e => {
+}
+qs('#cm-file').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; cmUpload('contract', f); });
+qs('#cm-wfile').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; cmUpload('garantie', f); });
+async function cmDeleteFile(e) {
   const b = e.target.closest('button.del'); if (!b || !cmDraft) return;
   const f = cmDraft.contracts.find(x => x.id === b.dataset.fid); if (!f) return;
-  if (!(await confirmDialog({ title: 'Ștergi contractul?', html: `<b>${escapeHtml(f.name)}</b> va fi șters definitiv de pe server.`, okLabel: 'Șterge' }))) return;
+  if (!(await confirmDialog({ title: f.kind === 'garantie' ? 'Ștergi garanția?' : 'Ștergi contractul?', html: `<b>${escapeHtml(f.name)}</b> va fi șters definitiv de pe server.`, okLabel: 'Șterge' }))) return;
   try {
     const r = await clApi(`/clients/${encodeURIComponent(cmDraft.id)}/contracts/${encodeURIComponent(f.id)}`, { method: 'DELETE' });
     cmDraft.contracts = r.client.contracts;
     const i = clients.findIndex(x => x.id === r.client.id); if (i >= 0) clients[i].contracts = r.client.contracts;
     renderCmFiles(); renderClients();
   } catch (err) { toast(err.message, 'err'); }
-});
+}
+qs('#cm-files').addEventListener('click', cmDeleteFile);
+qs('#cm-wfiles').addEventListener('click', cmDeleteFile);
 document.querySelectorAll('.nav-tab[data-tab="clients"]').forEach(t => t.addEventListener('click', () => loadClients(true)));
 
 /* ═══════════════════════════════════════

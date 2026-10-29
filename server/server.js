@@ -11,6 +11,7 @@
 //                  Stare în monitor-state.json. Dezactivare: variabila de mediu MONITOR=0.
 // v4.1 (29.10.2026): GET /snap?nvr=&ch=&token= — captură din stream-ul RTSP (ffmpeg) pentru NVR-urile care nu
 //                  oferă capturi ISAPI (ex. DS-7104NI-Q1). Credențialele NVR rămân pe server.
+// v4.5: clienți — furnizor echipamente + documente de garanție (PDF/JPG/PNG), câmp `kind` la fișiere.
 // v4.4: GET /company?cui= — datele firmei din serviciul public ANAF (PlatitorTvaRest v9), pt. completarea fișei clientului.
 // v4.3: evidență clienți (clients.json) + contracte PDF stocate pe VPS în contracts/ (nu în GitHub).
 // v4.2: monitorul ține cont și de canalele marcate în aplicație (seenCh) — ex. cameră pusă „urmărită” deși n-a mers niciodată.
@@ -634,7 +635,8 @@ function cleanClient(b, prev) {
     regCom: str(b.regCom, 40), phone: str(b.phone, 60), email: str(b.email, 200),
     address: str(b.address, 400), notes: str(b.notes, 4000),
     equip: { nvr: str(e.nvr, 200), cams: Math.max(0, Math.round(num(e.cams))), installDate: ymd(e.installDate),
-             warrantyUntil: ymd(e.warrantyUntil), details: str(e.details, 4000), nvrId: e.nvrId != null ? str(e.nvrId, 40) : '' },
+             warrantyUntil: ymd(e.warrantyUntil), details: str(e.details, 4000), nvrId: e.nvrId != null ? str(e.nvrId, 40) : '',
+             supplier: str(e.supplier, 200), supplierInvoice: str(e.supplierInvoice, 80), purchaseDate: ymd(e.purchaseDate) },
     sub: { active: !!sb.active, amount: Math.max(0, num(sb.amount)), dueDay: Math.min(28, Math.max(1, Math.round(num(sb.dueDay)) || 1)),
            start: /^\d{4}-\d{2}$/.test(sb.start || '') ? sb.start : '', paid },
     contracts: prev ? (prev.contracts || []) : [],
@@ -680,13 +682,18 @@ async function handleClients(req, res, pathname) {
     if (parts.length === 3 && req.method === 'POST') {
       let buf;
       try { buf = await readRaw(req, MAX_PDF); } catch { return sendJson(res, 413, { error: 'Fișierul e prea mare (maxim 20 MB)' }); }
-      if (buf.length < 5 || buf.slice(0, 5).toString('latin1') !== '%PDF-') return sendJson(res, 400, { error: 'Fișierul nu e PDF' });
       const q = url.parse(req.url, true).query;
-      const f = { id: newId(), name: (str(q.name, 150).replace(/[\\/:*?"<>|\r\n]/g, '_').trim() || 'contract.pdf'),
+      const kind = q.kind === 'garantie' ? 'garantie' : 'contract';
+      const head = buf.slice(0, 8);
+      const ext = head.slice(0, 5).toString('latin1') === '%PDF-' ? 'pdf'
+                : (kind === 'garantie' && head[0] === 0xFF && head[1] === 0xD8 && head[2] === 0xFF) ? 'jpg'
+                : (kind === 'garantie' && head.slice(0, 4).toString('hex') === '89504e47') ? 'png' : null;
+      if (!ext) return sendJson(res, 400, { error: kind === 'garantie' ? 'Fișierul trebuie să fie PDF, JPG sau PNG' : 'Fișierul nu e PDF' });
+      const f = { id: newId(), kind, ext, name: (str(q.name, 150).replace(/[\\/:*?"<>|\r\n]/g, '_').trim() || (kind + '.' + ext)),
                   size: buf.length, uploadedAt: Date.now(), signedAt: ymd(q.signedAt), validUntil: ymd(q.validUntil) };
-      if (!/\.pdf$/i.test(f.name)) f.name += '.pdf';
+      if (!new RegExp('\\.' + (ext === 'jpg' ? 'jpe?g' : ext) + '$', 'i').test(f.name)) f.name += '.' + ext;
       fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-      fs.writeFileSync(path.join(dir, f.id + '.pdf'), buf, { mode: 0o600 });
+      fs.writeFileSync(path.join(dir, f.id + '.' + ext), buf, { mode: 0o600 });
       cl.contracts = (cl.contracts || []).concat(f); cl.updatedAt = Date.now(); saveClients(all);
       return sendJson(res, 200, { contract: f, client: cl });
     }
@@ -694,11 +701,12 @@ async function handleClients(req, res, pathname) {
       if (!/^[\w-]+$/.test(cid || '')) return sendJson(res, 400, { error: 'ID invalid' });
       const f = (cl.contracts || []).find(x => x.id === cid);
       if (!f) return sendJson(res, 404, { error: 'Contract inexistent' });
-      const fp = path.join(dir, f.id + '.pdf');
+      const fext = f.ext || 'pdf';
+      const fp = path.join(dir, f.id + '.' + fext);
       if (req.method === 'GET') {
         let data; try { data = fs.readFileSync(fp); } catch { return sendJson(res, 404, { error: 'Fișierul lipsește de pe server' }); }
         const ascii = f.name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '');
-        res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Length': data.length, 'Cache-Control': 'private, no-store',
+        res.writeHead(200, { 'Content-Type': fext === 'jpg' ? 'image/jpeg' : fext === 'png' ? 'image/png' : 'application/pdf', 'Content-Length': data.length, 'Cache-Control': 'private, no-store',
           'Content-Disposition': `${url.parse(req.url, true).query.dl ? 'attachment' : 'inline'}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(f.name)}`, ...CORS });
         return res.end(data);
       }
@@ -900,7 +908,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4.4, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4.5, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/company' && req.method === 'GET') return await handleCompany(req, res, parsed);
     if (pathname === '/clients' || pathname.startsWith('/clients/')) return await handleClients(req, res, pathname);
@@ -975,4 +983,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v4.4 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v4.5 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
