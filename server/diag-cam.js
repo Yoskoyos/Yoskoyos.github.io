@@ -47,12 +47,17 @@ const short = b => b.replace(/<\?xml[^>]*>/, '').replace(/\s+/g, ' ').replace(/ 
       console.log(`\n===== ${nvr.name}  (${nvr.ip}:${nvr.port}, ${nvr.channels} canale) =====`);
       for (const uri of ['/ISAPI/System/deviceInfo',
                          '/ISAPI/ContentMgmt/InputProxy/channels/status',
-                         '/ISAPI/System/workingstatus?format=xml',
-                         '/ISAPI/System/workingstatus',
-                         '/ISAPI/ContentMgmt/InputProxy/channels',
-                         '/ISAPI/System/Video/inputs/channels']) {
+                         ]) {
         const r = await get(nvr, cred, uri);
         console.log(`\n--- ${uri}  → HTTP ${r.s}`);
+        if (uri.endsWith('channels/status') && r.s === 200) {
+          // rezumat pe canal: id · IP cameră · online · motiv
+          for (const b of r.b.matchAll(/<InputProxyChannelStatus\b[^>]*>([\s\S]*?)<\/InputProxyChannelStatus>/g)) {
+            const t = b[1], g = k => (t.match(new RegExp(`<${k}\\b[^>]*>\\s*([^<]*?)\\s*<`)) || [])[1] || '-';
+            console.log(`CH${g('id')}  ${g('ipAddress').padEnd(15)}  online=${g('online').padEnd(5)}  motiv=${g('chanDetectResult')}`);
+          }
+          continue;
+        }
         if (uri.endsWith('deviceInfo')) {
           const m = t => (r.b.match(new RegExp(`<${t}>([^<]*)<`)) || [])[1] || '?';
           console.log(`model ${m('model')} · firmware ${m('firmwareVersion')} ${m('firmwareReleasedDate')}`);
