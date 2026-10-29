@@ -11,6 +11,7 @@
 //                  Stare în monitor-state.json. Dezactivare: variabila de mediu MONITOR=0.
 // v4.1 (29.10.2026): GET /snap?nvr=&ch=&token= — captură din stream-ul RTSP (ffmpeg) pentru NVR-urile care nu
 //                  oferă capturi ISAPI (ex. DS-7104NI-Q1). Credențialele NVR rămân pe server.
+// v4.2: monitorul ține cont și de canalele marcate în aplicație (seenCh) — ex. cameră pusă „urmărită” deși n-a mers niciodată.
 
 const http    = require('http');
 const https   = require('https');
@@ -372,8 +373,10 @@ function evaluateNvr(key, nvr, res) {
 
   // camere
   if (res.cams) {
+    const appSeen = nvr.seenCh || {};   // canale văzute online în aplicație sau marcate „urmărește” de utilizator
     for (const [chS, on] of Object.entries(res.cams)) {
       const ch = parseInt(chS, 10);
+      if (!on && !st.seen[ch] && appSeen[ch]) st.seen[ch] = true;
       if (on) {
         if (st.cams[ch] === 'err') lines.push({ kind: 'info', text: `🟢 CH${ch} — cameră revenită online` });
         st.cams[ch] = 'ok'; st.camFail[ch] = 0; st.seen[ch] = true;
@@ -724,7 +727,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4.1, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4.2, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
 
     // Starea monitorizării pentru utilizatorul logat
@@ -797,4 +800,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v4.1 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v4.2 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
