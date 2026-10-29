@@ -354,6 +354,47 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .cf-body{padding:26px 22px 20px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px}
 .cf-icon{width:52px;height:52px;border-radius:50%;background:var(--err-dim);color:var(--err);display:grid;place-items:center;margin-bottom:6px}
 
+
+/* ── Fundal (Setări → Fundal): A = albastru, B = grilă tehnică ── */
+html[data-bg] .main{background:transparent}
+html[data-bg] header{background:color-mix(in srgb,var(--bg-1) 88%,transparent)}
+html[data-bg] .stat-card,html[data-bg] .nvr-card,html[data-bg] .cl-card,html[data-bg] .dash-sum,html[data-bg] .settings-section{box-shadow:0 1px 2px rgba(0,0,0,.18),0 12px 30px -16px rgba(0,0,0,.55)}
+/* închis (implicit) */
+html[data-bg="a"] .app{background:
+  radial-gradient(900px 520px at 8% -8%, rgba(0,120,255,.22), transparent 62%),
+  radial-gradient(800px 480px at 100% 0%, rgba(0,217,255,.12), transparent 60%),
+  linear-gradient(180deg,#0c1426 0%,#0a0f1b 100%)}
+html[data-bg="b"] .app{background:
+  radial-gradient(1000px 520px at 50% -10%, rgba(0,190,255,.16), transparent 65%),
+  linear-gradient(rgba(140,180,255,.05) 1px, transparent 1px) 0 0/28px 28px,
+  linear-gradient(90deg, rgba(140,180,255,.05) 1px, transparent 1px) 0 0/28px 28px,
+  #0a0d14}
+/* deschis */
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"])[data-bg] .stat-card,:root:not([data-theme="dark"])[data-bg] .nvr-card,:root:not([data-theme="dark"])[data-bg] .cl-card,:root:not([data-theme="dark"])[data-bg] .dash-sum,:root:not([data-theme="dark"])[data-bg] .settings-section{box-shadow:0 1px 2px rgba(15,20,34,.04),0 10px 28px -14px rgba(15,20,34,.18)}
+  :root:not([data-theme="dark"])[data-bg="a"] .app{background:
+    radial-gradient(900px 520px at 8% -8%, rgba(0,110,240,.26), transparent 62%),
+    radial-gradient(800px 480px at 100% 0%, rgba(0,200,255,.22), transparent 60%),
+    radial-gradient(700px 500px at 50% 110%, rgba(0,120,255,.08), transparent 60%),
+    linear-gradient(180deg,#dcebfb 0%,#eef3f9 50%,#e8eef6 100%)}
+  :root:not([data-theme="dark"])[data-bg="b"] .app{background:
+    radial-gradient(1000px 520px at 50% -10%, rgba(0,170,255,.24), transparent 65%),
+    linear-gradient(rgba(15,60,120,.075) 1px, transparent 1px) 0 0/28px 28px,
+    linear-gradient(90deg, rgba(15,60,120,.075) 1px, transparent 1px) 0 0/28px 28px,
+    #f1f4f8}
+}
+:root[data-theme="light"][data-bg] .stat-card,:root[data-theme="light"][data-bg] .nvr-card,:root[data-theme="light"][data-bg] .cl-card,:root[data-theme="light"][data-bg] .dash-sum,:root[data-theme="light"][data-bg] .settings-section{box-shadow:0 1px 2px rgba(15,20,34,.04),0 10px 28px -14px rgba(15,20,34,.18)}
+:root[data-theme="light"][data-bg="a"] .app{background:
+  radial-gradient(900px 520px at 8% -8%, rgba(0,110,240,.26), transparent 62%),
+  radial-gradient(800px 480px at 100% 0%, rgba(0,200,255,.22), transparent 60%),
+  radial-gradient(700px 500px at 50% 110%, rgba(0,120,255,.08), transparent 60%),
+  linear-gradient(180deg,#dcebfb 0%,#eef3f9 50%,#e8eef6 100%)}
+:root[data-theme="light"][data-bg="b"] .app{background:
+  radial-gradient(1000px 520px at 50% -10%, rgba(0,170,255,.24), transparent 65%),
+  linear-gradient(rgba(15,60,120,.075) 1px, transparent 1px) 0 0/28px 28px,
+  linear-gradient(90deg, rgba(15,60,120,.075) 1px, transparent 1px) 0 0/28px 28px,
+  #f1f4f8}
+
 /* ── Clienți ── */
 .cl-tools{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .cl-search{flex:1 1 200px;min-width:0;background:var(--bg-1);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;color:var(--fg);outline:none;font-family:var(--sans)}
@@ -1005,6 +1046,17 @@ html:not(.unlocked) .app{display:none}
             <option value="">Sistem</option>
             <option value="dark">Dark</option>
             <option value="light">Light</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">Fundal</div>
+            <div class="form-hint">Aspectul din spatele cardurilor</div>
+          </div>
+          <select class="form-input" id="s-bg" style="width:120px">
+            <option value="">Simplu</option>
+            <option value="a">Albastru</option>
+            <option value="b">Grilă tehnică</option>
           </select>
         </div>
         <div class="form-row" style="flex-direction:column;align-items:flex-start;gap:8px">
@@ -3007,6 +3059,12 @@ qs('#s-hdd-thresh').addEventListener('change', e=>{
   cfg.hddThresh = parseInt(e.target.value);
   save(SK.cfg, cfg);
 });
+applyBg(cfg.bg);
+qs('#s-bg').addEventListener('change', e=>{
+  cfg.bg = e.target.value;
+  save(SK.cfg, cfg);
+  applyBg(cfg.bg);
+});
 qs('#s-theme').addEventListener('change', e=>{
   cfg.theme = e.target.value;
   save(SK.cfg, cfg);
@@ -3432,6 +3490,12 @@ function applyTheme(t) {
   if (t) document.documentElement.dataset.theme = t;
   else delete document.documentElement.dataset.theme;
   try { qs('#s-theme').value = t||''; } catch {}
+  applyBg(cfg.bg);
+}
+function applyBg(b) {
+  if (b === 'a' || b === 'b') document.documentElement.dataset.bg = b;
+  else delete document.documentElement.dataset.bg;
+  try { qs('#s-bg').value = document.documentElement.dataset.bg || ''; } catch {}
 }
 
 /* ═══════════════════════════════════════
