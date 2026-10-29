@@ -149,6 +149,14 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .stat-card.err .stat-num{color:var(--err)}
 .stat-card.info .stat-num{color:var(--blue)}
 .stat-label{font-size:10px;color:var(--fg-2);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+/* card împărțit: NVR offline | Camere offline */
+.status-bar{grid-template-columns:1fr 2fr 1fr 1fr}
+.stat-split{display:grid;grid-template-columns:1fr 1fr}
+.stat-split .ss-half{min-width:0}
+.stat-split .ss-half + .ss-half{border-left:1px solid var(--border);padding-left:12px;margin-left:12px}
+.stat-card .ss-half.ok .stat-num{color:var(--ok)}
+.stat-card .ss-half.err .stat-num{color:var(--err)}
+.stat-card .ss-half.warn .stat-num{color:var(--warn)}
 
 /* ── Section ── */
 .section{margin-bottom:24px}
@@ -518,7 +526,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   #toast-wrap{top:calc(env(safe-area-inset-top,0px) + 56px)}
 
   /* statistici compacte pe un rând */
-  .status-bar{grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px}
+  .status-bar{grid-template-columns:1fr 2fr 1fr 1fr;gap:6px;margin-bottom:14px}
+  .stat-split .ss-half + .ss-half{padding-left:8px;margin-left:8px}
   .stat-card{padding:10px 8px 9px;border-radius:10px}
   .stat-num{font-size:22px;margin-bottom:4px}
   .stat-label{font-size:8.5px;letter-spacing:.03em;line-height:1.25}
@@ -668,7 +677,10 @@ html:not(.unlocked) .app{display:none}
       <div class="dash-sum" id="dash-summary" aria-live="polite"></div>
       <div class="status-bar" id="stat-bar">
         <div class="stat-card ok"><div class="stat-num" id="s-online">—</div><div class="stat-label">NVR Online</div></div>
-        <div class="stat-card err"><div class="stat-num" id="s-offline">—</div><div class="stat-label">NVR Offline</div></div>
+        <div class="stat-card stat-split err" id="s-off-card">
+          <div class="ss-half" id="ss-nvr"><div class="stat-num" id="s-offline">—</div><div class="stat-label">NVR Offline</div></div>
+          <div class="ss-half" id="ss-cam"><div class="stat-num" id="s-camoff">—</div><div class="stat-label">Camere Offline</div></div>
+        </div>
         <div class="stat-card ok"><div class="stat-num" id="s-cams">—</div><div class="stat-label">Camere active</div></div>
         <div class="stat-card warn"><div class="stat-num" id="s-hdd">—</div><div class="stat-label">HDD alertă</div></div>
       </div>
@@ -1687,13 +1699,18 @@ function renderStats(){
   const hddAlert = nvrs.reduce((s,n) => s + (n.hdds||[]).filter(h => h.status !== 'ok' && h.status !== 'idle' && h.status !== 'unknown').length, 0);
 
   qs('#s-online').textContent = online;
-  qs('#s-offline').textContent = offline + warn;
+  // camere offline doar la NVR-urile care răspund (la un NVR căzut nu știm starea camerelor)
+  const camsOff = nvrs.reduce((s,n) => (n.status==='offline' || n.status==='auth') ? s
+    : s + (Array.isArray(n.cams) ? n.cams.slice(0, n.channels).filter(c => c === 'err').length : 0), 0);
+  qs('#s-offline').textContent = offline;
+  qs('#s-camoff').textContent = camsOff;
   qs('#s-cams').textContent = totalCams;
   qs('#s-hdd').textContent = hddAlert;
 
-  // Update stat card colors
-  const offCard = qs('#s-offline').closest('.stat-card');
-  offCard.className = 'stat-card ' + ((offline+warn)>0?'err':'ok');
+  // culori: roșu doar unde e o problemă
+  qs('#ss-nvr').className = 'ss-half ' + (offline > 0 ? 'err' : 'ok');
+  qs('#ss-cam').className = 'ss-half ' + (camsOff > 0 ? 'err' : 'ok');
+  qs('#s-off-card').className = 'stat-card stat-split ' + ((offline || camsOff) ? 'err' : 'ok');
 }
 
 function nvrStatusLabel(s){
