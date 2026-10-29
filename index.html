@@ -1729,7 +1729,7 @@ function nvrCardHTML(n, showDetail){
       </button>
     </div>
     ${(() => {
-      if (n.status === 'auth') return `<div class="nvr-warnbar"><span>⚠ NVR-ul răspunde, dar <b>refuză utilizatorul sau parola</b>.</span><button type="button" class="nvr-fix-cred" data-nid="${n.id}">Corectează credențialele</button></div>`;
+      if (n.status === 'auth') return `<div class="nvr-warnbar"><span>⚠ NVR-ul răspunde, dar <b>refuză utilizatorul sau parola</b>.<small>Dacă parola e sigur corectă: după mai multe încercări greșite, NVR-urile Hikvision blochează accesul temporar (de obicei 30 de minute). Așteaptă sau repornește NVR-ul.</small></span><button type="button" class="nvr-fix-cred" data-nid="${n.id}">Corectează credențialele</button></div>`;
       const probs = camsArr.map((c, i) => c === 'err' ? [i + 1, camReasonLabel((n.camReasons || {})[i + 1])] : null).filter(x => x && x[1]);
       if (!probs.length || n.status === 'offline') return '';
       return `<div class="nvr-warnbar">${probs.map(([ch, why]) => { const h = camReasonHint(why); return `<span>⚠ <b>CH${ch}</b> — ${escapeHtml(why)}${h ? `<small>${escapeHtml(h)}</small>` : ''}</span>`; }).join('')}</div>`;
