@@ -180,6 +180,21 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .nvr-menu button.danger,.nvr-menu button.danger svg{color:var(--err)}
 .nvr-menu button.danger:hover,.nvr-menu button.danger:focus-visible{background:var(--err-dim)}
 .nvr-menu-sep{height:1px;background:var(--border);margin:5px 4px}
+.ord-modal{max-width:460px}
+.ord-hint{padding:12px 20px 4px;font-size:12px;color:var(--fg-3)}
+.ord-list{list-style:none;margin:0;padding:8px 12px 12px;max-height:60vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+.ord-row{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 10px;background:var(--bg-2);border:1px solid var(--border);border-radius:10px;cursor:grab;user-select:none;transition:background .15s,border-color .15s}
+.ord-row.dragging{opacity:.45}
+.ord-row.over{border-color:var(--accent);background:var(--accent-dim)}
+.ord-row.moved{animation:ord-flash .5s ease}
+@keyframes ord-flash{0%{background:var(--accent-dim)}100%{background:var(--bg-2)}}
+.ord-num{width:24px;height:24px;border-radius:50%;background:var(--bg-3);color:var(--fg-2);font-family:var(--mono);font-size:11px;font-weight:700;display:grid;place-items:center;flex-shrink:0}
+.ord-name{flex:1;min-width:0;font-size:14px;font-weight:600;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ord-name small{display:block;font-family:var(--mono);font-size:10.5px;font-weight:400;color:var(--fg-3)}
+.ord-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:var(--bg-1);color:var(--fg-2);display:grid;place-items:center;cursor:pointer;flex-shrink:0}
+.ord-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.ord-btn:disabled{opacity:.3;cursor:default}
+@media(max-width:600px){.ord-btn{width:42px;height:42px}.ord-row{cursor:default}}
 .nvr-icon{width:36px;height:36px;border-radius:8px;display:grid;place-items:center;flex-shrink:0;background:var(--bg-3);color:var(--fg-2)}
 .nvr-info{flex:1;min-width:0}
 .nvr-name{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -648,6 +663,7 @@ html:not(.unlocked) .app{display:none}
       <div class="section">
         <div class="section-hdr">
           <div class="section-title">Status NVR-uri</div>
+          <div class="section-action order-nvr-open" style="margin-left:auto;margin-right:16px"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M7 4v16M7 4L3 8M7 4l4 4M17 20V4M17 20l-4-4M17 20l4-4"/></svg>Ordine</div>
           <div class="section-action" id="dash-refresh-btn">
             <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
             Verifică acum
@@ -667,6 +683,7 @@ html:not(.unlocked) .app{display:none}
       <div class="section">
         <div class="section-hdr">
           <div class="section-title">NVR-uri configurate</div>
+          <div class="section-action order-nvr-open" style="margin-left:auto;margin-right:16px"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M7 4v16M7 4L3 8M7 4l4 4M17 20V4M17 20l-4-4M17 20l4-4"/></svg>Ordine</div>
           <div class="section-action" id="add-nvr-btn">
             <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
             Adaugă NVR
@@ -1024,6 +1041,22 @@ html:not(.unlocked) .app{display:none}
   </div>
 </div>
 
+<!-- Ordinea NVR-urilor -->
+<div class="overlay hidden" id="order-modal" role="dialog" aria-modal="true" aria-labelledby="order-title">
+  <div class="modal ord-modal">
+    <div class="modal-hdr">
+      <div class="modal-title" id="order-title">Ordinea NVR-urilor</div>
+      <div class="modal-x" id="order-x" role="button" aria-label="Închide">✕</div>
+    </div>
+    <div class="ord-hint">Folosește săgețile sau trage un rând cu mouse-ul.</div>
+    <ol class="ord-list" id="order-list"></ol>
+    <div class="modal-foot">
+      <button class="btn" id="order-cancel" type="button">Anulează</button>
+      <button class="btn primary" id="order-save" type="button">Salvează ordinea</button>
+    </div>
+  </div>
+</div>
+
 <!-- Meniu acțiuni NVR -->
 <div id="nvr-menu" class="nvr-menu" role="menu" aria-label="Acțiuni NVR" hidden>
   <div class="nvr-menu-title" id="nvr-menu-title"></div>
@@ -1033,6 +1066,8 @@ html:not(.unlocked) .app{display:none}
     <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Editează</button>
   <button type="button" role="menuitem" data-act="webui">
     <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Deschide Web UI</button>
+  <button type="button" role="menuitem" data-act="order">
+    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M7 4v16M7 4L3 8M7 4l4 4M17 20V4M17 20l-4-4M17 20l4-4"/></svg>Schimbă ordinea</button>
   <div class="nvr-menu-sep" role="separator"></div>
   <button type="button" role="menuitem" data-act="del" class="danger">
     <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>Șterge NVR</button>
@@ -1767,8 +1802,8 @@ const statusRank = n => (n.status in STATUS_ORDER ? STATUS_ORDER[n.status] : 2);
 function renderDashNvrs(){
   const el = qs('#dash-nvr-list');
   if (!nvrs.length) { el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--fg-3);font-size:12px">Niciun NVR configurat — mergi la tab-ul NVR-uri</div>'; return; }
-  const ordered = nvrs.map((n, i) => [n, i]).sort((a, b) => statusRank(a[0]) - statusRank(b[0]) || a[1] - b[1]).map(x => x[0]);
-  el.innerHTML = ordered.map(n => nvrCardHTML(n, _openCards.has('dash-nvr-list:'+n.id))).join('');
+  // ordinea aleasă de utilizator (problemele apar oricum în rezumatul de sus)
+  el.innerHTML = nvrs.map(n => nvrCardHTML(n, _openCards.has('dash-nvr-list:'+n.id))).join('');
   bindNvrActions(el);
   loadChThumbs(el);
 }
@@ -1848,6 +1883,7 @@ qs('#nvr-menu').addEventListener('click', e => {
   if (act === 'edit')  openEditModal(nid);
   if (act === 'webui') openNvrWebUi(nid);
   if (act === 'del')   deleteNvr(nid);
+  if (act === 'order') openOrderModal(nid);
 });
 qs('#nvr-menu').addEventListener('keydown', e => {
   const items = [...qs('#nvr-menu').querySelectorAll('[data-act]')];
@@ -1860,6 +1896,82 @@ document.addEventListener('click', e => { if (!e.target.closest('#nvr-menu')) cl
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNvrMenu(true); });
 window.addEventListener('resize', positionNvrMenu);
 document.addEventListener('scroll', positionNvrMenu, true);
+
+/* ── Ordinea NVR-urilor ── */
+let _orderTmp = [], _orderDragIdx = null;
+function openOrderModal(focusNid){
+  _orderTmp = nvrs.map(n => n.id);
+  const touch = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+  qs('.ord-hint').textContent = touch ? 'Folosește săgețile ↑ ↓ ca să muți un NVR.' : 'Folosește săgețile sau trage un rând cu mouse-ul.';
+  renderOrderList(focusNid);
+  qs('#order-modal').classList.remove('hidden');
+}
+function closeOrderModal(){ qs('#order-modal').classList.add('hidden'); }
+function renderOrderList(flashId){
+  const ul = qs('#order-list');
+  const up = '<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4"><polyline points="18 15 12 9 6 15"/></svg>';
+  const dn = '<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"/></svg>';
+  ul.innerHTML = _orderTmp.map((id, i) => {
+    const n = nvrs.find(x => x.id === id) || {};
+    return `<li class="ord-row${id === flashId ? ' moved' : ''}" draggable="true" data-i="${i}">
+      <span class="ord-num">${i + 1}</span>
+      <span class="ord-name">${escapeHtml(n.name || '?')}<small>${escapeHtml(n.ip || '')}:${escapeHtml(n.port || '')}${n.location ? ' · ' + escapeHtml(n.location) : ''}</small></span>
+      <button type="button" class="ord-btn" data-mv="-1" aria-label="Mută mai sus" ${i === 0 ? 'disabled' : ''}>${up}</button>
+      <button type="button" class="ord-btn" data-mv="1" aria-label="Mută mai jos" ${i === _orderTmp.length - 1 ? 'disabled' : ''}>${dn}</button>
+    </li>`;
+  }).join('');
+}
+function moveOrder(i, j){
+  if (j < 0 || j >= _orderTmp.length || i === j) return;
+  const [id] = _orderTmp.splice(i, 1);
+  _orderTmp.splice(j, 0, id);
+  renderOrderList(id);
+  const btn = qs(`#order-list .ord-row[data-i="${j}"] .ord-btn[data-mv="${j < i ? -1 : 1}"]`);
+  if (btn && !btn.disabled) btn.focus({ preventScroll: true });
+}
+qs('#order-list').addEventListener('click', e => {
+  const b = e.target.closest('.ord-btn'); if (!b) return;
+  const i = parseInt(b.closest('.ord-row').dataset.i);
+  moveOrder(i, i + parseInt(b.dataset.mv));
+});
+qs('#order-list').addEventListener('dragstart', e => {
+  const row = e.target.closest('.ord-row'); if (!row) return;
+  _orderDragIdx = parseInt(row.dataset.i); row.classList.add('dragging');
+  try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(_orderDragIdx)); } catch {}
+});
+qs('#order-list').addEventListener('dragover', e => {
+  const row = e.target.closest('.ord-row'); if (!row || _orderDragIdx === null) return;
+  e.preventDefault();
+  qs('#order-list').querySelectorAll('.over').forEach(r => r.classList.remove('over'));
+  row.classList.add('over');
+});
+qs('#order-list').addEventListener('drop', e => {
+  const row = e.target.closest('.ord-row'); if (!row || _orderDragIdx === null) return;
+  e.preventDefault();
+  const to = parseInt(row.dataset.i), from = _orderDragIdx;
+  _orderDragIdx = null;
+  moveOrder(from, to);
+});
+qs('#order-list').addEventListener('dragend', () => {
+  _orderDragIdx = null;
+  qs('#order-list').querySelectorAll('.dragging,.over').forEach(r => r.classList.remove('dragging', 'over'));
+});
+qs('#order-save').addEventListener('click', () => {
+  const byId = new Map(nvrs.map(n => [n.id, n]));
+  const changed = _orderTmp.some((id, i) => nvrs[i] && nvrs[i].id !== id);
+  nvrs = _orderTmp.map(id => byId.get(id)).filter(Boolean);
+  closeOrderModal();
+  if (!changed) return;
+  save(SK.nvrs, nvrs);          // se sincronizează automat cu serverul și celelalte dispozitive
+  renderAll();
+  addLog('info', 'Ordinea NVR-urilor a fost schimbată');
+  toast('Ordine salvată ✓', 'ok');
+});
+qs('#order-cancel').addEventListener('click', closeOrderModal);
+qs('#order-x').addEventListener('click', closeOrderModal);
+qs('#order-modal').addEventListener('click', e => { if (e.target === qs('#order-modal')) closeOrderModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !qs('#order-modal').classList.contains('hidden')) closeOrderModal(); });
+document.querySelectorAll('.order-nvr-open').forEach(b => b.addEventListener('click', () => openOrderModal()));
 
 function openNvrWebUi(nid){
   const n = nvrs.find(x=>x.id===nid);
