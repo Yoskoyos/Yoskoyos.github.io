@@ -889,6 +889,10 @@ html:not(.unlocked) .app{display:none}
       <div class="section">
         <div class="section-hdr">
           <div class="section-title">Clienți</div>
+          <div class="section-action" id="cl-backup-btn" style="margin-left:auto;margin-right:16px" title="Descarcă o arhivă ZIP cu toți clienții, contractele și garanțiile">
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            Copie de siguranță
+          </div>
           <div class="section-action" id="cl-add-btn">
             <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
             Adaugă client
@@ -2863,7 +2867,11 @@ function renderClients() {
   const monthly = subs.reduce((t, c) => t + (c.sub.amount || 0), 0);
   qs('#cl-sum').innerHTML = clients.length
     ? `<b>${clients.length}</b> ${clients.length === 1 ? 'client' : 'clienți'} · <b>${subs.length}</b> cu abonament (${fmtLei(monthly)}/lună)` +
-      (dueList.length ? ` · <span class="due">${dueList.length} de încasat${owed ? ' · ' + fmtLei(owed) : ''}</span>` : ' · toate plățile la zi')
+      (dueList.length ? ` · <span class="due">${dueList.length} de încasat${owed ? ' · ' + fmtLei(owed) : ''}</span>` : ' · toate plățile la zi') +
+      (() => { let t = 0; try { t = +localStorage.getItem('yca_last_backup') || 0; } catch {}
+               const days = t ? Math.floor((Date.now() - t) / 864e5) : null;
+               return days === null ? '<br><span style="color:var(--warn)">Nu ai făcut încă o copie de siguranță pe acest dispozitiv.</span>'
+                    : days >= 30 ? `<br><span style="color:var(--warn)">Ultima copie de siguranță: acum ${days} zile.</span>` : ''; })()
     : '';
   let rows = clients.slice().sort((a, b) => a.name.localeCompare(b.name, 'ro'));
   if (clFilter === 'due') rows = rows.filter(c => dueList.includes(c));
@@ -3083,6 +3091,20 @@ async function cmSave(quiet) {
 }
 
 qs('#cl-add-btn').addEventListener('click', () => openClientModal(null));
+// Copie de siguranță: ZIP generat pe server (clienti.csv + clienti.json + documentele fiecărui client)
+qs('#cl-backup-btn').addEventListener('click', () => {
+  const auth = getAuth();
+  if (!auth) return toast('Nu ești autentificat', 'err');
+  if (clients && !clients.length) return toast('Nu ai încă niciun client de salvat', 'warn');
+  const a = document.createElement('a');
+  a.href = `${getProxyBase()}/clients-backup?token=${encodeURIComponent(auth.token)}&t=${Date.now()}`;
+  a.download = `clienti-backup-${todayYmd()}.zip`;
+  a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+  try { localStorage.setItem('yca_last_backup', String(Date.now())); } catch {}
+  toast('Se descarcă arhiva cu clienții…', 'ok');
+  renderClients();
+});
 qs('#cl-search').addEventListener('input', renderClients);
 document.querySelectorAll('.cl-chip').forEach(b => b.addEventListener('click', () => {
   clFilter = b.dataset.f; document.querySelectorAll('.cl-chip').forEach(x => x.classList.toggle('on', x === b)); renderClients();

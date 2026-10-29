@@ -11,6 +11,7 @@
 //                  Stare în monitor-state.json. Dezactivare: variabila de mediu MONITOR=0.
 // v4.1 (29.10.2026): GET /snap?nvr=&ch=&token= — captură din stream-ul RTSP (ffmpeg) pentru NVR-urile care nu
 //                  oferă capturi ISAPI (ex. DS-7104NI-Q1). Credențialele NVR rămân pe server.
+// v4.6: GET /clients-backup — arhivă ZIP cu toți clienții (JSON + CSV) și documentele lor.
 // v4.5: clienți — furnizor echipamente + documente de garanție (PDF/JPG/PNG), câmp `kind` la fișiere.
 // v4.4: GET /company?cui= — datele firmei din serviciul public ANAF (PlatitorTvaRest v9), pt. completarea fișei clientului.
 // v4.3: evidență clienți (clients.json) + contracte PDF stocate pe VPS în contracts/ (nu în GitHub).
@@ -173,7 +174,7 @@ function getAuth(req) {
   if (!tok) {   // <img src> nu poate trimite antete → tokenul poate veni și în ?token= (doar pentru /snap)
     try {
       const q = url.parse(req.url, true);
-      const tokOk = q.pathname === '/snap' || (req.method === 'GET' && /^\/clients\/[\w-]+\/contracts\/[\w-]+$/.test(q.pathname || ''));
+      const tokOk = q.pathname === '/snap' || (req.method === 'GET' && (q.pathname === '/clients-backup' || /^\/clients\/[\w-]+\/contracts\/[\w-]+$/.test(q.pathname || '')));
       if (tokOk && q.query.token) tok = String(q.query.token);
     } catch {}
   }
@@ -778,6 +779,96 @@ async function handleCompany(req, res, parsed) {
   return sendJson(res, 200, data);
 }
 
+
+/* ═════════════ Copie de siguranță clienți (ZIP, fără dependențe) ═════════════ */
+const CRC_TABLE = (() => { const t = new Int32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c; } return t; })();
+function crc32(buf) { let c = -1; for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8); return (c ^ -1) >>> 0; }
+function dosTime(d) {
+  return { time: (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1),
+           date: ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate() };
+}
+// scrie intrările una câte una în răspuns (un singur fișier în memorie odată)
+function zipWriter(res) {
+  const zlib = require('zlib');
+  const central = []; let offset = 0;
+  const { time, date } = dosTime(new Date());
+  return {
+    add(name, data) {
+      const nameBuf = Buffer.from(name, 'utf8');
+      const crc = crc32(data);
+      const comp = data.length > 64 ? zlib.deflateRawSync(data, { level: 6 }) : null;
+      const useDeflate = comp && comp.length < data.length;
+      const body = useDeflate ? comp : data;
+      const h = Buffer.alloc(30);
+      h.writeUInt32LE(0x04034b50, 0); h.writeUInt16LE(20, 4); h.writeUInt16LE(0x0800, 6);   // UTF-8
+      h.writeUInt16LE(useDeflate ? 8 : 0, 8); h.writeUInt16LE(time, 10); h.writeUInt16LE(date, 12);
+      h.writeUInt32LE(crc, 14); h.writeUInt32LE(body.length, 18); h.writeUInt32LE(data.length, 22);
+      h.writeUInt16LE(nameBuf.length, 26); h.writeUInt16LE(0, 28);
+      res.write(h); res.write(nameBuf); res.write(body);
+      central.push({ nameBuf, crc, csize: body.length, size: data.length, method: useDeflate ? 8 : 0, offset });
+      offset += 30 + nameBuf.length + body.length;
+    },
+    end() {
+      let size = 0;
+      for (const e of central) {
+        const c = Buffer.alloc(46);
+        c.writeUInt32LE(0x02014b50, 0); c.writeUInt16LE(20, 4); c.writeUInt16LE(20, 6); c.writeUInt16LE(0x0800, 8);
+        c.writeUInt16LE(e.method, 10); c.writeUInt16LE(time, 12); c.writeUInt16LE(date, 14);
+        c.writeUInt32LE(e.crc, 16); c.writeUInt32LE(e.csize, 20); c.writeUInt32LE(e.size, 24);
+        c.writeUInt16LE(e.nameBuf.length, 28); c.writeUInt32LE(e.offset, 42);
+        res.write(c); res.write(e.nameBuf); size += 46 + e.nameBuf.length;
+      }
+      const z = Buffer.alloc(22);
+      z.writeUInt32LE(0x06054b50, 0); z.writeUInt16LE(central.length, 8); z.writeUInt16LE(central.length, 10);
+      z.writeUInt32LE(size, 12); z.writeUInt32LE(offset, 16);
+      res.end(z);
+    },
+  };
+}
+const safeName = t => String(t || '').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').replace(/\s+/g, ' ').trim().slice(0, 80) || 'fara-nume';
+const csvCell = v => { const t = String(v == null ? '' : v); return /[";\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+
+function handleClientsBackup(req, res) {
+  const ctx = requireUser(req, res); if (!ctx) return;
+  const uname = ctx.user.username;
+  const list = userClients(loadClients(), uname);
+  const udir = path.join(CONTRACTS_DIR, uname.replace(/[^\w.-]/g, '_'));
+  const stamp = new Date().toISOString().slice(0, 10);
+  res.writeHead(200, { 'Content-Type': 'application/zip', 'Cache-Control': 'no-store',
+    'Content-Disposition': `attachment; filename="clienti-backup-${stamp}.zip"`, ...CORS });
+  const z = zipWriter(res);
+  const root = `clienti-backup-${stamp}/`;
+  z.add(root + 'clienti.json', Buffer.from(JSON.stringify(list, null, 2), 'utf8'));
+  const head = ['Nume', 'Tip', 'CUI/CNP', 'Reg. Com.', 'Persoană contact', 'Telefon', 'Email', 'Adresă', 'NVR', 'Nr. camere',
+                'Data montaj', 'Garanție până', 'Furnizor', 'Factură furnizor', 'Data achiziție', 'Abonament (lei/lună)', 'Zi scadentă', 'Luni plătite', 'Documente', 'Observații'];
+  const rows = list.map(c => { const e = c.equip || {}, sb = c.sub || {};
+    return [c.name, c.kind === 'pj' ? 'PJ' : 'PF', c.code, c.regCom, c.contact, c.phone, c.email, c.address, e.nvr, e.cams || '',
+      e.installDate, e.warrantyUntil, e.supplier, e.supplierInvoice, e.purchaseDate, sb.active ? sb.amount : '', sb.active ? sb.dueDay : '',
+      Object.keys(sb.paid || {}).sort().join(' '), (c.contracts || []).length, c.notes].map(csvCell).join(';'); });
+  z.add(root + 'clienti.csv', Buffer.from('﻿' + [head.join(';'), ...rows].join('\r\n'), 'utf8'));   // BOM → Excel citește diacriticele
+  const usedDirs = new Set();
+  let missing = 0;
+  for (const c of list) {
+    let d = safeName(c.name), k = 2; while (usedDirs.has(d.toLowerCase())) d = safeName(c.name) + ' (' + k++ + ')';
+    usedDirs.add(d.toLowerCase());
+    const usedFiles = new Set();
+    for (const f of (c.contracts || [])) {
+      let data; try { data = fs.readFileSync(path.join(udir, c.id, f.id + '.' + (f.ext || 'pdf'))); } catch { missing++; continue; }
+      const sub = f.kind === 'garantie' ? 'garantii' : 'contracte';
+      let fn = safeName(f.name), n = 2; const dot = fn.lastIndexOf('.');
+      while (usedFiles.has(sub + '/' + fn.toLowerCase())) fn = (dot > 0 ? f.name.slice(0, dot) : fn) + ' (' + n++ + ')' + (dot > 0 ? fn.slice(dot) : '');
+      usedFiles.add(sub + '/' + fn.toLowerCase());
+      z.add(`${root}${d}/${sub}/${fn}`, data);
+    }
+  }
+  z.add(root + 'CITESTE-MA.txt', Buffer.from(
+    `Copie de siguranță — evidența clienților YCA CCTV Monitor\r\nCreată: ${new Date().toLocaleString('ro-RO')}\r\n` +
+    `Clienți: ${list.length}\r\n\r\nclienti.csv  — se deschide în Excel (date de bază, echipamente, abonament)\r\n` +
+    `clienti.json — toate datele, pentru restaurare\r\n<Client>/contracte, <Client>/garantii — documentele încărcate\r\n` +
+    (missing ? `\r\nATENȚIE: ${missing} fișiere lipseau de pe server.\r\n` : ''), 'utf8'));
+  z.end();
+}
+
 /* ───────────── Rute ───────────── */
 async function handleLogin(req, res) {
   const body = await readJson(req);
@@ -908,8 +999,9 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4.5, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4.6, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
+    if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/company' && req.method === 'GET') return await handleCompany(req, res, parsed);
     if (pathname === '/clients' || pathname.startsWith('/clients/')) return await handleClients(req, res, pathname);
 
@@ -983,4 +1075,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v4.5 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v4.6 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
