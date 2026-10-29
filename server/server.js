@@ -9,6 +9,8 @@
 //                  la fiecare minut și trimite alerte pe Telegram (NVR căzut/revenit, cameră căzută/revenită,
 //                  HDD cu eroare, înregistrare oprită), raport zilnic. Alertă doar după 2 verificări la rând.
 //                  Stare în monitor-state.json. Dezactivare: variabila de mediu MONITOR=0.
+// v4.1 (29.10.2026): GET /snap?nvr=&ch=&token= — captură din stream-ul RTSP (ffmpeg) pentru NVR-urile care nu
+//                  oferă capturi ISAPI (ex. DS-7104NI-Q1). Credențialele NVR rămân pe server.
 
 const http    = require('http');
 const https   = require('https');
@@ -16,6 +18,7 @@ const url     = require('url');
 const fs      = require('fs');
 const path    = require('path');
 const crypto  = require('crypto');
+const { spawn, execFileSync } = require('child_process');
 const jwt     = require('jsonwebtoken');
 const bcrypt  = require('bcryptjs');
 
@@ -161,8 +164,12 @@ async function readJson(req) {
 }
 function getAuth(req) {
   const h = req.headers['authorization'] || '';
-  if (!h.startsWith('Bearer ')) return null;
-  try { return jwt.verify(h.slice(7), JWT_SECRET); } catch { return null; }
+  let tok = h.startsWith('Bearer ') ? h.slice(7) : null;
+  if (!tok) {   // <img src> nu poate trimite antete → tokenul poate veni și în ?token= (doar pentru /snap)
+    try { const q = url.parse(req.url, true); if (q.pathname === '/snap' && q.query.token) tok = String(q.query.token); } catch {}
+  }
+  if (!tok) return null;
+  try { return jwt.verify(tok, JWT_SECRET); } catch { return null; }
 }
 // verifică tokenul și că utilizatorul încă există
 function requireUser(req, res) {
@@ -501,6 +508,92 @@ if (MONITOR_ENABLED) {
   console.log(`[monitor] pornit — verificare la ${MONITOR_INTERVAL_MS / 1000}s, alertă după ${MON_CONFIRM} verificări`);
 }
 
+
+/* ═════════════ Capturi din stream RTSP (ffmpeg) ═════════════ */
+let _ffmpegOk = null;
+function hasFfmpeg() {
+  if (_ffmpegOk !== null) return _ffmpegOk;
+  try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore', timeout: 5000 }); _ffmpegOk = true; } catch { _ffmpegOk = false; }
+  return _ffmpegOk;
+}
+const FF_MAX = 3;                 // câte ffmpeg simultan (protejăm procesorul VPS-ului)
+let ffActive = 0; const ffQueue = [];
+const snapCache = new Map();      // cheie → { t, buf } (3 s)
+const snapInflight = new Map();   // cheie → Promise (cereri identice simultane → un singur ffmpeg)
+
+function runFfmpeg(rtspUrl) {
+  return new Promise(resolve => {
+    const go = () => {
+      ffActive++;
+      const args = ['-hide_banner', '-loglevel', 'error', '-rtsp_transport', 'tcp', '-i', rtspUrl,
+                    '-frames:v', '1', '-vf', 'scale=960:-2', '-q:v', '6', '-f', 'image2', '-c:v', 'mjpeg', 'pipe:1'];
+      let p;
+      try { p = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] }); }
+      catch (e) { ffActive--; if (ffQueue.length) ffQueue.shift()(); return resolve({ err: e.message }); }
+      const chunks = []; let size = 0, err = '';
+      p.stdout.on('data', d => { size += d.length; if (size < 8e6) chunks.push(d); });
+      p.stderr.on('data', d => { if (err.length < 2000) err += d; });
+      const killer = setTimeout(() => { try { p.kill('SIGKILL'); } catch {} }, 10000);
+      let done = false;
+      const finish = (code) => {
+        if (done) return; done = true;
+        clearTimeout(killer); ffActive--; if (ffQueue.length) ffQueue.shift()();
+        resolve(code === 0 && size > 0 ? { buf: Buffer.concat(chunks) } : { err: err.trim() || ('ffmpeg ieșire ' + code) });
+      };
+      p.on('close', finish);
+      p.on('error', e => { err += e.message; finish(-1); });
+    };
+    if (ffActive < FF_MAX) go(); else ffQueue.push(go);
+  });
+}
+
+async function handleSnap(req, res, parsed) {
+  const ctx = requireUser(req, res); if (!ctx) return;
+  if (!hasFfmpeg()) return sendJson(res, 501, { error: 'ffmpeg nu e instalat pe server' });
+  const conf = ctx.db.configs[ctx.user.username] || {};
+  const nvr = (conf.nvrs || []).find(n => String(n.id) === String(parsed.query.nvr));
+  const ch = parseInt(parsed.query.ch, 10);
+  if (!nvr || !(ch >= 1 && ch <= 64)) return sendJson(res, 404, { error: 'NVR sau canal inexistent' });
+  const host = String(nvr.ip || '').trim();
+  if (!/^[a-zA-Z0-9.\-]+$/.test(host)) return sendJson(res, 400, { error: 'Adresă NVR invalidă' });
+  const cred = (conf.creds || {})[nvr.id] || (conf.creds || {})[String(nvr.id)] || {};
+  const port = parseInt(nvr.rtspPort, 10) || 554;
+  const key = `${ctx.user.username}:${nvr.id}:${ch}`;
+
+  const cached = snapCache.get(key);
+  let r = cached && Date.now() - cached.t < 3000 ? { buf: cached.buf } : null;
+  if (!r) {
+    let pr = snapInflight.get(key);
+    if (!pr) {
+      pr = (async () => {
+        const auth = `${encodeURIComponent(cred.user || 'admin')}:${encodeURIComponent(cred.pass || '')}@`;
+        let last = { err: '' };
+        for (const stream of ['02', '01']) {           // întâi sub-stream (mai rapid), apoi main
+          last = await runFfmpeg(`rtsp://${auth}${host}:${port}/Streaming/Channels/${ch}${stream}`);
+          if (last.buf || /401|unauthori/i.test(last.err)) break;
+        }
+        return last;
+      })().finally(() => snapInflight.delete(key));
+      snapInflight.set(key, pr);
+    }
+    r = await pr;
+    if (r.buf) {
+      snapCache.set(key, { t: Date.now(), buf: r.buf });
+      if (snapCache.size > 300) snapCache.delete(snapCache.keys().next().value);
+    }
+  }
+  if (r.buf) {
+    res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Content-Length': r.buf.length, 'Cache-Control': 'no-store', ...CORS });
+    return res.end(r.buf);
+  }
+  const e = String(r.err || '');
+  const msg = /401|unauthori/i.test(e) ? 'Utilizator sau parolă greșită (RTSP)'
+            : /refused|timed out|timeout|no route|unreachable|connection/i.test(e) ? 'Portul RTSP al NVR-ului nu răspunde'
+            : /404|not found/i.test(e) ? 'Canalul nu are stream video'
+            : 'Nu s-a putut citi imaginea din stream';
+  return sendJson(res, 502, { error: msg });
+}
+
 /* ───────────── Rute ───────────── */
 async function handleLogin(req, res) {
   const body = await readJson(req);
@@ -631,7 +724,8 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4, mail: mailReady(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4.1, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
 
     // Starea monitorizării pentru utilizatorul logat
     if (pathname === '/monitor' && req.method === 'GET') {
@@ -703,4 +797,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v4 running on port ' + PORT));
+server.listen(PORT, () => console.log('NVR Proxy v4.1 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));

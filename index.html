@@ -1262,12 +1262,18 @@ const SNAP_MODES = {
 function snapUrlFor(nvr, ch, mode){
   const { user, pass } = getNvrCreds(nvr);
   const proxy = (cfg.proxyUrl || 'https://proxy.supraveghere24h.ro').replace(/\/$/, '');
+  // NVR fără capturi ISAPI → serverul ia un cadru din stream-ul RTSP (parola NVR-ului rămâne pe server)
+  if ((mode || nvr.snapMode) === 'rtsp') {
+    const a = getAuth();
+    return `${proxy}/snap?nvr=${encodeURIComponent(nvr.id)}&ch=${ch}&token=${encodeURIComponent(a ? a.token : '')}&t=${Date.now()}`;
+  }
   const path = (SNAP_MODES[mode || nvr.snapMode] || SNAP_MODES.std)(ch);
   return `${proxy}/?url=${encodeURIComponent(`http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${nvr.ip}:${nvr.port}${path}?t=${Date.now()}`)}`;
 }
 const _snapDetect = {};
 const NOSNAP_RECHECK_MS = 24 * 3600 * 1000;   // NVR fără capturi → reverificăm o dată pe zi
-function nvrHasNoSnap(nvr){ return nvr && nvr.snapMode === 'none' && (Date.now() - (nvr.snapCheckedAt || 0)) < NOSNAP_RECHECK_MS; }
+const SNAP_V = 2;                             // v2: verificăm și captura din stream RTSP
+function nvrHasNoSnap(nvr){ return nvr && nvr.snapMode === 'none' && nvr.snapV === SNAP_V && (Date.now() - (nvr.snapCheckedAt || 0)) < NOSNAP_RECHECK_MS; }
 function detectSnapMode(nvr, force){
   if (!nvr) return Promise.resolve(null);
   if (nvrHasNoSnap(nvr) && !force) return Promise.resolve('none');
@@ -1291,11 +1297,22 @@ function detectSnapMode(nvr, force){
         }
       } catch {}
     }
-    // NVR-ul răspunde, dar refuză toate variantele → modelul nu oferă capturi prin rețea
+    // NVR-ul răspunde, dar refuză toate variantele ISAPI → încercăm un cadru din stream-ul RTSP (prin server)
     if (refused === Object.keys(SNAP_MODES).length) {
       const n = nvrs.find(x => x.id === nvr.id) || nvr;
+      try {
+        const r = await fetch(snapUrlFor(n, ch, 'rtsp'));
+        if (r.ok && (r.headers.get('content-type') || '').startsWith('image')) {
+          if (n.snapMode !== 'rtsp') {
+            n.snapMode = 'rtsp'; save(SK.nvrs, nvrs);
+            addLog('info', `<b>${escapeHtml(n.name)}</b> — imaginile camerelor se iau din stream-ul video (RTSP), prin server`);
+            try { markSettingsChanged(); } catch {}
+          }
+          return 'rtsp';
+        }
+      } catch {}
       const first = n.snapMode !== 'none';
-      n.snapMode = 'none'; n.snapCheckedAt = Date.now(); save(SK.nvrs, nvrs);
+      n.snapMode = 'none'; n.snapV = SNAP_V; n.snapCheckedAt = Date.now(); save(SK.nvrs, nvrs);
       if (first) addLog('info', `<b>${escapeHtml(n.name)}</b> — NVR-ul nu oferă capturi de imagine prin rețea (doar stream video); monitorizarea merge normal`);
       return 'none';
     }
@@ -1818,7 +1835,7 @@ function loadChThumbs(container){
   const cards = (container.matches && container.matches('.nvr-card[data-nid]')) ? [container] : [...container.querySelectorAll('.nvr-card[data-nid]')];
   cards.forEach(c => {
     const n = nvrs.find(x => x.id === parseInt(c.dataset.nid));
-    if (n && !n.snapMode && c.querySelector('.ch-cell.ok[data-nch]') && c.querySelector('.nvr-detail.open')) pending.add(n);
+    if (n && (!n.snapMode || (n.snapMode === 'none' && !nvrHasNoSnap(n))) && c.querySelector('.ch-cell.ok[data-nch]') && c.querySelector('.nvr-detail.open')) pending.add(n);
   });
   pending.forEach(n => detectSnapMode(n).then(m => { if (m === 'none') renderAll(); else if (m && m !== 'std') loadChThumbs(container); }));
   container.querySelectorAll('.ch-cell.ok[data-nch]').forEach(cell => {
@@ -2773,7 +2790,7 @@ function loadSnapModal(nvr, ch) {
   const { user, pass } = getNvrCreds(nvr);
   const proxy = (cfg.proxyUrl || 'https://proxy.supraveghere24h.ro').replace(/\/$/, '');
   // Includem credențialele direct în URL (Hikvision acceptă user:pass@ în URL)
-  (nvr.snapMode && nvr.snapMode !== 'none' ? Promise.resolve() : detectSnapMode(nvr))
+  (nvr.snapMode && nvr.snapMode !== 'none' ? Promise.resolve() : detectSnapMode(nvr, nvr.snapMode === 'none' && !nvrHasNoSnap(nvr)))
   .then(m => {
     if (m === 'none' || nvrHasNoSnap(nvrs.find(n => n.id === nvr.id) || nvr))
       throw new Error('Acest NVR nu oferă capturi de imagine prin rețea (limitare a modelului). Starea camerelor e monitorizată normal; imaginea o vezi în Hik-Connect / iVMS.');
@@ -2784,6 +2801,8 @@ function loadSnapModal(nvr, ch) {
       let msg = `HTTP ${r.status}`;
       try {
         const t = await r.text();
+        let je = null; try { je = JSON.parse(t).error; } catch {}
+        if (je) throw new Error(je);
         const sub = (t.match(/<subStatusCode>\s*([^<]+?)\s*</) || [])[1] || '';
         const ss  = (t.match(/<statusString>\s*([^<]+?)\s*</) || [])[1] || '';
         msg = snapErrorLabel(r.status, sub, ss);
