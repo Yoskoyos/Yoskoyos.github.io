@@ -1288,7 +1288,7 @@ html:not(.unlocked) .app{display:none}
       <div class="fg"><label for="cm-equip">Detalii echipamente</label><textarea id="cm-equip" rows="2" placeholder="Camere, HDD, switch, cabluri…"></textarea></div>
 
       <div class="f2">
-        <div class="fg"><label for="cm-supplier">Furnizor echipamente</label><div class="cm-cui"><input type="text" id="cm-supplier" list="cm-suppliers" placeholder="alege sau scrie" autocomplete="off"><a class="btn" id="cm-suplink" target="_blank" rel="noopener" hidden><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>Site</a></div><datalist id="cm-suppliers"></datalist></div>
+        <div class="fg"><label for="cm-supplier">Furnizor echipamente</label><div class="cm-cui"><select id="cm-supsel"></select><a class="btn" id="cm-suplink" target="_blank" rel="noopener" hidden><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>Site</a></div><input type="text" id="cm-supplier" placeholder="scrie numele furnizorului" autocomplete="off" hidden style="margin-top:6px"></div>
         <div class="fg"><label for="cm-supinv">Factură furnizor</label><input type="text" id="cm-supinv" placeholder="serie / număr" autocomplete="off"></div>
       </div>
       <div class="fg"><label for="cm-purchase">Data achiziției</label><input type="date" id="cm-purchase"></div>
@@ -2786,8 +2786,21 @@ const SUPPLIERS = [
   { name: 'Telesystem', url: 'https://telesystem.ro/' },
   { name: 'Vonmag',     url: 'https://www.vonmag.ro/' },
 ];
+// Listă de furnizori: cei predefiniți + cei folosiți deja la alți clienți + „Alt furnizor…”
+function cmFillSuppliers(cur) {
+  const names = [...new Set([...SUPPLIERS.map(x => x.name), ...(clients || []).map(x => x.equip && x.equip.supplier).filter(Boolean)])]
+    .sort((a, b) => a.localeCompare(b, 'ro'));
+  const sel = qs('#cm-supsel'), inp = qs('#cm-supplier');
+  sel.innerHTML = '<option value="">— alege furnizorul —</option>' + names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('') + '<option value="__other">✎ Alt furnizor…</option>';
+  const known = names.find(n => n.toLowerCase() === String(cur).trim().toLowerCase());
+  sel.value = known || (cur ? '__other' : '');
+  inp.value = known ? '' : cur;
+  inp.hidden = sel.value !== '__other';
+  cmSupplierLink();
+}
+function cmSupplierValue() { const v = qs('#cm-supsel').value; return v === '__other' ? qs('#cm-supplier').value.trim() : v; }
 function cmSupplierLink() {
-  const v = qs('#cm-supplier').value.trim().toLowerCase();
+  const v = cmSupplierValue().toLowerCase();
   const s = SUPPLIERS.find(x => x.name.toLowerCase() === v);
   const a = qs('#cm-suplink');
   a.hidden = !s; if (s) { a.href = s.url; a.title = 'Deschide ' + s.url; }
@@ -3025,9 +3038,8 @@ function openClientModal(c) {
   set('#cm-nvr', e.nvr); set('#cm-cams', e.cams || ''); set('#cm-install', e.installDate); set('#cm-warranty', e.warrantyUntil); set('#cm-equip', e.details);
   qs('#cm-sub-on').checked = !!s.active; set('#cm-amount', s.amount || ''); set('#cm-due', s.dueDay || ''); set('#cm-start', s.start || (c ? '' : ymNow()));
   set('#cm-signed', ''); set('#cm-valid', ''); set('#cm-wvalid', '');
-  set('#cm-supplier', e.supplier); set('#cm-supinv', e.supplierInvoice); set('#cm-purchase', e.purchaseDate);
-  qs('#cm-suppliers').innerHTML = [...new Set([...SUPPLIERS.map(x => x.name), ...(clients || []).map(x => x.equip && x.equip.supplier).filter(Boolean)])].sort((a, b) => a.localeCompare(b, 'ro')).map(n => `<option value="${escapeHtml(n)}">`).join('');
-  cmSupplierLink();
+  set('#cm-supinv', e.supplierInvoice); set('#cm-purchase', e.purchaseDate);
+  cmFillSuppliers(e.supplier || '');
   qs('#cm-anaf-msg').hidden = true;
   cmFillNvrSelect(c);
   qs('#cm-delete').style.display = c ? '' : 'none';
@@ -3044,7 +3056,7 @@ function cmCollect() {
     kind: qs('#cm-kind').value, name: v('#cm-name'), code: v('#cm-code'), contact: v('#cm-contact'), regCom: v('#cm-regcom'),
     phone: v('#cm-phone'), email: v('#cm-email'), address: v('#cm-address'), notes: qs('#cm-notes').value,
     equip: { nvr: v('#cm-nvr'), cams: v('#cm-cams'), installDate: v('#cm-install'), warrantyUntil: v('#cm-warranty'), details: qs('#cm-equip').value, nvrId: qs('#cm-nvrlink').value,
-             supplier: v('#cm-supplier'), supplierInvoice: v('#cm-supinv'), purchaseDate: v('#cm-purchase') },
+             supplier: cmSupplierValue(), supplierInvoice: v('#cm-supinv'), purchaseDate: v('#cm-purchase') },
     sub: { active: qs('#cm-sub-on').checked, amount: v('#cm-amount'), dueDay: v('#cm-due'), start: v('#cm-start'), paid: cmDraft.sub.paid || {} },
   };
 }
@@ -3086,6 +3098,12 @@ qs('#cm-kind').addEventListener('change', cmKindUi);
 qs('#cm-anaf').addEventListener('click', cmAnafLookup);
 qs('#cm-nvrpull').addEventListener('click', cmPullFromNvr);
 qs('#cm-supplier').addEventListener('input', cmSupplierLink);
+qs('#cm-supsel').addEventListener('change', () => {
+  const other = qs('#cm-supsel').value === '__other';
+  qs('#cm-supplier').hidden = !other;
+  if (other) setTimeout(() => qs('#cm-supplier').focus(), 30);
+  cmSupplierLink();
+});
 qs('#cm-nvrlink').addEventListener('change', () => { qs('#cm-nvr-msg').hidden = true; });
 qs('#cm-code').addEventListener('keydown', e => { if (e.key === 'Enter' && qs('#cm-kind').value === 'pj') { e.preventDefault(); cmAnafLookup(); } });
 qs('#cm-sub-on').addEventListener('change', cmSubUi);
