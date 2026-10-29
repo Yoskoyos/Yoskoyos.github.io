@@ -429,6 +429,8 @@ html[data-bg="b"] .app{background:
 .cm-cui{display:flex;gap:6px}
 .cm-cui input,.cm-cui select{flex:1;min-width:0}
 .cm-cui .btn{flex:0 0 auto;padding:0 12px;font-size:12px;color:var(--accent);border-color:var(--accent)}
+.cm-cui a.btn{text-decoration:none;display:flex}
+.cm-cui a.btn[hidden]{display:none}
 .cm-cui .btn:disabled{opacity:.6;cursor:default}
 .cm-anaf-msg{font-size:12px;line-height:1.45;border-radius:8px;padding:8px 10px;background:var(--ok-dim);color:var(--ok)}
 .cm-anaf-msg.bad{background:var(--err-dim);color:var(--err)}
@@ -1286,7 +1288,7 @@ html:not(.unlocked) .app{display:none}
       <div class="fg"><label for="cm-equip">Detalii echipamente</label><textarea id="cm-equip" rows="2" placeholder="Camere, HDD, switch, cabluri…"></textarea></div>
 
       <div class="f2">
-        <div class="fg"><label for="cm-supplier">Furnizor echipamente</label><input type="text" id="cm-supplier" list="cm-suppliers" placeholder="de unde ai cumpărat" autocomplete="off"><datalist id="cm-suppliers"></datalist></div>
+        <div class="fg"><label for="cm-supplier">Furnizor echipamente</label><div class="cm-cui"><input type="text" id="cm-supplier" list="cm-suppliers" placeholder="alege sau scrie" autocomplete="off"><a class="btn" id="cm-suplink" target="_blank" rel="noopener" hidden><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>Site</a></div><datalist id="cm-suppliers"></datalist></div>
         <div class="fg"><label for="cm-supinv">Factură furnizor</label><input type="text" id="cm-supinv" placeholder="serie / număr" autocomplete="off"></div>
       </div>
       <div class="fg"><label for="cm-purchase">Data achiziției</label><input type="date" id="cm-purchase"></div>
@@ -2777,6 +2779,19 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
 /* ═══════════════════════════════════════
    CLIENȚI (date pe server: /clients · contracte PDF pe VPS)
 ═══════════════════════════════════════ */
+// Furnizorii obișnuiți (apar în lista de la „Furnizor echipamente”; se pot scrie și alții)
+const SUPPLIERS = [
+  { name: 'A2T',        url: 'https://www.a2t.ro/' },
+  { name: 'Rovision',   url: 'https://rovision.ro/' },
+  { name: 'Telesystem', url: 'https://telesystem.ro/' },
+  { name: 'Vonmag',     url: 'https://www.vonmag.ro/' },
+];
+function cmSupplierLink() {
+  const v = qs('#cm-supplier').value.trim().toLowerCase();
+  const s = SUPPLIERS.find(x => x.name.toLowerCase() === v);
+  const a = qs('#cm-suplink');
+  a.hidden = !s; if (s) { a.href = s.url; a.title = 'Deschide ' + s.url; }
+}
 let clients = null;            // doar în memorie — datele personale nu se salvează în browser
 let clFilter = 'all';
 let cmDraft = null;            // clientul deschis în formular
@@ -3011,7 +3026,8 @@ function openClientModal(c) {
   qs('#cm-sub-on').checked = !!s.active; set('#cm-amount', s.amount || ''); set('#cm-due', s.dueDay || ''); set('#cm-start', s.start || (c ? '' : ymNow()));
   set('#cm-signed', ''); set('#cm-valid', ''); set('#cm-wvalid', '');
   set('#cm-supplier', e.supplier); set('#cm-supinv', e.supplierInvoice); set('#cm-purchase', e.purchaseDate);
-  qs('#cm-suppliers').innerHTML = [...new Set((clients || []).map(x => x.equip && x.equip.supplier).filter(Boolean))].sort().map(n => `<option value="${escapeHtml(n)}">`).join('');
+  qs('#cm-suppliers').innerHTML = [...new Set([...SUPPLIERS.map(x => x.name), ...(clients || []).map(x => x.equip && x.equip.supplier).filter(Boolean)])].sort((a, b) => a.localeCompare(b, 'ro')).map(n => `<option value="${escapeHtml(n)}">`).join('');
+  cmSupplierLink();
   qs('#cm-anaf-msg').hidden = true;
   cmFillNvrSelect(c);
   qs('#cm-delete').style.display = c ? '' : 'none';
@@ -3069,6 +3085,7 @@ qs('#cl-list').addEventListener('keydown', e => {
 qs('#cm-kind').addEventListener('change', cmKindUi);
 qs('#cm-anaf').addEventListener('click', cmAnafLookup);
 qs('#cm-nvrpull').addEventListener('click', cmPullFromNvr);
+qs('#cm-supplier').addEventListener('input', cmSupplierLink);
 qs('#cm-nvrlink').addEventListener('change', () => { qs('#cm-nvr-msg').hidden = true; });
 qs('#cm-code').addEventListener('keydown', e => { if (e.key === 'Enter' && qs('#cm-kind').value === 'pj') { e.preventDefault(); cmAnafLookup(); } });
 qs('#cm-sub-on').addEventListener('change', cmSubUi);
