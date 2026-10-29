@@ -1248,9 +1248,44 @@ function getNvrCreds(nvr){
   return { user: c.user || 'admin', pass: c.pass || '' };
 }
 
-function snapUrl(nvr, ch){
+// Unde dă NVR-ul captura unei camere. Unele NVR-uri (ex. seria DS-71xxNI-Q1) nu oferă calea standard
+// pentru camerele IP, ci doar prin StreamingProxy sau pe sub-stream → detectăm o dată și reținem per NVR.
+const SNAP_MODES = {
+  std:   ch => `/ISAPI/Streaming/channels/${ch}01/picture`,
+  proxy: ch => `/ISAPI/ContentMgmt/StreamingProxy/channels/${ch}01/picture`,
+  sub:   ch => `/ISAPI/Streaming/channels/${ch}02/picture`,
+  psub:  ch => `/ISAPI/ContentMgmt/StreamingProxy/channels/${ch}02/picture`,
+};
+function snapUrlFor(nvr, ch, mode){
   const { user, pass } = getNvrCreds(nvr);
-  return `http://${nvr.ip}:${nvr.port}/ISAPI/Streaming/channels/${ch}01/picture?auth=${btoa(user+':'+pass)}&t=${Date.now()}`;
+  const proxy = (cfg.proxyUrl || 'https://proxy.supraveghere24h.ro').replace(/\/$/, '');
+  const path = (SNAP_MODES[mode || nvr.snapMode] || SNAP_MODES.std)(ch);
+  return `${proxy}/?url=${encodeURIComponent(`http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${nvr.ip}:${nvr.port}${path}?t=${Date.now()}`)}`;
+}
+const _snapDetect = {};
+function detectSnapMode(nvr, force){
+  if (!nvr) return Promise.resolve(null);
+  if (nvr.snapMode && !force) return Promise.resolve(nvr.snapMode);
+  if (_snapDetect[nvr.id] && !force) return _snapDetect[nvr.id];
+  const ch = (Array.isArray(nvr.cams) ? nvr.cams.indexOf('ok') : -1) + 1 || 1;
+  _snapDetect[nvr.id] = (async () => {
+    for (const m of Object.keys(SNAP_MODES)) {
+      try {
+        const r = await fetch(snapUrlFor(nvr, ch, m));
+        const type = r.headers.get('content-type') || '';
+        if (r.ok && type.startsWith('image')) {
+          const n = nvrs.find(x => x.id === nvr.id) || nvr;
+          if (n.snapMode !== m) {
+            n.snapMode = m; save(SK.nvrs, nvrs);
+            if (m !== 'std') addLog('info', `<b>${escapeHtml(n.name)}</b> — imaginile camerelor se iau pe calea alternativă (${m})`);
+          }
+          return m;
+        }
+      } catch {}
+    }
+    return null;
+  })();
+  return _snapDetect[nvr.id];
 }
 
 function checkNvr(nvr){
@@ -1760,6 +1795,14 @@ const THUMB_MS    = 6000;        // reîmprospătare miniatură
 function loadChThumbs(container){
   const proxy = (cfg.proxyUrl||'https://proxy.supraveghere24h.ro').replace(/\/$/,'');
   if (!proxy) return;
+  // NVR-uri fără cale de captură cunoscută → o detectăm, apoi reîncărcăm miniaturile
+  const pending = new Set();
+  const cards = (container.matches && container.matches('.nvr-card[data-nid]')) ? [container] : [...container.querySelectorAll('.nvr-card[data-nid]')];
+  cards.forEach(c => {
+    const n = nvrs.find(x => x.id === parseInt(c.dataset.nid));
+    if (n && !n.snapMode && c.querySelector('.ch-cell.ok[data-nch]') && c.querySelector('.nvr-detail.open')) pending.add(n);
+  });
+  pending.forEach(n => detectSnapMode(n).then(m => { if (m && m !== 'std') loadChThumbs(container); }));
   container.querySelectorAll('.ch-cell.ok[data-nch]').forEach(cell => {
     if (!cell.offsetParent) return;                 // card închis sau tab ascuns
     const card = cell.closest('[data-nid]');
@@ -1771,7 +1814,6 @@ function loadChThumbs(container){
     const list = (cell.closest('.nvr-grid') || {}).id || 'x';
     const key = list+':'+nvrId+'-'+ch;
     const {user, pass} = getNvrCreds(nvr);
-    const baseUrl = 'http://'+encodeURIComponent(user)+':'+encodeURIComponent(pass)+'@'+nvr.ip+':'+nvr.port+'/ISAPI/Streaming/channels/'+ch+'01/picture';
     let fails = 0, busy = false, tick = 0;
 
     const stop = () => { if (_liveTimers[key]) { clearInterval(_liveTimers[key]); delete _liveTimers[key]; } };
@@ -1802,7 +1844,7 @@ function loadChThumbs(container){
         }
         // nu oprim: reîncercăm (eroarea poate fi temporară)
       };
-      img.src = `${proxy}?url=${encodeURIComponent(baseUrl+'?t='+Date.now())}`;
+      img.src = snapUrlFor(nvrs.find(n => n.id === nvrId) || nvr, ch);
     }
 
     stop();
@@ -2318,7 +2360,7 @@ async function loadSnaps(){
   grid.innerHTML = Array.from({length:total},(_,i)=>{
     const ch = i+1;
     const url = proxy
-      ? `${proxy}?url=${encodeURIComponent(`http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${nvr.ip}:${nvr.port}/ISAPI/Streaming/channels/${ch}01/picture?t=${Date.now()}`)}`
+      ? snapUrlFor(nvr, ch)
       : `http://${nvr.ip}:${nvr.port}/ISAPI/Streaming/channels/${ch}01/picture?t=${Date.now()}`;
     return `<div class="snap-card" id="sc-${ch}">
       <img src="${url}" alt="CH${ch}"
@@ -2664,7 +2706,7 @@ function loadSnapModalSilent(nvr, ch) {
   const { user, pass } = getNvrCreds(nvr);
   const proxy = (cfg.proxyUrl || 'https://proxy.supraveghere24h.ro').replace(/\/$/, '');
   const nvrBase = `http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${nvr.ip}:${nvr.port}`;
-  const url = `${proxy}?url=${encodeURIComponent(nvrBase+'/ISAPI/Streaming/channels/'+ch+'01/picture?t='+Date.now())}`;
+  const url = snapUrlFor(nvr, ch);
   fetch(url).then(async r => {
     if (!r.ok) return;
     const blob = await r.blob();
@@ -2713,11 +2755,8 @@ function loadSnapModal(nvr, ch) {
   const { user, pass } = getNvrCreds(nvr);
   const proxy = (cfg.proxyUrl || 'https://proxy.supraveghere24h.ro').replace(/\/$/, '');
   // Includem credențialele direct în URL (Hikvision acceptă user:pass@ în URL)
-  const nvrBase = `http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${nvr.ip}:${nvr.port}`;
-  const snapPath = `/ISAPI/Streaming/channels/${ch}01/picture?t=${Date.now()}`;
-  const url = `${proxy}?url=${encodeURIComponent(nvrBase + snapPath)}`;
-
-  fetch(url)
+  (nvr.snapMode ? Promise.resolve() : detectSnapMode(nvr))
+  .then(() => fetch(snapUrlFor(nvrs.find(n => n.id === nvr.id) || nvr, ch)))
   .then(async r => {
     if (!r.ok) {
       let msg = `HTTP ${r.status}`;
