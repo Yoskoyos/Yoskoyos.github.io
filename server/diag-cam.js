@@ -45,6 +45,7 @@ const short = b => b.replace(/<\?xml[^>]*>/, '').replace(/\s+/g, ' ').replace(/ 
       found++;
       const cred = (conf.creds || {})[nvr.id] || {};
       console.log(`\n===== ${nvr.name}  (${nvr.ip}:${nvr.port}, ${nvr.channels} canale) =====`);
+      console.log('Canale văzute vreodată online (în aplicație): ' + (Object.keys(nvr.seenCh || {}).map(c => 'CH' + c).join(', ') || 'niciunul'));
       for (const uri of ['/ISAPI/System/deviceInfo',
                          '/ISAPI/ContentMgmt/InputProxy/channels/status',
                          ]) {
