@@ -385,6 +385,13 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .cm-sec:first-child{margin-top:0;padding-top:0;border-top:0}
 .fg textarea{background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:9px 12px;font-size:13px;color:var(--fg);font-family:var(--sans);outline:none;width:100%;min-height:64px;resize:vertical}
 .fg textarea:focus{border-color:var(--accent)}
+.cm-cui{display:flex;gap:6px}
+.cm-cui input{flex:1;min-width:0}
+.cm-cui .btn{flex:0 0 auto;padding:0 12px;font-size:12px;color:var(--accent);border-color:var(--accent)}
+.cm-cui .btn:disabled{opacity:.6;cursor:default}
+.cm-anaf-msg{font-size:12px;line-height:1.45;border-radius:8px;padding:8px 10px;background:var(--ok-dim);color:var(--ok)}
+.cm-anaf-msg.bad{background:var(--err-dim);color:var(--err)}
+.cm-anaf-msg.warn{background:var(--warn-dim);color:var(--warn)}
 .cm-check{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--fg);cursor:pointer}
 .cm-check input{width:18px;height:18px;accent-color:var(--accent)}
 .cm-months{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px}
@@ -1198,8 +1205,9 @@ html:not(.unlocked) .app{display:none}
       <div class="cm-sec">Date client</div>
       <div class="f2">
         <div class="fg"><label for="cm-kind">Tip</label><select id="cm-kind"><option value="pf">Persoană fizică</option><option value="pj">Firmă (PJ)</option></select></div>
-        <div class="fg"><label for="cm-code" id="cm-code-lbl">CNP</label><input type="text" id="cm-code" autocomplete="off"></div>
+        <div class="fg"><label for="cm-code" id="cm-code-lbl">CNP</label><div class="cm-cui"><input type="text" id="cm-code" autocomplete="off"><button type="button" class="btn" id="cm-anaf" title="Completează datele firmei din ANAF"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>ANAF</button></div></div>
       </div>
+      <div class="cm-anaf-msg" id="cm-anaf-msg" hidden></div>
       <div class="fg"><label for="cm-name" id="cm-name-lbl">Nume și prenume</label><input type="text" id="cm-name" autocomplete="off"></div>
       <div class="f2 cm-pj">
         <div class="fg"><label for="cm-contact">Persoană de contact</label><input type="text" id="cm-contact" autocomplete="off"></div>
@@ -2795,6 +2803,33 @@ function cmKindUi() {
   qs('#cm-name-lbl').textContent = pj ? 'Denumire firmă' : 'Nume și prenume';
   qs('#cm-code-lbl').textContent = pj ? 'CUI' : 'CNP';
   qs('.cm-pj').style.display = pj ? '' : 'none';
+  qs('#cm-anaf').style.display = pj ? '' : 'none';
+  qs('#cm-code').placeholder = pj ? 'ex: RO12345678' : '';
+  if (!pj) qs('#cm-anaf-msg').hidden = true;
+}
+
+// Completează fișa firmei din baza publică ANAF (prin serverul nostru)
+async function cmAnafLookup() {
+  const cui = qs('#cm-code').value.trim().toUpperCase().replace(/\s+/g, '');
+  const msg = qs('#cm-anaf-msg'), btn = qs('#cm-anaf');
+  const show = (txt, cls) => { msg.className = 'cm-anaf-msg ' + (cls || ''); msg.innerHTML = txt; msg.hidden = false; };
+  if (!/^(RO)?\d{2,10}$/.test(cui)) { show('Scrie un CUI valid (doar cifre, cu sau fără RO).', 'warn'); qs('#cm-code').focus(); return; }
+  btn.disabled = true; show('Caut firma în baza ANAF…', 'warn');
+  try {
+    const d = await clApi('/company?cui=' + encodeURIComponent(cui));
+    qs('#cm-name').value = d.name || qs('#cm-name').value;
+    qs('#cm-code').value = (d.vat ? 'RO' : '') + d.cui;
+    if (d.regCom) qs('#cm-regcom').value = d.regCom;
+    if (d.phone && !qs('#cm-phone').value.trim()) qs('#cm-phone').value = d.phone;
+    if (d.address && !qs('#cm-address').value.trim()) qs('#cm-address').value = d.address;
+    if (cmDraft && !cmDraft.id) qs('#cm-title').textContent = d.name || 'Client nou';
+    const bits = [d.vat ? 'plătitor de TVA' : 'neplătitor de TVA'];
+    if (d.address) bits.push('sediu: ' + escapeHtml(d.address));
+    if (d.radiat) show('⚠ <b>' + escapeHtml(d.name) + '</b> este <b>radiată</b> (închisă) conform ANAF.', 'bad');
+    else if (d.inactive) show('⚠ <b>' + escapeHtml(d.name) + '</b> este declarată <b>inactivă fiscal</b> de ANAF. · ' + bits.join(' · '), 'warn');
+    else show('✓ Date preluate din ANAF · ' + bits.join(' · '));
+  } catch (e) { show(escapeHtml(e.message), 'bad'); }
+  finally { btn.disabled = false; }
 }
 function cmSubUi() { qs('.cm-subbox').style.display = qs('#cm-sub-on').checked ? '' : 'none'; renderCmMonths(); }
 
@@ -2835,6 +2870,7 @@ function openClientModal(c) {
   set('#cm-nvr', e.nvr); set('#cm-cams', e.cams || ''); set('#cm-install', e.installDate); set('#cm-warranty', e.warrantyUntil); set('#cm-equip', e.details);
   qs('#cm-sub-on').checked = !!s.active; set('#cm-amount', s.amount || ''); set('#cm-due', s.dueDay || ''); set('#cm-start', s.start || (c ? '' : ymNow()));
   set('#cm-signed', ''); set('#cm-valid', '');
+  qs('#cm-anaf-msg').hidden = true;
   qs('#cm-delete').style.display = c ? '' : 'none';
   cmKindUi(); cmSubUi(); renderCmFiles();
   qs('#client-modal').classList.remove('hidden');
@@ -2887,6 +2923,8 @@ qs('#cl-list').addEventListener('keydown', e => {
   if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('cl-card')) { e.preventDefault(); e.target.click(); }
 });
 qs('#cm-kind').addEventListener('change', cmKindUi);
+qs('#cm-anaf').addEventListener('click', cmAnafLookup);
+qs('#cm-code').addEventListener('keydown', e => { if (e.key === 'Enter' && qs('#cm-kind').value === 'pj') { e.preventDefault(); cmAnafLookup(); } });
 qs('#cm-sub-on').addEventListener('change', cmSubUi);
 ['#cm-start', '#cm-due'].forEach(id => qs(id).addEventListener('change', renderCmMonths));
 qs('#cm-months').addEventListener('click', e => {

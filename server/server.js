@@ -11,6 +11,7 @@
 //                  Stare în monitor-state.json. Dezactivare: variabila de mediu MONITOR=0.
 // v4.1 (29.10.2026): GET /snap?nvr=&ch=&token= — captură din stream-ul RTSP (ffmpeg) pentru NVR-urile care nu
 //                  oferă capturi ISAPI (ex. DS-7104NI-Q1). Credențialele NVR rămân pe server.
+// v4.4: GET /company?cui= — datele firmei din serviciul public ANAF (PlatitorTvaRest v9), pt. completarea fișei clientului.
 // v4.3: evidență clienți (clients.json) + contracte PDF stocate pe VPS în contracts/ (nu în GitHub).
 // v4.2: monitorul ține cont și de canalele marcate în aplicație (seenCh) — ex. cameră pusă „urmărită” deși n-a mers niciodată.
 
@@ -711,6 +712,64 @@ async function handleClients(req, res, pathname) {
   return sendJson(res, 405, { error: 'Operație necunoscută' });
 }
 
+
+/* ═════════════ Date firmă după CUI (ANAF, serviciu public) ═════════════ */
+const ANAF_URL = process.env.ANAF_URL || 'https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva';
+const anafCache = new Map();           // cui → { t, data }  (24 h)
+let anafChain = Promise.resolve();     // ANAF cere maxim 1 cerere/secundă → le punem la rând
+function anafPost(cui) {
+  const body = JSON.stringify([{ cui: Number(cui), data: new Date().toISOString().slice(0, 10) }]);
+  return new Promise(resolve => {
+    const u = new URL(ANAF_URL);
+    const lib = u.protocol === 'http:' ? http : https;
+    const r = lib.request({ hostname: u.hostname, port: u.port || undefined, path: u.pathname + u.search, method: 'POST', timeout: 12000,
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }, res => {
+      let b = ''; res.setEncoding('utf8');
+      res.on('data', d => { if (b.length < 500000) b += d; });
+      res.on('end', () => { try { resolve({ status: res.statusCode, json: JSON.parse(b) }); } catch { resolve({ status: res.statusCode, json: null }); } });
+    });
+    r.on('error', () => resolve({ status: 0 }));
+    r.on('timeout', () => { r.destroy(); resolve({ status: 0 }); });
+    r.end(body);
+  });
+}
+function anafQueued(cui) {
+  const p = anafChain.then(() => anafPost(cui));
+  anafChain = p.then(() => new Promise(r => setTimeout(r, 1100)), () => new Promise(r => setTimeout(r, 1100)));
+  return p;
+}
+const cap = s => String(s || '').trim();
+function anafParse(f) {
+  const g = f.date_generale || f;                       // v8/v9: grupat; versiunile vechi: plat
+  const tva = f.inregistrare_scop_Tva || f;
+  const ina = f.stare_inactiv || f;
+  const sa  = f.adresa_sediu_social || f;
+  const street = [cap(sa.sdenumire_Strada), cap(sa.snumar_Strada) ? 'nr. ' + cap(sa.snumar_Strada) : ''].filter(Boolean).join(' ');
+  const built = [street, cap(sa.sdetalii_Adresa), cap(sa.sdenumire_Localitate), cap(sa.sdenumire_Judet)].filter(Boolean).join(', ');
+  return {
+    cui: String(g.cui || ''), name: cap(g.denumire), regCom: cap(g.nrRegCom), phone: cap(g.telefon),
+    address: cap(g.adresa) || built, postal: cap(g.codPostal || sa.scod_Postal),
+    vat: !!tva.scpTVA, inactive: !!ina.statusInactivi, radiat: !!cap(ina.dataRadiere),
+    state: cap(g.stare_inregistrare), caen: cap(g.cod_CAEN),
+  };
+}
+async function handleCompany(req, res, parsed) {
+  const ctx = requireUser(req, res); if (!ctx) return;
+  const cui = String(parsed.query.cui || '').toUpperCase().replace(/^RO/, '').replace(/\s+/g, '');
+  if (!/^\d{2,10}$/.test(cui)) return sendJson(res, 400, { error: 'CUI invalid — doar cifre, cu sau fără RO' });
+  const c = anafCache.get(cui);
+  if (c && Date.now() - c.t < 24 * 3600e3) return sendJson(res, 200, c.data);
+  const r = await anafQueued(cui);
+  if (!r.status) return sendJson(res, 504, { error: 'ANAF nu răspunde acum — încearcă din nou peste un minut' });
+  const found = r.json && Array.isArray(r.json.found) ? r.json.found : [];
+  if (r.status !== 200 || !r.json) return sendJson(res, 502, { error: `ANAF a răspuns cu eroare (HTTP ${r.status})` });
+  if (!found.length) return sendJson(res, 404, { error: 'CUI-ul nu există în baza ANAF' });
+  const data = anafParse(found[0]);
+  anafCache.set(cui, { t: Date.now(), data });
+  if (anafCache.size > 500) anafCache.delete(anafCache.keys().next().value);
+  return sendJson(res, 200, data);
+}
+
 /* ───────────── Rute ───────────── */
 async function handleLogin(req, res) {
   const body = await readJson(req);
@@ -841,8 +900,9 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4.3, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4.4, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
+    if (pathname === '/company' && req.method === 'GET') return await handleCompany(req, res, parsed);
     if (pathname === '/clients' || pathname.startsWith('/clients/')) return await handleClients(req, res, pathname);
 
     // Starea monitorizării pentru utilizatorul logat
@@ -915,4 +975,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v4.3 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v4.4 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
