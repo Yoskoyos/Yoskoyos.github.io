@@ -13,6 +13,16 @@ if ! command -v ffmpeg >/dev/null 2>&1; then
   echo "Instalez ffmpeg (pentru imaginile din stream RTSP)..."
   (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg) >/dev/null 2>&1 || echo "ATENȚIE: ffmpeg nu s-a instalat — restul merge normal"
 fi
+# contracte PDF: nginx acceptă implicit doar 1 MB → ridicăm limita la 25 MB (o singură dată)
+NG=$(grep -ls "server_name proxy.supraveghere24h.ro" /etc/nginx/sites-enabled/* /etc/nginx/conf.d/*.conf 2>/dev/null | head -1)
+if [ -n "$NG" ]; then
+  NG=$(readlink -f "$NG")
+  if ! grep -q client_max_body_size "$NG"; then
+    cp "$NG" /root/nginx-nvr-proxy.conf.bak
+    sed -i '0,/server_name proxy.supraveghere24h.ro;/s//&\n    client_max_body_size 25m;/' "$NG"
+    if nginx -t >/dev/null 2>&1; then systemctl reload nginx; echo "nginx: limită upload 25 MB"; else cp /root/nginx-nvr-proxy.conf.bak "$NG"; echo "ATENȚIE: nu am putut modifica nginx (restaurat)"; fi
+  fi
+fi
 [ -d node_modules/nodemailer ] || npm install --silent nodemailer@6 >/dev/null 2>&1 || true
 cp server.js server.js.prev
 mv server.new.js server.js

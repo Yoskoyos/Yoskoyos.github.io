@@ -353,6 +353,66 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .cf-modal{max-width:380px}
 .cf-body{padding:26px 22px 20px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px}
 .cf-icon{width:52px;height:52px;border-radius:50%;background:var(--err-dim);color:var(--err);display:grid;place-items:center;margin-bottom:6px}
+
+/* ── Clienți ── */
+.cl-tools{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.cl-search{flex:1 1 200px;min-width:0;background:var(--bg-1);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;color:var(--fg);outline:none;font-family:var(--sans)}
+.cl-search:focus{border-color:var(--accent)}
+.cl-filter{display:flex;gap:6px}
+.cl-chip{border:1px solid var(--border);background:var(--bg-1);color:var(--fg-2);border-radius:999px;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans);white-space:nowrap}
+.cl-chip.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+.cl-sum{font-size:12px;color:var(--fg-2);margin:0 2px 12px;line-height:1.5}
+.cl-sum b{color:var(--fg)}
+.cl-sum .due{color:var(--err);font-weight:700}
+.cl-list{display:flex;flex-direction:column;gap:8px}
+.cl-card{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;display:flex;gap:12px;align-items:center;cursor:pointer;text-align:left;width:100%;font-family:var(--sans);color:var(--fg)}
+.cl-card:hover{border-color:var(--border-2)}
+.cl-av{width:38px;height:38px;border-radius:50%;background:var(--bg-3);color:var(--fg-2);display:grid;place-items:center;font-weight:700;font-size:13px;flex-shrink:0}
+.cl-main{flex:1;min-width:0}
+.cl-name{font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;min-width:0}
+.cl-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cl-kind{font-size:9px;font-weight:700;letter-spacing:.05em;border:1px solid var(--border-2);color:var(--fg-3);border-radius:4px;padding:1px 4px;flex-shrink:0}
+.cl-sub{font-size:12px;color:var(--fg-3);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap}
+.cl-sub a{color:var(--accent);text-decoration:none}
+.cl-pay{font-size:11px;font-weight:700;border-radius:999px;padding:5px 9px;white-space:nowrap;flex-shrink:0;border:1px solid transparent}
+.cl-pay.ok{background:var(--ok-dim);color:var(--ok)}
+.cl-pay.soon{background:var(--warn-dim);color:var(--warn);border-color:var(--warn)}
+.cl-pay.late{background:var(--err-dim);color:var(--err);border-color:var(--err)}
+.cl-empty{text-align:center;padding:40px 16px;color:var(--fg-3);font-size:13px;line-height:1.6}
+#client-modal .modal{max-width:620px}
+#client-modal .modal-body{max-height:74vh}
+.cm-sec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin-top:6px;padding-top:12px;border-top:1px solid var(--border)}
+.cm-sec:first-child{margin-top:0;padding-top:0;border-top:0}
+.fg textarea{background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:9px 12px;font-size:13px;color:var(--fg);font-family:var(--sans);outline:none;width:100%;min-height:64px;resize:vertical}
+.fg textarea:focus{border-color:var(--accent)}
+.cm-check{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--fg);cursor:pointer}
+.cm-check input{width:18px;height:18px;accent-color:var(--accent)}
+.cm-months{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px}
+.cm-month{border:1px solid var(--border);background:var(--bg-2);border-radius:8px;padding:7px 6px;font-size:11px;font-weight:700;cursor:pointer;text-align:center;font-family:var(--sans);color:var(--fg-2);line-height:1.3}
+.cm-month small{display:block;font-weight:600;font-size:10px;margin-top:1px}
+.cm-month.paid{background:var(--ok-dim);border-color:var(--ok);color:var(--ok)}
+.cm-month.late{border-color:var(--err);color:var(--err)}
+.cm-hint{font-size:11px;color:var(--fg-3);line-height:1.5}
+.cm-files{display:flex;flex-direction:column;gap:6px}
+.cm-file{display:flex;align-items:center;gap:10px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:9px 10px}
+.cm-file-ic{color:var(--err);flex-shrink:0}
+.cm-file-main{flex:1;min-width:0}
+.cm-file-name{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm-file-meta{font-size:11px;color:var(--fg-3);margin-top:2px}
+.cm-file a,.cm-file button{font-size:12px;font-weight:700;color:var(--accent);background:none;border:0;cursor:pointer;padding:6px;text-decoration:none;font-family:var(--sans)}
+.cm-file button.del{color:var(--fg-3)}
+.cm-upload{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+.cm-upload .fg{flex:1 1 130px}
+.cm-del{color:var(--err)!important;flex:0 0 auto!important;margin-right:auto}
+@media(max-width:600px){
+  .cl-card{padding:12px}
+  .cl-pay{font-size:10.5px;padding:5px 8px}
+  #client-modal{padding:0;align-items:flex-end}
+  #client-modal .modal{max-width:none;border-radius:18px 18px 0 0;max-height:94vh;display:flex;flex-direction:column}
+  #client-modal .modal-body{max-height:none;flex:1;padding-bottom:20px}
+  #client-modal .modal-foot{padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+  #client-modal .f2{grid-template-columns:1fr}
+}
 .cf-icon.cf-watch{background:var(--warn-dim, rgba(245,158,11,.15));color:var(--warn)}
 .cf-title{font-size:16px;font-weight:700;color:var(--fg)}
 .cf-text{font-size:13px;line-height:1.55;color:var(--fg-2)}
@@ -668,6 +728,7 @@ html:not(.unlocked) .app{display:none}
     <div class="nav-tab on" data-tab="dashboard"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span class="lbl-l">Dashboard</span><span class="lbl-s">Acasă</span></div>
     <div class="nav-tab" data-tab="nvrs"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01"/><circle cx="18" cy="12" r="2"/></svg><span class="lbl-l">NVR-uri</span><span class="lbl-s">NVR-uri</span></div>
     <div class="nav-tab" data-tab="snapshots"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg><span class="lbl-l">Snapshots</span><span class="lbl-s">Camere</span></div>
+    <div class="nav-tab" data-tab="clients"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg><span class="lbl-l">Clienți</span><span class="lbl-s">Clienți</span></div>
     <div class="nav-tab" data-tab="alerts"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg><span class="lbl-l">Alerte</span><span class="lbl-s">Alerte</span> <span class="badge" id="alert-badge" style="display:none">0</span></div>
     <div class="nav-tab" data-tab="log"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span class="lbl-l">Jurnal</span><span class="lbl-s">Jurnal</span></div>
     <div class="nav-tab" data-tab="settings"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span class="lbl-l">Setări</span><span class="lbl-s">Setări</span></div>
@@ -773,6 +834,28 @@ html:not(.unlocked) .app{display:none}
     </div>
 
     <!-- ── Alerte ── -->
+    <!-- ── Clienți ── -->
+    <div class="panel" id="panel-clients">
+      <div class="section">
+        <div class="section-hdr">
+          <div class="section-title">Clienți</div>
+          <div class="section-action" id="cl-add-btn">
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            Adaugă client
+          </div>
+        </div>
+        <div class="cl-tools">
+          <input type="search" class="cl-search" id="cl-search" placeholder="Caută după nume, telefon, adresă, CUI…" autocomplete="off">
+          <div class="cl-filter">
+            <button type="button" class="cl-chip on" data-f="all">Toți</button>
+            <button type="button" class="cl-chip" data-f="due">De încasat</button>
+          </div>
+        </div>
+        <div class="cl-sum" id="cl-sum"></div>
+        <div class="cl-list" id="cl-list"><div class="cl-empty">Se încarcă…</div></div>
+      </div>
+    </div>
+
     <div class="panel" id="panel-alerts">
       <div class="section">
         <div class="section-hdr">
@@ -1104,6 +1187,71 @@ html:not(.unlocked) .app{display:none}
 </div>
 
 <!-- Confirm modal -->
+<!-- Client modal -->
+<div class="overlay hidden" id="client-modal" role="dialog" aria-modal="true" aria-labelledby="cm-title">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title" id="cm-title">Client nou</div>
+      <div class="modal-x" id="cm-x" role="button" aria-label="Închide">✕</div>
+    </div>
+    <div class="modal-body">
+      <div class="cm-sec">Date client</div>
+      <div class="f2">
+        <div class="fg"><label for="cm-kind">Tip</label><select id="cm-kind"><option value="pf">Persoană fizică</option><option value="pj">Firmă (PJ)</option></select></div>
+        <div class="fg"><label for="cm-code" id="cm-code-lbl">CNP</label><input type="text" id="cm-code" autocomplete="off"></div>
+      </div>
+      <div class="fg"><label for="cm-name" id="cm-name-lbl">Nume și prenume</label><input type="text" id="cm-name" autocomplete="off"></div>
+      <div class="f2 cm-pj">
+        <div class="fg"><label for="cm-contact">Persoană de contact</label><input type="text" id="cm-contact" autocomplete="off"></div>
+        <div class="fg"><label for="cm-regcom">Nr. Reg. Comerțului</label><input type="text" id="cm-regcom" placeholder="J40/123/2020" autocomplete="off"></div>
+      </div>
+      <div class="f2">
+        <div class="fg"><label for="cm-phone">Telefon</label><input type="tel" id="cm-phone" inputmode="tel" autocomplete="off"></div>
+        <div class="fg"><label for="cm-email">Email</label><input type="email" id="cm-email" inputmode="email" autocomplete="off"></div>
+      </div>
+      <div class="fg"><label for="cm-address">Adresa montajului</label><input type="text" id="cm-address" autocomplete="off"></div>
+      <div class="fg"><label for="cm-notes">Observații</label><textarea id="cm-notes" rows="2"></textarea></div>
+
+      <div class="cm-sec">Echipamente montate</div>
+      <div class="f2">
+        <div class="fg"><label for="cm-nvr">NVR / DVR (model)</label><input type="text" id="cm-nvr" placeholder="ex: DS-7608NXI-K2" autocomplete="off"></div>
+        <div class="fg"><label for="cm-cams">Nr. camere</label><input type="text" id="cm-cams" inputmode="numeric" autocomplete="off"></div>
+      </div>
+      <div class="f2">
+        <div class="fg"><label for="cm-install">Data montajului</label><input type="date" id="cm-install"></div>
+        <div class="fg"><label for="cm-warranty">Garanție până la</label><input type="date" id="cm-warranty"></div>
+      </div>
+      <div class="fg"><label for="cm-equip">Detalii echipamente</label><textarea id="cm-equip" rows="2" placeholder="Camere, HDD, switch, cabluri…"></textarea></div>
+
+      <div class="cm-sec">Abonament</div>
+      <label class="cm-check"><input type="checkbox" id="cm-sub-on"> Are abonament lunar</label>
+      <div class="cm-subbox">
+        <div class="f2">
+          <div class="fg"><label for="cm-amount">Sumă lunară (lei)</label><input type="text" id="cm-amount" inputmode="decimal" autocomplete="off"></div>
+          <div class="fg"><label for="cm-due">Zi scadentă</label><input type="text" id="cm-due" inputmode="numeric" placeholder="1–28" autocomplete="off"></div>
+        </div>
+        <div class="fg" style="margin-top:14px"><label for="cm-start">Începând cu luna</label><input type="month" id="cm-start"></div>
+        <div class="fg" style="margin-top:14px"><label>Plăți (apasă pe o lună ca s-o marchezi plătită / neplătită)</label><div class="cm-months" id="cm-months"></div></div>
+      </div>
+
+      <div class="cm-sec">Contracte</div>
+      <div class="cm-files" id="cm-files"></div>
+      <div class="cm-upload">
+        <div class="fg"><label for="cm-signed">Semnat la</label><input type="date" id="cm-signed"></div>
+        <div class="fg"><label for="cm-valid">Valabil până la</label><input type="date" id="cm-valid"></div>
+        <button type="button" class="btn" id="cm-upload-btn" style="flex:1 1 100%"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>Încarcă contract PDF</button>
+        <input type="file" id="cm-file" accept="application/pdf,.pdf" hidden>
+      </div>
+      <div class="cm-hint">PDF, maxim 20 MB. Contractele se păstrează doar pe serverul tău și se deschid numai după autentificare.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn cm-del" id="cm-delete" type="button">Șterge</button>
+      <button class="btn" id="cm-cancel" type="button">Anulează</button>
+      <button class="btn primary" id="cm-save" type="button">Salvează</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay hidden" id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text">
   <div class="modal cf-modal">
     <div class="cf-body">
@@ -2548,6 +2696,250 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     qs('#panel-'+tab.dataset.tab).classList.add('on');
   });
 });
+
+
+/* ═══════════════════════════════════════
+   CLIENȚI (date pe server: /clients · contracte PDF pe VPS)
+═══════════════════════════════════════ */
+let clients = null;            // doar în memorie — datele personale nu se salvează în browser
+let clFilter = 'all';
+let cmDraft = null;            // clientul deschis în formular
+const MONTHS_RO = ['ian','feb','mar','apr','mai','iun','iul','aug','sep','oct','nov','dec'];
+const ymNow = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
+const ymLabel = ym => { const [y, m] = ym.split('-'); return MONTHS_RO[+m - 1] + ' ' + y; };
+const ymAdd = (ym, k) => { let [y, m] = ym.split('-').map(Number); m += k; while (m < 1) { m += 12; y--; } while (m > 12) { m -= 12; y++; } return y + '-' + String(m).padStart(2, '0'); };
+const fmtLei = v => (Math.round(v * 100) / 100).toLocaleString('ro-RO') + ' lei';
+const fmtDate = d => d ? d.split('-').reverse().join('.') : '';
+const todayYmd = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+
+async function clApi(path, opts = {}) {
+  const auth = getAuth();
+  if (!auth) throw new Error('Nu ești autentificat');
+  const r = await fetch(getProxyBase() + path, { ...opts, headers: { ...(opts.headers || {}), 'Authorization': 'Bearer ' + auth.token } });
+  let j = null; try { j = await r.json(); } catch {}
+  if (!r.ok) throw new Error((j && j.error) || (!j && (r.status === 404 || r.status === 400) ? 'Serverul nu are încă evidența clienților — actualizează serverul' : r.status === 413 ? 'Fișierul e prea mare' : 'Eroare server (HTTP ' + r.status + ')'));
+  return j || {};
+}
+
+// luni de plată ale unui client: de la început (sau data creării) până luna curentă
+function clMonths(c) {
+  const s = c.sub || {}; if (!s.active) return [];
+  const now = ymNow();
+  let start = s.start || (c.createdAt ? new Date(c.createdAt).toISOString().slice(0, 7) : now);
+  if (start > now) return [];
+  const out = []; let ym = start, guard = 0;
+  while (ym <= now && guard++ < 120) { out.push(ym); ym = ymAdd(ym, 1); }
+  return out;
+}
+// starea plății: restanțe (luni trecute neplătite + luna curentă dacă a trecut scadența)
+function clPayState(c) {
+  const s = c.sub || {}; if (!s.active) return null;
+  const now = ymNow(), day = new Date().getDate(), paid = s.paid || {};
+  const months = clMonths(c);
+  const late = months.filter(ym => !paid[ym] && (ym < now || day > (s.dueDay || 1)));
+  const curDue = months.includes(now) && !paid[now];
+  return { late, curDue, owed: (late.length + (curDue && !late.includes(now) ? 1 : 0)) * (s.amount || 0), paidNow: !!paid[now], due: s.dueDay || 1 };
+}
+
+async function loadClients(force) {
+  if (clients && !force) return renderClients();
+  const list = qs('#cl-list');
+  if (!clients) list.innerHTML = '<div class="cl-empty">Se încarcă…</div>';
+  try { clients = (await clApi('/clients')).clients || []; renderClients(); }
+  catch (e) { list.innerHTML = `<div class="cl-empty">${escapeHtml(e.message)}</div>`; qs('#cl-sum').textContent = ''; }
+}
+
+function renderClients() {
+  const list = qs('#cl-list'); if (!list || !clients) return;
+  const q = (qs('#cl-search').value || '').trim().toLowerCase();
+  const subs = clients.filter(c => c.sub && c.sub.active);
+  const st = new Map(clients.map(c => [c.id, clPayState(c)]));
+  const dueList = subs.filter(c => { const p = st.get(c.id); return p && (p.late.length || p.curDue); });
+  const owed = subs.reduce((t, c) => t + (st.get(c.id).owed || 0), 0);
+  const monthly = subs.reduce((t, c) => t + (c.sub.amount || 0), 0);
+  qs('#cl-sum').innerHTML = clients.length
+    ? `<b>${clients.length}</b> ${clients.length === 1 ? 'client' : 'clienți'} · <b>${subs.length}</b> cu abonament (${fmtLei(monthly)}/lună)` +
+      (dueList.length ? ` · <span class="due">${dueList.length} de încasat${owed ? ' · ' + fmtLei(owed) : ''}</span>` : ' · toate plățile la zi')
+    : '';
+  let rows = clients.slice().sort((a, b) => a.name.localeCompare(b.name, 'ro'));
+  if (clFilter === 'due') rows = rows.filter(c => dueList.includes(c));
+  if (q) rows = rows.filter(c => [c.name, c.contact, c.phone, c.email, c.address, c.code, c.equip && c.equip.nvr, c.notes].join(' ').toLowerCase().includes(q));
+  if (!rows.length) {
+    list.innerHTML = `<div class="cl-empty">${!clients.length ? 'Niciun client încă.<br>Apasă <b>Adaugă client</b> ca să începi.' : clFilter === 'due' && !q ? 'Nimic de încasat. Toate plățile sunt la zi.' : 'Niciun client găsit.'}</div>`;
+    return;
+  }
+  list.innerHTML = rows.map(c => {
+    const p = st.get(c.id);
+    let pay = '';
+    if (p) {
+      if (p.late.length) pay = `<span class="cl-pay late" title="${p.late.map(ymLabel).join(', ')}">${p.late.length === 1 ? 'Restant ' + ymLabel(p.late[0]) : p.late.length + ' luni restante'}</span>`;
+      else if (p.curDue) pay = `<span class="cl-pay soon">De plată · ${p.due} ${MONTHS_RO[new Date().getMonth()]}</span>`;
+      else pay = `<span class="cl-pay ok">Plătit</span>`;
+    }
+    const ini = c.name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+    const nC = (c.contracts || []).length;
+    const sub = [
+      c.phone ? `<a href="tel:${escapeHtml(c.phone.replace(/[^\d+]/g, ''))}" onclick="event.stopPropagation()">${escapeHtml(c.phone)}</a>` : '',
+      c.address ? `<span>${escapeHtml(c.address)}</span>` : '',
+      nC ? `<span>📄 ${nC} ${nC === 1 ? 'contract' : 'contracte'}</span>` : '',
+    ].filter(Boolean).join('');
+    return `<div class="cl-card" role="button" tabindex="0" data-cid="${escapeHtml(c.id)}">
+      <div class="cl-av">${escapeHtml(ini || '?')}</div>
+      <div class="cl-main"><div class="cl-name"><span>${escapeHtml(c.name)}</span><em class="cl-kind">${c.kind === 'pj' ? 'PJ' : 'PF'}</em></div>${sub ? `<div class="cl-sub">${sub}</div>` : ''}</div>
+      ${pay}</div>`;
+  }).join('');
+}
+
+function cmKindUi() {
+  const pj = qs('#cm-kind').value === 'pj';
+  qs('#cm-name-lbl').textContent = pj ? 'Denumire firmă' : 'Nume și prenume';
+  qs('#cm-code-lbl').textContent = pj ? 'CUI' : 'CNP';
+  qs('.cm-pj').style.display = pj ? '' : 'none';
+}
+function cmSubUi() { qs('.cm-subbox').style.display = qs('#cm-sub-on').checked ? '' : 'none'; renderCmMonths(); }
+
+function renderCmMonths() {
+  const box = qs('#cm-months'); if (!cmDraft) return;
+  const tmp = { ...cmDraft, sub: { ...cmDraft.sub, active: qs('#cm-sub-on').checked, start: qs('#cm-start').value, dueDay: parseInt(qs('#cm-due').value) || 1 } };
+  const months = clMonths(tmp).slice(-24).reverse();
+  const paid = cmDraft.sub.paid || {}, now = ymNow(), day = new Date().getDate();
+  box.innerHTML = months.length ? months.map(ym => {
+    const late = !paid[ym] && (ym < now || day > tmp.sub.dueDay);
+    return `<button type="button" class="cm-month ${paid[ym] ? 'paid' : late ? 'late' : ''}" data-ym="${ym}">${ymLabel(ym)}<small>${paid[ym] ? 'plătit ' + fmtDate(paid[ym]).slice(0, 5) : late ? 'restant' : 'de plată'}</small></button>`;
+  }).join('') : '<div class="cm-hint">Alege luna de început a abonamentului.</div>';
+}
+
+function renderCmFiles() {
+  const box = qs('#cm-files'); const files = (cmDraft && cmDraft.contracts) || [];
+  if (!files.length) { box.innerHTML = '<div class="cm-hint">Niciun contract încărcat.</div>'; return; }
+  const auth = getAuth();
+  box.innerHTML = files.map(f => {
+    const href = `${getProxyBase()}/clients/${encodeURIComponent(cmDraft.id)}/contracts/${encodeURIComponent(f.id)}?token=${encodeURIComponent(auth ? auth.token : '')}`;
+    const meta = [f.signedAt ? 'semnat ' + fmtDate(f.signedAt) : '', f.validUntil ? 'valabil până ' + fmtDate(f.validUntil) : '', (f.size < 1048576 ? Math.max(1, Math.round(f.size / 1024)) + ' KB' : (f.size / 1048576).toFixed(1) + ' MB')].filter(Boolean).join(' · ');
+    const expired = f.validUntil && f.validUntil < todayYmd();
+    return `<div class="cm-file"><svg class="cm-file-ic" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+      <div class="cm-file-main"><div class="cm-file-name">${escapeHtml(f.name)}</div><div class="cm-file-meta">${escapeHtml(meta)}${expired ? ' · <b style="color:var(--err)">expirat</b>' : ''}</div></div>
+      <a href="${escapeHtml(href)}" target="_blank" rel="noopener">Deschide</a><button type="button" class="del" data-fid="${escapeHtml(f.id)}" aria-label="Șterge contractul">Șterge</button></div>`;
+  }).join('');
+}
+
+function openClientModal(c) {
+  cmDraft = c ? JSON.parse(JSON.stringify(c)) : { id: null, kind: 'pf', name: '', equip: {}, sub: { active: false, paid: {} }, contracts: [] };
+  cmDraft.sub = cmDraft.sub || { paid: {} }; cmDraft.sub.paid = cmDraft.sub.paid || {}; cmDraft.equip = cmDraft.equip || {};
+  const e = cmDraft.equip, s = cmDraft.sub;
+  qs('#cm-title').textContent = c ? c.name : 'Client nou';
+  qs('#cm-kind').value = cmDraft.kind || 'pf';
+  const set = (id, v) => { qs(id).value = v == null ? '' : v; };
+  set('#cm-name', cmDraft.name); set('#cm-code', cmDraft.code); set('#cm-contact', cmDraft.contact); set('#cm-regcom', cmDraft.regCom);
+  set('#cm-phone', cmDraft.phone); set('#cm-email', cmDraft.email); set('#cm-address', cmDraft.address); set('#cm-notes', cmDraft.notes);
+  set('#cm-nvr', e.nvr); set('#cm-cams', e.cams || ''); set('#cm-install', e.installDate); set('#cm-warranty', e.warrantyUntil); set('#cm-equip', e.details);
+  qs('#cm-sub-on').checked = !!s.active; set('#cm-amount', s.amount || ''); set('#cm-due', s.dueDay || ''); set('#cm-start', s.start || (c ? '' : ymNow()));
+  set('#cm-signed', ''); set('#cm-valid', '');
+  qs('#cm-delete').style.display = c ? '' : 'none';
+  cmKindUi(); cmSubUi(); renderCmFiles();
+  qs('#client-modal').classList.remove('hidden');
+  qs('#client-modal .modal-body').scrollTop = 0;
+  if (!c) setTimeout(() => qs('#cm-name').focus(), 50);
+}
+function closeClientModal() { qs('#client-modal').classList.add('hidden'); cmDraft = null; }
+
+function cmCollect() {
+  const v = id => qs(id).value.trim();
+  return {
+    kind: qs('#cm-kind').value, name: v('#cm-name'), code: v('#cm-code'), contact: v('#cm-contact'), regCom: v('#cm-regcom'),
+    phone: v('#cm-phone'), email: v('#cm-email'), address: v('#cm-address'), notes: qs('#cm-notes').value,
+    equip: { nvr: v('#cm-nvr'), cams: v('#cm-cams'), installDate: v('#cm-install'), warrantyUntil: v('#cm-warranty'), details: qs('#cm-equip').value },
+    sub: { active: qs('#cm-sub-on').checked, amount: v('#cm-amount'), dueDay: v('#cm-due'), start: v('#cm-start'), paid: cmDraft.sub.paid || {} },
+  };
+}
+// salvează pe server; întoarce clientul salvat
+async function cmSave(quiet) {
+  const body = cmCollect();
+  if (!body.name) { toast('Scrie numele clientului', 'warn'); qs('#cm-name').focus(); return null; }
+  const btn = qs('#cm-save'); btn.disabled = true;
+  try {
+    const r = cmDraft.id
+      ? await clApi('/clients/' + encodeURIComponent(cmDraft.id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      : await clApi('/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const saved = r.client;
+    clients = clients || [];
+    const i = clients.findIndex(x => x.id === saved.id);
+    if (i >= 0) clients[i] = saved; else clients.push(saved);
+    cmDraft = { ...JSON.parse(JSON.stringify(saved)) };
+    qs('#cm-title').textContent = saved.name; qs('#cm-delete').style.display = '';
+    renderClients();
+    if (!quiet) toast('Client salvat', 'ok');
+    return saved;
+  } catch (e) { toast(e.message, 'err'); return null; }
+  finally { btn.disabled = false; }
+}
+
+qs('#cl-add-btn').addEventListener('click', () => openClientModal(null));
+qs('#cl-search').addEventListener('input', renderClients);
+document.querySelectorAll('.cl-chip').forEach(b => b.addEventListener('click', () => {
+  clFilter = b.dataset.f; document.querySelectorAll('.cl-chip').forEach(x => x.classList.toggle('on', x === b)); renderClients();
+}));
+qs('#cl-list').addEventListener('click', e => {
+  const card = e.target.closest('.cl-card'); if (!card) return;
+  const c = (clients || []).find(x => x.id === card.dataset.cid); if (c) openClientModal(c);
+});
+qs('#cl-list').addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('cl-card')) { e.preventDefault(); e.target.click(); }
+});
+qs('#cm-kind').addEventListener('change', cmKindUi);
+qs('#cm-sub-on').addEventListener('change', cmSubUi);
+['#cm-start', '#cm-due'].forEach(id => qs(id).addEventListener('change', renderCmMonths));
+qs('#cm-months').addEventListener('click', e => {
+  const b = e.target.closest('.cm-month'); if (!b || !cmDraft) return;
+  const p = cmDraft.sub.paid;
+  if (p[b.dataset.ym]) delete p[b.dataset.ym]; else p[b.dataset.ym] = todayYmd();
+  renderCmMonths();
+});
+qs('#cm-x').addEventListener('click', closeClientModal);
+qs('#cm-cancel').addEventListener('click', closeClientModal);
+qs('#client-modal').addEventListener('click', e => { if (e.target.id === 'client-modal') closeClientModal(); });
+qs('#cm-save').addEventListener('click', async () => { if (await cmSave()) closeClientModal(); });
+qs('#cm-delete').addEventListener('click', async () => {
+  if (!cmDraft || !cmDraft.id) return;
+  const n = (cmDraft.contracts || []).length;
+  const ok = await confirmDialog({ title: 'Ștergi clientul?', html: `<b>${escapeHtml(cmDraft.name)}</b> va fi șters definitiv${n ? `, împreună cu <b>${n} ${n === 1 ? 'contract' : 'contracte'}</b>` : ''}.`, okLabel: 'Șterge' });
+  if (!ok) return;
+  try {
+    await clApi('/clients/' + encodeURIComponent(cmDraft.id), { method: 'DELETE' });
+    clients = clients.filter(x => x.id !== cmDraft.id); closeClientModal(); renderClients(); toast('Client șters', 'ok');
+  } catch (e) { toast(e.message, 'err'); }
+});
+qs('#cm-upload-btn').addEventListener('click', () => qs('#cm-file').click());
+qs('#cm-file').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f || !cmDraft) return;
+  if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf') return toast('Alege un fișier PDF', 'warn');
+  if (f.size > 20 * 1048576) return toast('Fișierul e prea mare (maxim 20 MB)', 'warn');
+  if (!cmDraft.id && !(await cmSave(true))) return;     // client nou → îl salvăm întâi
+  const btn = qs('#cm-upload-btn'), old = btn.innerHTML;
+  btn.disabled = true; btn.textContent = 'Se încarcă…';
+  try {
+    const q = `name=${encodeURIComponent(f.name)}&signedAt=${encodeURIComponent(qs('#cm-signed').value)}&validUntil=${encodeURIComponent(qs('#cm-valid').value)}`;
+    const r = await clApi(`/clients/${encodeURIComponent(cmDraft.id)}/contracts?${q}`, { method: 'POST', headers: { 'Content-Type': 'application/pdf' }, body: f });
+    cmDraft.contracts = r.client.contracts;
+    const i = clients.findIndex(x => x.id === r.client.id); if (i >= 0) clients[i].contracts = r.client.contracts;
+    qs('#cm-signed').value = ''; qs('#cm-valid').value = '';
+    renderCmFiles(); renderClients(); toast('Contract încărcat', 'ok');
+  } catch (err) { toast(err.message, 'err'); }
+  finally { btn.disabled = false; btn.innerHTML = old; }
+});
+qs('#cm-files').addEventListener('click', async e => {
+  const b = e.target.closest('button.del'); if (!b || !cmDraft) return;
+  const f = cmDraft.contracts.find(x => x.id === b.dataset.fid); if (!f) return;
+  if (!(await confirmDialog({ title: 'Ștergi contractul?', html: `<b>${escapeHtml(f.name)}</b> va fi șters definitiv de pe server.`, okLabel: 'Șterge' }))) return;
+  try {
+    const r = await clApi(`/clients/${encodeURIComponent(cmDraft.id)}/contracts/${encodeURIComponent(f.id)}`, { method: 'DELETE' });
+    cmDraft.contracts = r.client.contracts;
+    const i = clients.findIndex(x => x.id === r.client.id); if (i >= 0) clients[i].contracts = r.client.contracts;
+    renderCmFiles(); renderClients();
+  } catch (err) { toast(err.message, 'err'); }
+});
+document.querySelectorAll('.nav-tab[data-tab="clients"]').forEach(t => t.addEventListener('click', () => loadClients(true)));
 
 /* ═══════════════════════════════════════
    SETTINGS

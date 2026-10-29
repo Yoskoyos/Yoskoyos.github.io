@@ -11,6 +11,7 @@
 //                  Stare în monitor-state.json. Dezactivare: variabila de mediu MONITOR=0.
 // v4.1 (29.10.2026): GET /snap?nvr=&ch=&token= — captură din stream-ul RTSP (ffmpeg) pentru NVR-urile care nu
 //                  oferă capturi ISAPI (ex. DS-7104NI-Q1). Credențialele NVR rămân pe server.
+// v4.3: evidență clienți (clients.json) + contracte PDF stocate pe VPS în contracts/ (nu în GitHub).
 // v4.2: monitorul ține cont și de canalele marcate în aplicație (seenCh) — ex. cameră pusă „urmărită” deși n-a mers niciodată.
 
 const http    = require('http');
@@ -147,15 +148,16 @@ function sendJson(res, status, obj) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', ...CORS });
   res.end(JSON.stringify(obj));
 }
-function readRaw(req) {
+function readRaw(req, limit) {
+  const max = limit || MAX_BODY;
   return new Promise((resolve, reject) => {
     const chunks = []; let size = 0;
     req.on('data', c => {
       size += c.length;
-      if (size > MAX_BODY) { reject(new Error('Body too large')); req.destroy(); return; }
+      if (size > max) { chunks.length = 0; return; }   // citim până la capăt (fără să păstrăm), ca să putem răspunde 413
       chunks.push(c);
     });
-    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('end', () => size > max ? reject(new Error('Body too large')) : resolve(Buffer.concat(chunks)));
     req.on('error', reject);
   });
 }
@@ -167,7 +169,11 @@ function getAuth(req) {
   const h = req.headers['authorization'] || '';
   let tok = h.startsWith('Bearer ') ? h.slice(7) : null;
   if (!tok) {   // <img src> nu poate trimite antete → tokenul poate veni și în ?token= (doar pentru /snap)
-    try { const q = url.parse(req.url, true); if (q.pathname === '/snap' && q.query.token) tok = String(q.query.token); } catch {}
+    try {
+      const q = url.parse(req.url, true);
+      const tokOk = q.pathname === '/snap' || (req.method === 'GET' && /^\/clients\/[\w-]+\/contracts\/[\w-]+$/.test(q.pathname || ''));
+      if (tokOk && q.query.token) tok = String(q.query.token);
+    } catch {}
   }
   if (!tok) return null;
   try { return jwt.verify(tok, JWT_SECRET); } catch { return null; }
@@ -597,6 +603,114 @@ async function handleSnap(req, res, parsed) {
   return sendJson(res, 502, { error: msg });
 }
 
+
+/* ═════════════ Clienți + contracte ═════════════ */
+// clients.json: { <username>: [ client, ... ] }   ·   PDF-uri: contracts/<username>/<clientId>/<fileId>.pdf
+const CLIENTS_FILE  = path.join(BASE_DIR, 'clients.json');
+const CONTRACTS_DIR = path.join(BASE_DIR, 'contracts');
+const MAX_PDF       = 20 * 1024 * 1024;
+function loadClients() {
+  try { const c = JSON.parse(fs.readFileSync(CLIENTS_FILE, 'utf8')); return c && typeof c === 'object' ? c : {}; } catch { return {}; }
+}
+function saveClients(all) {
+  const tmp = CLIENTS_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(all, null, 2), { mode: 0o600 });
+  fs.renameSync(tmp, CLIENTS_FILE);
+}
+const newId = () => Date.now().toString(36) + crypto.randomBytes(4).toString('hex');
+const str = (v, max) => String(v == null ? '' : v).slice(0, max || 300);
+const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : 0; };
+const ymd = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v) : '';
+// păstrăm doar câmpurile cunoscute (datele vin din aplicație)
+function cleanClient(b, prev) {
+  const e = b.equip || {}, sb = b.sub || {};
+  const paid = {};
+  for (const [k, v] of Object.entries(sb.paid || {})) if (/^\d{4}-\d{2}$/.test(k)) paid[k] = ymd(v) || new Date().toISOString().slice(0, 10);
+  return {
+    id: prev ? prev.id : newId(),
+    kind: b.kind === 'pj' ? 'pj' : 'pf',
+    name: str(b.name, 200).trim(), contact: str(b.contact, 200), code: str(b.code, 40),
+    regCom: str(b.regCom, 40), phone: str(b.phone, 60), email: str(b.email, 200),
+    address: str(b.address, 400), notes: str(b.notes, 4000),
+    equip: { nvr: str(e.nvr, 200), cams: Math.max(0, Math.round(num(e.cams))), installDate: ymd(e.installDate),
+             warrantyUntil: ymd(e.warrantyUntil), details: str(e.details, 4000), nvrId: e.nvrId != null ? str(e.nvrId, 40) : '' },
+    sub: { active: !!sb.active, amount: Math.max(0, num(sb.amount)), dueDay: Math.min(28, Math.max(1, Math.round(num(sb.dueDay)) || 1)),
+           start: /^\d{4}-\d{2}$/.test(sb.start || '') ? sb.start : '', paid },
+    contracts: prev ? (prev.contracts || []) : [],
+    createdAt: prev ? prev.createdAt : Date.now(), updatedAt: Date.now(),
+  };
+}
+function userClients(all, username) { return Array.isArray(all[username]) ? all[username] : (all[username] = []); }
+
+async function handleClients(req, res, pathname) {
+  const ctx = requireUser(req, res); if (!ctx) return;
+  const uname = ctx.user.username;
+  const all = loadClients(); const list = userClients(all, uname);
+  const parts = pathname.split('/').filter(Boolean);           // clients[/id[/contracts[/cid]]]
+  const id = parts[1], cid = parts[3];
+  if (id && !/^[\w-]+$/.test(id)) return sendJson(res, 400, { error: 'ID invalid' });
+  const cl = id ? list.find(c => c.id === id) : null;
+  if (id && !cl) return sendJson(res, 404, { error: 'Client inexistent' });
+  const dir = id ? path.join(CONTRACTS_DIR, uname.replace(/[^\w.-]/g, '_'), id) : null;
+
+  if (parts.length === 1) {
+    if (req.method === 'GET') return sendJson(res, 200, { clients: list });
+    if (req.method === 'POST') {
+      const b = await readJson(req);
+      if (!str(b.name).trim()) return sendJson(res, 400, { error: 'Numele clientului e obligatoriu' });
+      const c = cleanClient(b, null); list.push(c); saveClients(all);
+      return sendJson(res, 200, { client: c });
+    }
+  }
+  if (parts.length === 2) {
+    if (req.method === 'PUT' || req.method === 'POST') {
+      const b = await readJson(req);
+      if (!str(b.name).trim()) return sendJson(res, 400, { error: 'Numele clientului e obligatoriu' });
+      const c = cleanClient(b, cl); list[list.indexOf(cl)] = c; saveClients(all);
+      return sendJson(res, 200, { client: c });
+    }
+    if (req.method === 'DELETE') {
+      all[uname] = list.filter(c => c !== cl); saveClients(all);
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+      return sendJson(res, 200, { ok: true });
+    }
+  }
+  if (parts[2] === 'contracts') {
+    if (parts.length === 3 && req.method === 'POST') {
+      let buf;
+      try { buf = await readRaw(req, MAX_PDF); } catch { return sendJson(res, 413, { error: 'Fișierul e prea mare (maxim 20 MB)' }); }
+      if (buf.length < 5 || buf.slice(0, 5).toString('latin1') !== '%PDF-') return sendJson(res, 400, { error: 'Fișierul nu e PDF' });
+      const q = url.parse(req.url, true).query;
+      const f = { id: newId(), name: (str(q.name, 150).replace(/[\\/:*?"<>|\r\n]/g, '_').trim() || 'contract.pdf'),
+                  size: buf.length, uploadedAt: Date.now(), signedAt: ymd(q.signedAt), validUntil: ymd(q.validUntil) };
+      if (!/\.pdf$/i.test(f.name)) f.name += '.pdf';
+      fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+      fs.writeFileSync(path.join(dir, f.id + '.pdf'), buf, { mode: 0o600 });
+      cl.contracts = (cl.contracts || []).concat(f); cl.updatedAt = Date.now(); saveClients(all);
+      return sendJson(res, 200, { contract: f, client: cl });
+    }
+    if (parts.length === 4) {
+      if (!/^[\w-]+$/.test(cid || '')) return sendJson(res, 400, { error: 'ID invalid' });
+      const f = (cl.contracts || []).find(x => x.id === cid);
+      if (!f) return sendJson(res, 404, { error: 'Contract inexistent' });
+      const fp = path.join(dir, f.id + '.pdf');
+      if (req.method === 'GET') {
+        let data; try { data = fs.readFileSync(fp); } catch { return sendJson(res, 404, { error: 'Fișierul lipsește de pe server' }); }
+        const ascii = f.name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '');
+        res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Length': data.length, 'Cache-Control': 'private, no-store',
+          'Content-Disposition': `${url.parse(req.url, true).query.dl ? 'attachment' : 'inline'}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(f.name)}`, ...CORS });
+        return res.end(data);
+      }
+      if (req.method === 'DELETE') {
+        try { fs.unlinkSync(fp); } catch {}
+        cl.contracts = cl.contracts.filter(x => x !== f); cl.updatedAt = Date.now(); saveClients(all);
+        return sendJson(res, 200, { ok: true, client: cl });
+      }
+    }
+  }
+  return sendJson(res, 405, { error: 'Operație necunoscută' });
+}
+
 /* ───────────── Rute ───────────── */
 async function handleLogin(req, res) {
   const body = await readJson(req);
@@ -727,8 +841,9 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4.2, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4.3, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
+    if (pathname === '/clients' || pathname.startsWith('/clients/')) return await handleClients(req, res, pathname);
 
     // Starea monitorizării pentru utilizatorul logat
     if (pathname === '/monitor' && req.method === 'GET') {
@@ -800,4 +915,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v4.2 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v4.3 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
