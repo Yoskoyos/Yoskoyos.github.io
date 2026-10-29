@@ -211,6 +211,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .nvr-fix-cred{align-self:flex-start;margin-top:4px;padding:7px 12px;border-radius:8px;border:1px solid var(--err);background:var(--bg-1);color:var(--err);font-family:var(--sans);font-weight:700;font-size:12.5px;cursor:pointer}
 .nvr-fix-cred:hover{background:var(--err);color:#fff}
 .ch-cell.err{flex-direction:column;gap:2px;text-align:center}
+#snap-modal-err-txt{max-width:85%;text-align:center;line-height:1.5;font-family:var(--sans);font-size:13px;padding:0 8px}
 .ch-why{display:block;font-family:var(--sans);font-size:9.5px;font-weight:700;line-height:1.1;padding:0 3px}
 .nvr-badge.checking{background:var(--blue-dim);color:var(--blue)}
 
@@ -2675,6 +2676,22 @@ function loadSnapModalSilent(nvr, ch) {
   }).catch(()=>{});
 }
 
+// Explică pe înțeles de ce NVR-ul nu dă imaginea (codurile Hikvision ISAPI)
+function snapErrorLabel(status, sub, statusString){
+  const x = (String(sub) + ' ' + String(statusString)).toLowerCase();
+  if (status === 401) return 'Utilizator sau parolă greșită';
+  if (/nopermission|permission|forbidden|unauthori[sz]ed|notallow/.test(x))
+    return 'Utilizatorul nu are drept de vizualizare (Live View) pe acest canal — verifică permisiunile din NVR';
+  if (/notsupport|unsupport/.test(x)) return 'NVR-ul nu oferă captură de imagine pe acest canal';
+  if (/invalidoperation|busy|notready|offline|nolink|nosignal|disconnect/.test(x))
+    return 'Canalul nu e pregătit (camera se conectează sau e offline) — încearcă peste un minut';
+  if (status === 403) return 'NVR-ul refuză imaginea (HTTP 403' + (sub ? ' · ' + sub : '') + ') — de obicei lipsă permisiune Live View sau camera încă se conectează';
+  if (status === 404) return 'Canal inexistent pe NVR';
+  if (status === 502 || status === 504) return 'NVR-ul nu răspunde';
+  if (status === 503) return 'Serverul e ocupat — încearcă din nou';
+  return `HTTP ${status}${sub ? ' · ' + sub : ''}`;
+}
+
 function loadSnapModal(nvr, ch) {
   const img     = qs('#snap-modal-img');
   const spinner = qs('#snap-modal-spinner');
@@ -2702,7 +2719,16 @@ function loadSnapModal(nvr, ch) {
 
   fetch(url)
   .then(async r => {
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    if (!r.ok) {
+      let msg = `HTTP ${r.status}`;
+      try {
+        const t = await r.text();
+        const sub = (t.match(/<subStatusCode>\s*([^<]+?)\s*</) || [])[1] || '';
+        const ss  = (t.match(/<statusString>\s*([^<]+?)\s*</) || [])[1] || '';
+        msg = snapErrorLabel(r.status, sub, ss);
+      } catch {}
+      throw new Error(msg);
+    }
     const blob = await r.blob();
     if (!blob.size || !blob.type.startsWith('image/')) throw new Error('Răspuns invalid');
     const objUrl = URL.createObjectURL(blob);
