@@ -770,61 +770,76 @@ html[data-font] .nvr-name,html[data-font] .cl-name,html[data-font] .modal-title{
 
 /* ── Ecran de login ── */
 html:not(.unlocked) .app{display:none}
-#login-screen{position:fixed;inset:0;z-index:290;display:flex;overflow-y:auto;background:var(--bg);
+#login-screen{position:fixed;inset:0;z-index:290;display:flex;overflow-y:auto;background:#0D1F33;color-scheme:light;
+  --l-ink:#0D1F33;--l-mut:#5B6B7C;--l-line:#DCE3EC;--l-field:#F4F7FB;--l-org:#F5A100;--l-blue:#0B5FB0;
+  font-family:'Inter','IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   padding:max(24px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(24px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
 #login-screen[hidden]{display:none}
-.ls-bg{position:fixed;inset:0;pointer-events:none;
+.ls-bg{position:fixed;inset:0;pointer-events:none;overflow:hidden;
   background:
-    radial-gradient(600px 380px at 50% 18%, rgba(0,217,255,.10), transparent 70%),
-    linear-gradient(var(--border) 1px, transparent 1px) 0 0/32px 32px,
-    linear-gradient(90deg, var(--border) 1px, transparent 1px) 0 0/32px 32px;
-  -webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 35%, #000 30%, transparent 80%);
-          mask-image:radial-gradient(ellipse 70% 60% at 50% 35%, #000 30%, transparent 80%);
-  opacity:.55}
-.ls-wrap{position:relative;margin:auto;width:100%;max-width:380px;display:flex;flex-direction:column;gap:18px}
-.ls-card{background:var(--bg-1);border:1px solid var(--border);border-radius:16px;padding:28px 24px 22px;
-  box-shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 24px 60px -20px rgba(0,0,0,.45)}
+    radial-gradient(700px 420px at 85% -5%, rgba(11,95,176,.55), transparent 65%),
+    radial-gradient(520px 360px at 0% 105%, rgba(245,161,0,.16), transparent 70%),
+    linear-gradient(160deg,#0D1F33 0%,#102843 55%,#0B1A2C 100%)}
+.ls-bg::before{content:"";position:absolute;inset:0;opacity:.10;
+  background:linear-gradient(#6f9fd4 1px,transparent 1px) 0 0/36px 36px,linear-gradient(90deg,#6f9fd4 1px,transparent 1px) 0 0/36px 36px;
+  -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 20%,#000 20%,transparent 75%);mask-image:radial-gradient(ellipse 80% 60% at 50% 20%,#000 20%,transparent 75%)}
+.ls-bg::after{content:"";position:absolute;top:-10%;bottom:-10%;right:-140px;width:90px;background:var(--l-org);transform:rotate(18deg);opacity:.9;box-shadow:-34px 0 0 rgba(255,255,255,.04)}
+.ls-wrap{position:relative;margin:auto;width:100%;max-width:400px;display:flex;flex-direction:column;gap:18px}
+.ls-hero{text-align:center;color:#fff;padding:4px 8px 0}
+.ls-kicker{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--l-org)}
+.ls-kicker i{display:inline-block;width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 4px rgba(34,197,94,.18);animation:ls-pulse 2s infinite}
+@keyframes ls-pulse{50%{box-shadow:0 0 0 7px rgba(34,197,94,.05)}}
+.ls-card{background:#fff;border-radius:20px;padding:28px 24px 22px;border:0;color:var(--l-ink);position:relative;overflow:hidden;
+  box-shadow:0 30px 70px -25px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.06)}
+.ls-card::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:linear-gradient(90deg,var(--l-org),#ffc24d)}
 .ls-card.shake{animation:ls-shake .38s}
-@keyframes ls-shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+@keyframes ls-shake{10%,90%{transform:translateX(-1px)}20%,80%{transform:translateX(2px)}30%,50%,70%{transform:translateX(-4px)}40%,60%{transform:translateX(4px)}}
 .ls-brand{display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:22px}
-.ls-logo-plate{background:#fff;border-radius:12px;padding:4px 10px;margin-bottom:16px;border:1px solid var(--border)}
-.ls-logo-plate img{display:block;height:72px;width:auto;max-width:260px;object-fit:contain}
-.ls-title{font-family:var(--mono);font-size:17px;font-weight:600;letter-spacing:.04em;color:var(--fg)}
-.ls-sub{font-size:12px;color:var(--fg-2);margin-top:4px}
-.ls-checking{text-align:center;font-family:var(--mono);font-size:12px;color:var(--fg-2);padding:12px 0}
+.ls-logo-plate{background:transparent;border:0;padding:0;margin-bottom:18px}
+.ls-logo-plate img{display:block;height:64px;width:auto;max-width:270px;object-fit:contain}
+.ls-title{font-family:inherit;font-size:23px;font-weight:800;letter-spacing:-.01em;color:var(--l-ink)}
+.ls-sub{font-size:14px;color:var(--l-mut);margin-top:4px}
+.ls-checking{text-align:center;font-size:13px;color:var(--l-mut);padding:12px 0}
 .ls-form{display:flex;flex-direction:column;gap:14px}
 .ls-form[hidden]{display:none}
-.ls-field{display:flex;flex-direction:column;gap:6px}
-.ls-field>span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--fg-3)}
-.ls-field input{width:100%;height:46px;background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:0 14px;
-  font-size:16px;font-family:var(--sans);color:var(--fg);outline:none;-webkit-appearance:none;transition:border-color .15s, box-shadow .15s}
-.ls-field input::placeholder{color:var(--fg-3)}
-.ls-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.ls-field{display:flex;flex-direction:column;gap:7px;position:relative}
+.ls-field>span{font-size:12px;font-weight:700;letter-spacing:.02em;color:var(--l-ink)}
+.ls-field input{width:100%;height:50px;background:var(--l-field);border:1.5px solid var(--l-line);border-radius:12px;padding:0 14px 0 44px;
+  font-size:16px;font-family:inherit;color:var(--l-ink);outline:none;-webkit-appearance:none;transition:border-color .15s, box-shadow .15s, background .15s}
+.ls-field input::placeholder{color:#9AA8B8}
+.ls-field input:focus{border-color:var(--l-blue);background:#fff;box-shadow:0 0 0 4px rgba(11,95,176,.12)}
+.ls-ic{position:absolute;left:14px;bottom:15px;width:20px;height:20px;color:#7C8DA0;pointer-events:none}
+.ls-field:focus-within .ls-ic{color:var(--l-blue)}
 .ls-pass-wrap{position:relative}
-.ls-pass-wrap input{padding-right:48px}
-.ls-eye{position:absolute;right:4px;top:4px;width:38px;height:38px;border:0;background:transparent;color:var(--fg-3);border-radius:8px;display:grid;place-items:center;cursor:pointer}
-.ls-eye:hover,.ls-eye[aria-pressed="true"]{color:var(--accent-tx)}
-.ls-remember{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--fg-2);cursor:pointer;user-select:none;padding:2px 0}
+.ls-pass-wrap .ls-ic{bottom:15px}
+.ls-pass-wrap input{padding-right:50px}
+.ls-eye{position:absolute;right:5px;top:5px;width:40px;height:40px;border:0;background:transparent;color:#7C8DA0;border-radius:9px;display:grid;place-items:center;cursor:pointer}
+.ls-eye:hover,.ls-eye[aria-pressed="true"]{color:var(--l-ink);background:#E9EEF5}
+.ls-remember{display:flex;align-items:center;gap:10px;font-size:14px;color:#3B4A5A;cursor:pointer;user-select:none;padding:2px 0}
 .ls-remember input{position:absolute;opacity:0;width:1px;height:1px}
-.ls-check{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--border-2);background:var(--bg-2);display:grid;place-items:center;flex-shrink:0;transition:all .15s}
-.ls-remember input:checked + .ls-check{background:var(--accent);border-color:var(--accent)}
-.ls-remember input:checked + .ls-check::after{content:"";width:10px;height:5px;border:2px solid #000;border-top:0;border-right:0;transform:translateY(-1px) rotate(-45deg)}
-.ls-remember input:focus-visible + .ls-check{box-shadow:0 0 0 3px var(--accent-dim)}
-.ls-btn{position:relative;height:48px;margin-top:4px;border:0;border-radius:10px;background:var(--accent);color:#001018;
-  font-family:var(--sans);font-size:15px;font-weight:700;letter-spacing:.01em;cursor:pointer;transition:filter .15s, transform .05s}
-.ls-btn:hover{filter:brightness(1.06)}
+.ls-check{width:22px;height:22px;border-radius:7px;border:1.5px solid #B8C4D2;background:#fff;display:grid;place-items:center;flex-shrink:0;transition:all .15s}
+.ls-remember input:checked + .ls-check{background:var(--l-ink);border-color:var(--l-ink)}
+.ls-remember input:checked + .ls-check::after{content:"";width:10px;height:5px;border:2px solid #fff;border-top:0;border-right:0;transform:translateY(-1px) rotate(-45deg)}
+.ls-remember input:focus-visible + .ls-check{box-shadow:0 0 0 4px rgba(11,95,176,.15)}
+.ls-btn{position:relative;height:52px;margin-top:4px;border:0;border-radius:12px;background:var(--l-org);color:var(--l-ink);
+  font-family:inherit;font-size:16px;font-weight:800;letter-spacing:.01em;cursor:pointer;transition:filter .15s, transform .05s, box-shadow .15s;
+  box-shadow:0 10px 22px -10px rgba(245,161,0,.8)}
+.ls-btn-txt{display:inline-flex;align-items:center;gap:8px}
+.ls-btn:hover{filter:brightness(1.05)}
 .ls-btn:active{transform:translateY(1px)}
 .ls-btn:disabled{cursor:default;filter:saturate(.6)}
-.ls-spin{display:none;position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border:2px solid rgba(0,16,24,.25);border-top-color:#001018;border-radius:50%;animation:ls-rot .7s linear infinite}
+.ls-spin{display:none;position:absolute;left:50%;top:50%;width:20px;height:20px;margin:-10px 0 0 -10px;border:2.5px solid rgba(13,31,51,.25);border-top-color:var(--l-ink);border-radius:50%;animation:ls-rot .7s linear infinite}
 .ls-btn.busy .ls-btn-txt{visibility:hidden}
 .ls-btn.busy .ls-spin{display:block}
 @keyframes ls-rot{to{transform:rotate(360deg)}}
-.ls-err{min-height:18px;font-size:12.5px;color:var(--err);text-align:center;line-height:1.4}
-.ls-link{align-self:center;background:none;border:0;color:var(--fg-2);font-family:var(--sans);font-size:13px;cursor:pointer;padding:6px 8px;border-radius:6px;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--border-2)}
-.ls-link:hover{color:var(--accent-tx);text-decoration-color:currentColor}
-.ls-mode-title{font-size:15px;font-weight:700;color:var(--fg);text-align:center}
-.ls-mode-text{font-size:13px;line-height:1.5;color:var(--fg-2);text-align:center;margin:-6px 0 2px}
-.ls-err.ok{color:var(--ok)}
+.ls-err{min-height:0;font-size:13.5px;color:#B42318;text-align:center;line-height:1.4}
+.ls-err:not(:empty){background:#FEF3F2;border:1px solid #FECDCA;border-radius:10px;padding:10px 12px}
+.ls-link{align-self:center;background:none;border:0;color:var(--l-mut);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;padding:6px 8px;border-radius:6px;text-decoration:none}
+.ls-link:hover{color:var(--l-ink);text-decoration:underline;text-underline-offset:3px}
+.ls-mode-title{font-size:18px;font-weight:800;color:var(--l-ink);text-align:center}
+.ls-mode-text{font-size:14px;line-height:1.5;color:var(--l-mut);text-align:center;margin:-6px 0 2px}
+.ls-err.ok{color:#067647}
+.ls-err.ok:not(:empty){background:#ECFDF3;border-color:#ABEFC6}
 .acct-block{flex-direction:column;align-items:stretch!important;gap:10px}
 .acct-head{display:flex;flex-direction:column}
 .acct-line{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -836,9 +851,14 @@ html:not(.unlocked) .app{display:none}
 .acct-msg.ok{color:var(--ok)}.acct-msg.err{color:var(--err)}
 .mon-note{justify-content:flex-start!important;flex-direction:row!important;align-items:flex-start!important;gap:12px;background:var(--ok-dim)}
 .mon-dot{width:10px;height:10px;border-radius:50%;background:var(--ok);margin-top:4px;flex-shrink:0;box-shadow:0 0 0 4px rgba(34,197,94,.18)}
-.ls-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:10px;color:var(--fg-3);padding:0 4px}
+.ls-feats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ls-feat{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;font-size:11.5px;line-height:1.3;color:#C9D4E0;padding:10px 6px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}
+.ls-feat svg{color:var(--l-org)}
+.ls-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:11px;color:#8FA3B8;padding:0 4px}
 .ls-lock{display:inline-flex;align-items:center;gap:5px}
-@media (prefers-reduced-motion: reduce){.ls-card.shake{animation:none}.ls-spin{animation-duration:1.6s}}
+@media (prefers-reduced-motion: reduce){.ls-card.shake{animation:none}.ls-spin{animation-duration:1.6s}.ls-kicker i{animation:none}}
+@media (max-width:380px){.ls-card{padding:24px 18px 18px}.ls-logo-plate img{height:54px}}
+@media (max-width:640px){.ls-bg::after{right:-170px;opacity:.55}}
 
 /* text accent lizibil în tema deschisă */
 :root[data-theme="light"] .section-action,:root[data-theme="light"] .cm-sec,:root[data-theme="light"] .cl-chip{font-weight:700}
@@ -1292,11 +1312,12 @@ html:not(.unlocked) .app{display:none}
 <div id="login-screen" hidden>
   <div class="ls-bg" aria-hidden="true"></div>
   <div class="ls-wrap">
+    <div class="ls-hero"><span class="ls-kicker"><i></i>Monitorizare non-stop</span></div>
     <div class="ls-card" id="ls-card">
       <div class="ls-brand">
         <div class="ls-logo-plate"><img id="ls-logo" alt="Supraveghere24h"></div>
-        <h1 class="ls-title">CCTV Monitor</h1>
-        <p class="ls-sub">Monitorizare NVR în timp real</p>
+        <h1 class="ls-title">Bine ai revenit</h1>
+        <p class="ls-sub">Intră în contul tău CCTV Monitor</p>
       </div>
 
       <div id="ls-checking" class="ls-checking" hidden>Se verifică sesiunea…</div>
@@ -1304,12 +1325,12 @@ html:not(.unlocked) .app{display:none}
       <form id="ls-form" class="ls-form" autocomplete="on" novalidate>
         <label class="ls-field">
           <span>Utilizator</span>
-          <input id="ls-user" name="username" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ex. admin" required>
+          <input id="ls-user" name="username" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ex. admin" required><svg class="ls-ic" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
         </label>
         <label class="ls-field">
           <span>Parolă</span>
           <div class="ls-pass-wrap">
-            <input id="ls-pass" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required>
+            <input id="ls-pass" name="password" type="password" autocomplete="current-password" placeholder="Parola ta" required><svg class="ls-ic" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
             <button type="button" id="ls-eye" class="ls-eye" aria-label="Arată parola" aria-pressed="false">
               <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
@@ -1320,7 +1341,7 @@ html:not(.unlocked) .app{display:none}
           <span class="ls-check" aria-hidden="true"></span>
           <span>Ține-mă minte pe acest dispozitiv</span>
         </label>
-        <button id="ls-btn" class="ls-btn" type="submit"><span class="ls-btn-txt">Intră în cont</span><span class="ls-spin" aria-hidden="true"></span></button>
+        <button id="ls-btn" class="ls-btn" type="submit"><span class="ls-btn-txt">Intră în cont <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><span class="ls-spin" aria-hidden="true"></span></button>
         <div id="ls-err" class="ls-err" role="alert" aria-live="polite"></div>
         <button type="button" class="ls-link" id="ls-to-forgot">Ai uitat parola?</button>
       </form>
@@ -1330,7 +1351,7 @@ html:not(.unlocked) .app{display:none}
         <p class="ls-mode-text">Scrie utilizatorul sau emailul contului. Îți trimitem pe mail un link valabil 30 de minute.</p>
         <label class="ls-field">
           <span>Utilizator sau email</span>
-          <input id="ls-f-login" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ex. admin">
+          <input id="ls-f-login" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ex. admin"><svg class="ls-ic" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
         </label>
         <button id="ls-f-btn" class="ls-btn" type="submit"><span class="ls-btn-txt">Trimite linkul</span><span class="ls-spin" aria-hidden="true"></span></button>
         <div id="ls-f-msg" class="ls-err" role="alert" aria-live="polite"></div>
@@ -1342,16 +1363,21 @@ html:not(.unlocked) .app{display:none}
         <p class="ls-mode-text">Alege o parolă nouă pentru contul tău (minim 6 caractere).</p>
         <label class="ls-field">
           <span>Parola nouă</span>
-          <input id="ls-r-pass" type="password" autocomplete="new-password" placeholder="••••••••">
+          <input id="ls-r-pass" type="password" autocomplete="new-password" placeholder="Minim 6 caractere"><svg class="ls-ic" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
         </label>
         <label class="ls-field">
           <span>Confirmă parola</span>
-          <input id="ls-r-pass2" type="password" autocomplete="new-password" placeholder="••••••••">
+          <input id="ls-r-pass2" type="password" autocomplete="new-password" placeholder="Repetă parola"><svg class="ls-ic" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
         </label>
         <button id="ls-r-btn" class="ls-btn" type="submit"><span class="ls-btn-txt">Salvează parola</span><span class="ls-spin" aria-hidden="true"></span></button>
         <div id="ls-r-msg" class="ls-err" role="alert" aria-live="polite"></div>
         <button type="button" class="ls-link" data-ls-back>← Înapoi la autentificare</button>
       </form>
+    </div>
+    <div class="ls-feats" aria-hidden="true">
+      <div class="ls-feat"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>NVR-uri<br>monitorizate</div>
+      <div class="ls-feat"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Alerte<br>Telegram 24/7</div>
+      <div class="ls-feat"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z"/><path d="M9 12l2 2 4-4"/></svg>Clienți<br>și oferte</div>
     </div>
     <div class="ls-foot">
       <span class="ls-lock"><svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Conexiune securizată</span>
