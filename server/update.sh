@@ -23,6 +23,12 @@ if [ -n "$NG" ]; then
     if nginx -t >/dev/null 2>&1; then systemctl reload nginx; echo "nginx: limită upload 25 MB"; else cp /root/nginx-nvr-proxy.conf.bak "$NG"; echo "ATENȚIE: nu am putut modifica nginx (restaurat)"; fi
   fi
 fi
+# oferte: serverul are nevoie de IP-ul real al vizitatorului (limitare cereri) → X-Forwarded-For (o singură dată)
+if [ -n "$NG" ] && ! grep -q "X-Forwarded-For" "$NG"; then
+  cp "$NG" /root/nginx-nvr-proxy.conf.bak2
+  sed -i '0,/proxy_set_header Host \$host;/s//&\n        proxy_set_header X-Forwarded-For $remote_addr;/' "$NG"
+  if nginx -t >/dev/null 2>&1; then systemctl reload nginx; echo "nginx: IP real vizitatori"; else cp /root/nginx-nvr-proxy.conf.bak2 "$NG"; echo "ATENȚIE: nu am putut adăuga X-Forwarded-For (restaurat)"; fi
+fi
 [ -d node_modules/nodemailer ] || npm install --silent nodemailer@6 >/dev/null 2>&1 || true
 cp server.js server.js.prev
 mv server.new.js server.js

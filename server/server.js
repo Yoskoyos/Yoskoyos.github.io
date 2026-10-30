@@ -11,6 +11,8 @@
 //                  Stare în monitor-state.json. Dezactivare: variabila de mediu MONITOR=0.
 // v4.1 (29.10.2026): GET /snap?nvr=&ch=&token= — captură din stream-ul RTSP (ffmpeg) pentru NVR-urile care nu
 //                  oferă capturi ISAPI (ex. DS-7104NI-Q1). Credențialele NVR rămân pe server.
+// v4.7: oferte — calculator public (/calculator, pentru iframe în WordPress), POST /public/quote, pagina ofertei
+//                  /q/<token> cu Accept / Refuz / Cer clarificări, /quotes + /quote-settings (aplicație), Telegram, email.
 // v4.6: GET /clients-backup — arhivă ZIP cu toți clienții (JSON + CSV) și documentele lor.
 // v4.5: clienți — furnizor echipamente + documente de garanție (PDF/JPG/PNG), câmp `kind` la fișiere.
 // v4.4: GET /company?cui= — datele firmei din serviciul public ANAF (PlatitorTvaRest v9), pt. completarea fișei clientului.
@@ -869,6 +871,428 @@ function handleClientsBackup(req, res) {
   z.end();
 }
 
+
+/* ═════════════ Oferte: calculator public + pagina ofertei + răspunsul clientului ═════════════ */
+// quotes.json: { seq, list:[quote] }  ·  setările de preț: db.configs[owner].quoteCfg (editate din aplicație)
+const DEFAULT_LOGO = 'data:image/png;base64,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';
+const QUOTES_FILE = path.join(BASE_DIR, 'quotes.json');
+function loadQuotes() {
+  try { const q = JSON.parse(fs.readFileSync(QUOTES_FILE, 'utf8')); if (q && Array.isArray(q.list)) return q; } catch {}
+  return { seq: 1000, list: [] };
+}
+function saveQuotes(q) {
+  const tmp = QUOTES_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(q, null, 2), { mode: 0o600 });
+  fs.renameSync(tmp, QUOTES_FILE);
+}
+// contul care primește cererile de pe site: QUOTE_OWNER sau primul administrator
+function quoteOwner(db) {
+  const want = String(process.env.QUOTE_OWNER || '').toLowerCase();
+  return (want && db.users.find(u => u.username.toLowerCase() === want)) || db.users.find(u => u.role === 'admin') || db.users[0] || null;
+}
+const QUOTE_DEFAULTS = {
+  enabled: true,
+  company: 'Supraveghere24h',
+  phone: '', email: '',
+  priceInterior: 0, priceExterior: 0, priceLift: 0,     // lei / cameră (echipament + montaj)
+  priceNvr4: 0, priceNvr8: 0, priceNvr16: 0, priceNvr32: 0,  // punct stocare și control, după nr. camere
+  priceSetup: 0,                                         // configurare + punere în funcțiune
+  monthly: 0,                                            // abonament lunar
+  vatMode: 'included',                                   // 'included' | 'plus' | 'none'
+  vatRate: 21,
+  validDays: 30,
+  intro: 'Vă mulțumim pentru interes! Mai jos găsiți oferta estimativă pentru sistemul de supraveghere video.',
+  note: 'Oferta poate fi îmbunătățită după inspectarea locației. Prețurile includ echipamentele, montajul și configurarea.',
+};
+function quoteCfg(db, owner) {
+  const c = (owner && db.configs[owner.username] && db.configs[owner.username].quoteCfg) || {};
+  return { ...QUOTE_DEFAULTS, ...c };
+}
+const qNum = v => { const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isFinite(n) && n > 0 ? n : 0; };
+function quotePriced(c) { return qNum(c.priceInterior) > 0 || qNum(c.priceExterior) > 0; }
+function buildQuote(c, inp) {
+  const n = { in: Math.min(64, Math.max(0, Math.round(qNum(inp.interior)))), ex: Math.min(64, Math.max(0, Math.round(qNum(inp.exterior)))), lift: Math.min(16, Math.max(0, Math.round(qNum(inp.lift)))) };
+  const total = n.in + n.ex + n.lift;
+  const items = [];
+  if (n.in)   items.push({ name: 'Cameră de interior (echipament + montaj)', qty: n.in,   price: qNum(c.priceInterior) });
+  if (n.ex)   items.push({ name: 'Cameră de exterior (echipament + montaj)', qty: n.ex,   price: qNum(c.priceExterior) });
+  if (n.lift) items.push({ name: 'Cameră pentru lift (echipament + montaj)', qty: n.lift, price: qNum(c.priceLift) || qNum(c.priceInterior) });
+  const nvr = total <= 4 ? ['4', c.priceNvr4] : total <= 8 ? ['8', c.priceNvr8] : total <= 16 ? ['16', c.priceNvr16] : ['32', c.priceNvr32];
+  if (total) items.push({ name: `Punct de stocare și control (NVR ${nvr[0]} canale + HDD)`, qty: 1, price: qNum(nvr[1]) });
+  if (total && qNum(c.priceSetup)) items.push({ name: 'Configurare și punere în funcțiune', qty: 1, price: qNum(c.priceSetup) });
+  for (const it of items) it.total = Math.round(it.qty * it.price * 100) / 100;
+  const sub = Math.round(items.reduce((s, it) => s + it.total, 0) * 100) / 100;
+  const rate = qNum(c.vatRate) || 21;
+  let net = sub, vat = 0, gross = sub;
+  if (c.vatMode === 'plus') { vat = Math.round(sub * rate) / 100; gross = Math.round((sub + vat) * 100) / 100; }
+  else if (c.vatMode === 'included') { net = Math.round(sub / (1 + rate / 100) * 100) / 100; vat = Math.round((sub - net) * 100) / 100; }
+  return { cams: n, totalCams: total, items, net, vat, total: gross, vatMode: c.vatMode, vatRate: rate, monthly: qNum(c.monthly) };
+}
+const lei = v => (Math.round(v * 100) / 100).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' lei';
+const roDate = t => new Date(t).toLocaleDateString('ro-RO', { timeZone: 'Europe/Bucharest', day: '2-digit', month: '2-digit', year: 'numeric' });
+const publicBase = req => process.env.PUBLIC_URL ? process.env.PUBLIC_URL.replace(/\/$/, '') : 'https://' + String(req.headers.host || 'proxy.supraveghere24h.ro').replace(/[^\w.:-]/g, '');
+const QSTATUS = { sent: 'Trimisă', viewed: 'Văzută', accepted: 'Acceptată', rejected: 'Refuzată', clarify: 'Cere clarificări', expired: 'Expirată' };
+function quoteStatus(q) { return (q.status === 'sent' || q.status === 'viewed') && Date.now() > q.validUntil ? 'expired' : q.status; }
+
+// limitare cereri publice: 6 oferte / oră / IP
+const pubHits = new Map();
+function pubLimited(req, max) {
+  const fwd = req.headers['x-forwarded-for'] || req.headers['x-real-ip'];
+  const ip = fwd ? String(fwd).split(',')[0].trim() : 'local:' + (req.socket.remoteAddress || '');
+  if (!fwd) max = max * 6;            // fără IP real de la nginx: limită comună, mai largă
+  const now = Date.now(), arr = (pubHits.get(ip) || []).filter(t => now - t < 3600e3);
+  arr.push(now); pubHits.set(ip, arr);
+  if (pubHits.size > 5000) pubHits.clear();
+  return arr.length > max;
+}
+const PUB_CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
+function sendHtml(res, status, html) {
+  res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer' });
+  res.end(html);
+}
+async function notifyOwner(db, owner, text) {
+  try { const ucfg = (db.configs[owner.username] || {}).cfg || {}; await tgSend(ucfg, text); } catch {}
+}
+
+const PAGE_CSS = `
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--ink:#0f1a2e;--ink2:#4a5568;--ink3:#8a96a8;--line:#e3e8ef;--bg:#f2f6fb;--card:#fff;--brand:#0284c7;--brand2:#0ea5e9;--ok:#16a34a;--err:#dc2626;--warn:#d97706}
+body{font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:760px;margin:0 auto;padding:24px 16px 48px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 32px -18px rgba(15,26,46,.25);overflow:hidden}
+.hd{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:22px 24px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.hd img{height:44px;width:auto}
+.hd .no{text-align:right;font-size:13px;color:var(--ink2)}
+.hd .no b{display:block;font-size:18px;color:var(--ink)}
+.sec{padding:20px 24px;border-bottom:1px solid var(--line)}
+.sec:last-child{border-bottom:0}
+h1{font-size:22px;letter-spacing:-.01em;margin-bottom:6px}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin-bottom:10px}
+.muted{color:var(--ink2)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;font-size:14px}
+.grid span{color:var(--ink3)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);padding:8px 6px;border-bottom:1px solid var(--line)}
+td{padding:10px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+.tot{display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-top:14px;font-size:14px}
+.tot .big{font-size:24px;font-weight:800;color:var(--ink)}
+.pill{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:4px 10px}
+.st-accepted{background:#dcfce7;color:var(--ok)}.st-rejected{background:#fee2e2;color:var(--err)}.st-clarify{background:#fef3c7;color:var(--warn)}.st-expired{background:#eef2f7;color:var(--ink2)}.st-sent,.st-viewed{background:#e0f2fe;color:var(--brand)}
+.acts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:12px;padding:13px 10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.no{color:var(--err);border-color:#f3c2c2}
+.btn.q{color:var(--warn);border-color:#f5d7a1}
+.btn:disabled{opacity:.6;cursor:default}
+textarea,input{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:15px;font-family:inherit;color:var(--ink);background:#fbfcfe;outline:none}
+textarea:focus,input:focus{border-color:var(--brand2);box-shadow:0 0 0 3px rgba(14,165,233,.15)}
+textarea{min-height:90px;resize:vertical}
+.msg{margin-top:12px;display:none}
+.banner{border-radius:12px;padding:14px 16px;font-weight:600}
+.banner.ok{background:#dcfce7;color:#14532d}.banner.no{background:#fee2e2;color:#7f1d1d}.banner.q{background:#fef3c7;color:#78350f}.banner.x{background:#eef2f7;color:var(--ink2)}
+.foot{text-align:center;color:var(--ink3);font-size:12px;margin-top:18px}
+.foot a{color:var(--brand)}
+.print{background:none;border:0;color:var(--brand);font-weight:600;cursor:pointer;font-size:13px;font-family:inherit}
+@media(max-width:560px){.grid{grid-template-columns:1fr}.acts{grid-template-columns:1fr}.hd .no{text-align:left}.sec,.hd{padding:18px 16px}}
+@media print{body{background:#fff}.card{box-shadow:none;border:0}.noprint{display:none!important}}
+`;
+function quotePageHtml(q, cfg, logo) {
+  const st = quoteStatus(q);
+  const c = q.customer, p = q.pricing;
+  const rows = p.items.map(it => `<tr><td>${escHtml(it.name)}</td><td class="n">${it.qty}</td><td class="n">${lei(it.price)}</td><td class="n">${lei(it.total)}</td></tr>`).join('');
+  const vatLine = p.vatMode === 'plus' ? `<div>Subtotal: ${lei(p.net)}</div><div>TVA ${p.vatRate}%: ${lei(p.vat)}</div>`
+                : p.vatMode === 'included' ? `<div class="muted">din care TVA ${p.vatRate}%: ${lei(p.vat)}</div>` : '';
+  const done = st === 'accepted' || st === 'rejected' || st === 'expired';      // după „clarificări” clientul poate încă accepta / refuza
+  const bannerTxt = { accepted: ['ok', 'Ați acceptat această ofertă. Vă mulțumim! Vă contactăm în cel mai scurt timp pentru programarea montajului.'],
+                      rejected: ['no', 'Ați refuzat această ofertă. Vă mulțumim pentru timpul acordat.'],
+                      clarify:  ['q', 'Am primit cererea dumneavoastră de clarificări. Vă contactăm în maxim 24 de ore.'],
+                      expired:  ['x', 'Această ofertă a expirat. Ne puteți contacta pentru o ofertă actualizată.'] }[st];
+  return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Oferta nr. ${q.no} — ${escHtml(cfg.company)}</title>
+<style>${PAGE_CSS}</style></head><body><div class="wrap">
+<div class="card">
+  <div class="hd">${logo ? `<img src="${logo}" alt="${escHtml(cfg.company)}">` : `<b>${escHtml(cfg.company)}</b>`}
+    <div class="no"><b>Ofertă nr. ${q.no}</b>emisă ${roDate(q.createdAt)} · valabilă până ${roDate(q.validUntil)}<br><span class="pill st-${st}">${QSTATUS[st]}</span></div></div>
+  <div class="sec"><h1>Bună ziua, ${escHtml(c.name.split(' ')[0] || c.name)}!</h1><p class="muted">${escHtml(cfg.intro)}</p></div>
+  <div class="sec"><h2>Date client</h2><div class="grid">
+    <div><span>Nume:</span> ${escHtml(c.name)}</div><div><span>Telefon:</span> ${escHtml(c.phone)}</div>
+    <div><span>Email:</span> ${escHtml(c.email)}</div><div><span>Localitate:</span> ${escHtml(c.city)}</div>
+    ${c.propType ? `<div><span>Tip imobil:</span> ${escHtml(c.propType)}</div>` : ''}${c.address ? `<div><span>Adresă:</span> ${escHtml(c.address)}</div>` : ''}
+  </div></div>
+  <div class="sec"><h2>Sistem propus · ${p.totalCams} ${p.totalCams === 1 ? 'cameră' : 'camere'}</h2>
+    <table><thead><tr><th>Descriere</th><th class="n">Cant.</th><th class="n">Preț unitar</th><th class="n">Valoare</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="tot">${vatLine}<div class="big">Total: ${lei(p.total)}</div>${p.monthly ? `<div class="muted">Abonament lunar monitorizare: <b>${lei(p.monthly)}</b>/lună</div>` : ''}</div>
+    ${cfg.note ? `<p class="muted" style="margin-top:14px;font-size:13px">${escHtml(cfg.note)}</p>` : ''}
+    ${c.message ? `<p style="margin-top:12px;font-size:13px"><b>Mesajul dumneavoastră:</b> ${escHtml(c.message)}</p>` : ''}
+  </div>
+  <div class="sec noprint" id="act">
+    ${st === 'clarify' ? `<div class="banner q" style="margin-bottom:14px">${bannerTxt[1]}</div>` : ''}
+    ${done ? `<div class="banner ${bannerTxt[0]}">${bannerTxt[1]}</div>${q.response && q.response.message ? `<p class="muted" style="margin-top:10px;font-size:13px">Mesaj trimis: „${escHtml(q.response.message)}”</p>` : ''}`
+    : `<h2>Răspunsul dumneavoastră</h2>
+    <div class="acts"><button class="btn ok" data-a="accept">✓ Accept oferta</button><button class="btn q" data-a="clarify">? Cer clarificări</button><button class="btn no" data-a="reject">✕ Refuz</button></div>
+    <div class="msg" id="msgbox"><textarea id="msg" placeholder=""></textarea><button class="btn" id="send" style="margin-top:10px;width:100%">Trimite</button></div>
+    <div id="out" style="margin-top:12px"></div>`}
+  </div>
+</div>
+<div class="foot noprint"><button class="print" onclick="window.print()">Descarcă / printează oferta</button>${cfg.phone ? ` · Telefon: <a href="tel:${escHtml(cfg.phone.replace(/[^\d+]/g, ''))}">${escHtml(cfg.phone)}</a>` : ''}${cfg.email ? ` · <a href="mailto:${escHtml(cfg.email)}">${escHtml(cfg.email)}</a>` : ''}</div>
+</div>
+${done ? '' : `<script>
+(function(){
+  var act=null, box=document.getElementById('msgbox'), ta=document.getElementById('msg'), out=document.getElementById('out');
+  var ph={accept:'Observații (opțional) — ex. când vă putem contacta pentru programare',clarify:'Ce ați dori să clarificăm? (ex. o cameră în plus, alt tip de cameră, plata în rate…)',reject:'Ne spuneți motivul? (opțional)'};
+  function send(){
+    var b=document.querySelectorAll('.btn'); for(var i=0;i<b.length;i++) b[i].disabled=true;
+    fetch(location.pathname+'/respond',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:act,message:ta.value})})
+      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+      .then(function(x){ if(x.ok) location.replace(location.pathname); else { out.textContent=x.j.error||'Eroare'; for(var i=0;i<b.length;i++) b[i].disabled=false; } })
+      .catch(function(){ out.textContent='Nu s-a putut trimite. Verificați conexiunea și încercați din nou.'; for(var i=0;i<b.length;i++) b[i].disabled=false; });
+  }
+  [].forEach.call(document.querySelectorAll('[data-a]'),function(el){ el.addEventListener('click',function(){
+    act=el.getAttribute('data-a'); ta.placeholder=ph[act]; box.style.display='block';
+    document.getElementById('send').textContent= act==='accept'?'Confirm acceptarea ofertei': act==='reject'?'Confirm refuzul':'Trimite întrebarea';
+    if(act==='clarify') ta.focus();
+  });});
+  document.getElementById('send').addEventListener('click',function(){
+    if(act==='clarify' && !ta.value.trim()){ out.textContent='Scrieți ce ați dori să clarificăm.'; ta.focus(); return; }
+    send();
+  });
+})();
+</script>`}
+</body></html>`;
+}
+
+function calculatorHtml(cfg, logo, base) {
+  const goTxt = mailReady() ? 'Primește oferta pe email' : 'Vezi oferta';
+  const priced = quotePriced(cfg);
+  const P = JSON.stringify({ in: qNum(cfg.priceInterior), ex: qNum(cfg.priceExterior), lift: qNum(cfg.priceLift) || qNum(cfg.priceInterior),
+    n4: qNum(cfg.priceNvr4), n8: qNum(cfg.priceNvr8), n16: qNum(cfg.priceNvr16), n32: qNum(cfg.priceNvr32), setup: qNum(cfg.priceSetup),
+    vatMode: cfg.vatMode, vatRate: qNum(cfg.vatRate) || 21, monthly: qNum(cfg.monthly) });
+  return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Calculează oferta — ${escHtml(cfg.company)}</title><style>${PAGE_CSS}
+.wrap{padding:12px 12px 24px}
+.step{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.step:last-child{border-bottom:0}
+.step b{display:block;font-size:15px}.step small{color:var(--ink3);font-size:12.5px}
+.ctr{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.ctr button{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:20px;font-weight:700;color:var(--brand);cursor:pointer}
+.ctr input{width:56px;text-align:center;font-weight:800;font-size:17px;padding:8px 4px}
+.types{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.types label{border:1px solid var(--line);border-radius:12px;padding:12px 8px;text-align:center;font-weight:600;font-size:14px;cursor:pointer;background:#fff}
+.types input{display:none}
+.types input:checked+span{color:var(--brand)}
+.types label:has(input:checked){border-color:var(--brand2);background:#f0f9ff}
+.est{display:flex;justify-content:space-between;align-items:baseline;gap:10px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:14px 16px;margin-top:14px}
+.est b{font-size:24px}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fl{display:flex;flex-direction:column;gap:5px;margin-bottom:10px;font-size:13px;font-weight:600;color:var(--ink2)}
+.chk{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--ink2);margin:6px 0 14px}
+.chk input{width:18px;height:18px;flex-shrink:0;margin-top:2px}
+.go{width:100%;background:var(--brand);border:0;color:#fff;border-radius:12px;padding:15px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit}
+.go:disabled{opacity:.6}
+.err{color:var(--err);font-size:13px;margin-top:8px;min-height:18px}
+.hp{position:absolute;left:-9999px}
+@media(max-width:560px){.f2{grid-template-columns:1fr}.types{grid-template-columns:1fr}}
+</style></head><body><div class="wrap"><div class="card">
+${!priced || !cfg.enabled ? `<div class="sec"><h1>Calculatorul nu este disponibil momentan</h1><p class="muted">Vă rugăm să ne contactați telefonic${cfg.phone ? ' la ' + escHtml(cfg.phone) : ''}.</p></div>` : `
+<form id="f" novalidate>
+ <div class="sec"><h2>1 · Tipul imobilului</h2><div class="types">
+  <label><input type="radio" name="propType" value="Casă / vilă" checked><span>Casă / vilă</span></label>
+  <label><input type="radio" name="propType" value="Bloc / asociație de proprietari"><span>Bloc / asociație</span></label>
+  <label><input type="radio" name="propType" value="Firmă / spațiu comercial"><span>Firmă / spațiu comercial</span></label></div></div>
+ <div class="sec"><h2>2 · Câte camere aveți nevoie?</h2>
+  <div class="step"><div><b>Camere de interior</b><small>holuri, scări, birouri, magazin</small></div><div class="ctr"><button type="button" data-d="-1" data-t="interior">−</button><input id="interior" name="interior" inputmode="numeric" value="0"><button type="button" data-d="1" data-t="interior">+</button></div></div>
+  <div class="step"><div><b>Camere de exterior</b><small>curte, intrare, parcare, perimetru</small></div><div class="ctr"><button type="button" data-d="-1" data-t="exterior">−</button><input id="exterior" name="exterior" inputmode="numeric" value="0"><button type="button" data-d="1" data-t="exterior">+</button></div></div>
+  <div class="step"><div><b>Camere pentru lift</b><small>dacă e cazul</small></div><div class="ctr"><button type="button" data-d="-1" data-t="lift">−</button><input id="lift" name="lift" inputmode="numeric" value="0"><button type="button" data-d="1" data-t="lift">+</button></div></div>
+  <div class="est"><span class="muted">Preț estimativ<br><small id="estsub"></small></span><b id="est">—</b></div>
+ </div>
+ <div class="sec"><h2>3 · Datele dumneavoastră</h2>
+  <div class="f2"><label class="fl">Nume și prenume *<input name="name" autocomplete="name" required></label><label class="fl">Telefon *<input name="phone" type="tel" autocomplete="tel" required></label></div>
+  <div class="f2"><label class="fl">Email *<input name="email" type="email" autocomplete="email" required></label><label class="fl">Localitate / sector *<input name="city" autocomplete="address-level2" required></label></div>
+  <label class="fl">Mesaj (opțional)<textarea name="message" placeholder="Detalii despre locație, preferințe…"></textarea></label>
+  <input class="hp" name="website" tabindex="-1" autocomplete="off">
+  <label class="chk"><input type="checkbox" name="consent" required> Sunt de acord cu prelucrarea datelor personale în scopul ofertării și al contactării mele.</label>
+  <button class="go" id="go">${goTxt}</button><div class="err" id="err"></div>
+ </div>
+</form>`}
+</div><div class="foot">Oferta finală se confirmă după inspectarea locației.</div></div>
+${!priced || !cfg.enabled ? '' : `<script>
+(function(){
+  var P=${P}, f=document.getElementById('f');
+  function v(id){var x=parseInt(document.getElementById(id).value,10);return isFinite(x)&&x>0?x:0;}
+  function lei(x){return (Math.round(x*100)/100).toLocaleString('ro-RO',{minimumFractionDigits:0,maximumFractionDigits:2})+' lei';}
+  function calc(){
+    var i=v('interior'),e=v('exterior'),l=v('lift'),t=i+e+l;
+    if(!t){document.getElementById('est').textContent='—';document.getElementById('estsub').textContent='alegeți numărul de camere';return;}
+    var s=i*P.in+e*P.ex+l*P.lift+(t<=4?P.n4:t<=8?P.n8:t<=16?P.n16:P.n32)+P.setup;
+    if(P.vatMode==='plus') s=s*(1+P.vatRate/100);
+    document.getElementById('est').textContent=lei(s);
+    document.getElementById('estsub').textContent=t+(t===1?' cameră':' camere')+(P.vatMode==='none'?'':' · TVA inclus')+(P.monthly?' · + '+lei(P.monthly)+'/lună abonament':'');
+  }
+  [].forEach.call(document.querySelectorAll('[data-t]'),function(b){b.addEventListener('click',function(){
+    var el=document.getElementById(b.getAttribute('data-t')); el.value=Math.max(0,Math.min(64,v(el.id)+parseInt(b.getAttribute('data-d'),10))); calc();});});
+  ['interior','exterior','lift'].forEach(function(id){document.getElementById(id).addEventListener('input',calc);});
+  calc();
+  f.addEventListener('submit',function(ev){
+    ev.preventDefault(); var err=document.getElementById('err'); err.textContent='';
+    var d={}; new FormData(f).forEach(function(val,k){d[k]=val;}); d.consent=!!f.consent.checked;
+    if(!(v('interior')+v('exterior')+v('lift'))) return err.textContent='Alegeți cel puțin o cameră.';
+    if(!d.name.trim()||!d.phone.trim()||!d.email.trim()||!d.city.trim()) return err.textContent='Completați câmpurile marcate cu *.';
+    if(!/^\\S+@\\S+\\.\\S+$/.test(d.email.trim())) return err.textContent='Adresa de email nu pare corectă.';
+    if(!d.consent) return err.textContent='Bifați acordul pentru prelucrarea datelor.';
+    var go=document.getElementById('go'); go.disabled=true; go.textContent='Se trimite…';
+    fetch('/public/quote',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)})
+     .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+     .then(function(x){ if(!x.ok){err.textContent=x.j.error||'Eroare';go.disabled=false;go.textContent='${goTxt}';return;}
+        f.innerHTML='<div class="sec" style="text-align:center"><div style="font-size:44px">✅</div><h1>Oferta nr. '+x.j.no+' este gata!</h1><p class="muted" style="margin:6px 0 18px">'+(x.j.emailed?'V-am trimis-o și pe email. ':'')+'O puteți vedea acum și ne puteți răspunde direct din pagina ofertei.</p><a class="go" style="display:block;text-decoration:none" target="_top" href="'+x.j.url+'">Vezi oferta</a></div>';
+        try{ f.scrollIntoView({behavior:'smooth'}); }catch(e){} })
+     .catch(function(){err.textContent='Nu s-a putut trimite. Încercați din nou.';go.disabled=false;go.textContent='${goTxt}';});
+  });
+})();
+</script>`}
+</body></html>`;
+}
+function quoteEmailHtml(q, cfg, url) {
+  const p = q.pricing;
+  const btn = (txt, color, a) => `<a href="${url}?a=${a}" style="display:inline-block;background:${color};color:#fff;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:10px;margin:4px 6px 4px 0">${txt}</a>`;
+  return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:auto;color:#0f1a2e">
+<h2 style="margin:0 0 6px">Oferta nr. ${q.no} — sistem de supraveghere video</h2>
+<p>Bună ziua, ${escHtml(q.customer.name)},</p><p>${escHtml(cfg.intro)}</p>
+<table style="width:100%;border-collapse:collapse;font-size:14px">${p.items.map(it => `<tr><td style="padding:6px 0;border-bottom:1px solid #e3e8ef">${escHtml(it.name)} × ${it.qty}</td><td style="padding:6px 0;border-bottom:1px solid #e3e8ef;text-align:right;white-space:nowrap">${lei(it.total)}</td></tr>`).join('')}</table>
+<p style="font-size:20px;font-weight:bold;text-align:right;margin:12px 0">Total: ${lei(p.total)}</p>
+${p.monthly ? `<p style="text-align:right;color:#4a5568;margin-top:-6px">Abonament lunar: ${lei(p.monthly)}/lună</p>` : ''}
+<p style="color:#4a5568;font-size:13px">Oferta este valabilă până la ${roDate(q.validUntil)}. ${escHtml(cfg.note)}</p>
+<p style="margin:18px 0 6px"><b>Vă rugăm să ne transmiteți răspunsul:</b></p>
+<p>${btn('✓ Accept oferta', '#16a34a', 'accept')}${btn('? Cer clarificări', '#d97706', 'clarify')}${btn('✕ Refuz', '#dc2626', 'reject')}</p>
+<p style="font-size:13px"><a href="${url}">Vezi oferta completă online</a></p>
+<p style="color:#8a96a8;font-size:12px;margin-top:24px">${escHtml(cfg.company)}${cfg.phone ? ' · ' + escHtml(cfg.phone) : ''}${cfg.email ? ' · ' + escHtml(cfg.email) : ''}</p></div>`;
+}
+
+async function handlePublicQuote(req, res) {
+  if (pubLimited(req, 6)) { res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8', ...PUB_CORS }); return res.end(JSON.stringify({ error: 'Prea multe cereri. Încercați din nou mai târziu.' })); }
+  const send = (st, o) => { res.writeHead(st, { 'Content-Type': 'application/json; charset=utf-8', ...PUB_CORS }); res.end(JSON.stringify(o)); };
+  const b = await readJson(req);
+  if (b.website) return send(200, { url: '/' });                                   // capcană pentru roboți
+  const db = loadDb(); const owner = quoteOwner(db);
+  if (!owner) return send(503, { error: 'Serviciu indisponibil' });
+  const cfg = quoteCfg(db, owner);
+  if (!cfg.enabled || !quotePriced(cfg)) return send(503, { error: 'Calculatorul nu este disponibil momentan.' });
+  const cust = { name: str(b.name, 120).trim(), phone: str(b.phone, 40).trim(), email: str(b.email, 160).trim(), city: str(b.city, 120).trim(),
+                 address: str(b.address, 300).trim(), propType: str(b.propType, 60).trim(), message: str(b.message, 2000).trim() };
+  if (!cust.name || !cust.phone || !cust.city || !/^\S+@\S+\.\S+$/.test(cust.email)) return send(400, { error: 'Completați numele, telefonul, emailul și localitatea.' });
+  if (!b.consent) return send(400, { error: 'Este necesar acordul pentru prelucrarea datelor.' });
+  const pricing = buildQuote(cfg, b);
+  if (!pricing.totalCams) return send(400, { error: 'Alegeți cel puțin o cameră.' });
+  const all = loadQuotes();
+  const q = { id: newId(), no: ++all.seq, token: crypto.randomBytes(18).toString('hex'), owner: owner.username, source: 'site',
+              createdAt: Date.now(), validUntil: Date.now() + (Math.round(qNum(cfg.validDays)) || 30) * 864e5,
+              customer: cust, pricing, status: 'sent', events: [{ t: Date.now(), type: 'created' }], emailed: false };
+  all.list.push(q); saveQuotes(all);
+  const url = `${publicBase(req)}/q/${q.token}`;
+  if (mailReady()) {
+    q.emailed = await sendMail(cust.email, `Oferta nr. ${q.no} — ${cfg.company}`,
+      `Bună ziua, ${cust.name}!\n\nOferta dumneavoastră (total ${lei(pricing.total)}) poate fi văzută aici:\n${url}\n\nPe pagina ofertei o puteți accepta, refuza sau cere clarificări.\n\n${cfg.company}`,
+      quoteEmailHtml(q, cfg, url));
+    const a2 = loadQuotes(); const x = a2.list.find(z => z.id === q.id); if (x) { x.emailed = q.emailed; saveQuotes(a2); }
+  }
+  notifyOwner(db, owner, `🧾 <b>Cerere nouă de ofertă #${q.no}</b>\n${escHtml(cust.name)} · ${escHtml(cust.phone)}\n${escHtml(cust.city)} · ${pricing.totalCams} camere · <b>${lei(pricing.total)}</b>${q.emailed ? '' : '\n(email neconfigurat — oferta NU a fost trimisă pe mail)'}`);
+  return send(200, { ok: true, no: q.no, url, emailed: q.emailed });
+}
+
+const LOGO_CACHE = { v: null };
+function quoteLogo() {
+  if (LOGO_CACHE.v !== null) return LOGO_CACHE.v;
+  try { LOGO_CACHE.v = 'data:image/png;base64,' + fs.readFileSync(path.join(BASE_DIR, 'logo.png')).toString('base64'); } catch { LOGO_CACHE.v = DEFAULT_LOGO; }
+  return LOGO_CACHE.v;
+}
+
+async function handleQuotePublic(req, res, pathname, parsed) {
+  const m = pathname.match(/^\/q\/([a-f0-9]{36})(\/respond)?$/);
+  if (!m) return sendHtml(res, 404, '<h1>Ofertă inexistentă</h1>');
+  const all = loadQuotes(); const q = all.list.find(x => x.token === m[1]);
+  if (!q) return sendHtml(res, 404, `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:system-ui;padding:40px;text-align:center"><h2>Oferta nu a fost găsită</h2><p>Linkul este greșit sau oferta a fost ștearsă.</p></body>`);
+  const db = loadDb(); const owner = db.users.find(u => u.username === q.owner) || quoteOwner(db);
+  const cfg = quoteCfg(db, owner);
+  if (m[2]) {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Metodă invalidă' });
+    if (pubLimited(req, 30)) return sendJson(res, 429, { error: 'Prea multe încercări' });
+    const b = await readJson(req);
+    const act = { accept: 'accepted', reject: 'rejected', clarify: 'clarify' }[b.action];
+    if (!act) return sendJson(res, 400, { error: 'Răspuns invalid' });
+    const st = quoteStatus(q);
+    if (st === 'accepted' || st === 'rejected') return sendJson(res, 409, { error: 'Ați răspuns deja la această ofertă.' });
+    if (st === 'expired') return sendJson(res, 410, { error: 'Oferta a expirat.' });
+    const msg = str(b.message, 2000).trim();
+    if (act === 'clarify' && !msg) return sendJson(res, 400, { error: 'Scrieți ce ați dori să clarificăm.' });
+    q.status = act; q.response = { action: act, message: msg, at: Date.now() };
+    q.events.push({ t: Date.now(), type: act, message: msg });
+    // la acceptare: clientul apare automat în evidența de clienți
+    if (act === 'accepted' && !q.clientId) {
+      try {
+        const cl = loadClients(); const list = userClients(cl, q.owner);
+        const c = cleanClient({ kind: 'pf', name: q.customer.name, phone: q.customer.phone, email: q.customer.email,
+          address: [q.customer.address, q.customer.city].filter(Boolean).join(', '),
+          notes: `Din oferta nr. ${q.no} acceptată pe ${roDate(Date.now())} · ${q.pricing.totalCams} camere · ${lei(q.pricing.total)}${msg ? '\nMesaj client: ' + msg : ''}`,
+          equip: { cams: q.pricing.totalCams } }, null);
+        list.push(c); saveClients(cl); q.clientId = c.id;
+      } catch (e) { console.error('Oferte: nu am putut crea clientul:', e.message); }
+    }
+    saveQuotes(all);
+    const icon = { accepted: '✅', rejected: '❌', clarify: '❓' }[act];
+    notifyOwner(db, owner, `${icon} <b>Oferta #${q.no} — ${QSTATUS[act]}</b>\n${escHtml(q.customer.name)} · ${escHtml(q.customer.phone)} · ${lei(q.pricing.total)}${msg ? '\n„' + escHtml(msg) + '”' : ''}`);
+    return sendJson(res, 200, { ok: true, status: act });
+  }
+  if (req.method !== 'GET') return sendJson(res, 405, { error: 'Metodă invalidă' });
+  // prima deschidere → „Văzută” (nu numărăm vizitele proprietarului din aplicație: ?own=1)
+  if (!parsed.query.own) {
+    q.views = (q.views || 0) + 1; q.lastViewAt = Date.now();
+    if (q.status === 'sent') { q.status = 'viewed'; q.viewedAt = Date.now(); q.events.push({ t: Date.now(), type: 'viewed' }); }
+    saveQuotes(all);
+  }
+  let html = quotePageHtml(q, cfg, quoteLogo());
+  const pre = { accept: 'accept', reject: 'reject', clarify: 'clarify' }[parsed.query.a];
+  if (pre && ['sent', 'viewed', 'clarify'].includes(quoteStatus(q))) html = html.replace('</body>', `<script>setTimeout(function(){var b=document.querySelector('[data-a="${pre}"]');if(b){b.click();b.scrollIntoView({behavior:'smooth',block:'center'});}},300)</script></body>`);
+  return sendHtml(res, 200, html);
+}
+
+async function handleQuotesApi(req, res, pathname, parsed) {
+  const ctx = requireUser(req, res); if (!ctx) return;
+  const uname = ctx.user.username;
+  if (pathname === '/quote-settings') {
+    if (req.method === 'GET') return sendJson(res, 200, { settings: quoteCfg(ctx.db, ctx.user), mail: mailReady(), base: publicBase(req) });
+    if (req.method === 'PUT' || req.method === 'POST') {
+      const b = await readJson(req); const out = {};
+      for (const k of Object.keys(QUOTE_DEFAULTS)) {
+        if (!(k in b)) continue;
+        out[k] = typeof QUOTE_DEFAULTS[k] === 'number' ? qNum(b[k]) : typeof QUOTE_DEFAULTS[k] === 'boolean' ? !!b[k] : str(b[k], k === 'intro' || k === 'note' ? 1000 : 160);
+      }
+      if (!['included', 'plus', 'none'].includes(out.vatMode)) delete out.vatMode;
+      const conf = ctx.db.configs[uname] = ctx.db.configs[uname] || {};
+      conf.quoteCfg = { ...(conf.quoteCfg || {}), ...out };
+      saveDb(ctx.db);
+      return sendJson(res, 200, { settings: quoteCfg(ctx.db, ctx.user) });
+    }
+  }
+  const all = loadQuotes();
+  const mine = all.list.filter(q => q.owner === uname);
+  const view = q => ({ ...q, status: quoteStatus(q), url: `${publicBase(req)}/q/${q.token}` });
+  if (pathname === '/quotes' && req.method === 'GET') return sendJson(res, 200, { quotes: mine.map(view).reverse(), mail: mailReady() });
+  const id = pathname.split('/')[2];
+  const q = mine.find(x => x.id === id);
+  if (!q) return sendJson(res, 404, { error: 'Ofertă inexistentă' });
+  if (req.method === 'PUT') {
+    const b = await readJson(req);
+    if (b.status && QSTATUS[b.status] && b.status !== 'expired' && b.status !== q.status) { q.status = b.status; q.events.push({ t: Date.now(), type: b.status, manual: true }); }
+    if ('notes' in b) q.notes = str(b.notes, 4000);
+    if ('handled' in b) q.handled = !!b.handled;
+    if (b.extendDays) { q.validUntil = Math.max(Date.now(), q.validUntil) + Math.min(365, qNum(b.extendDays)) * 864e5; q.events.push({ t: Date.now(), type: 'extended' }); }
+    saveQuotes(all);
+    return sendJson(res, 200, { quote: view(q) });
+  }
+  if (req.method === 'DELETE') { all.list = all.list.filter(x => x !== q); saveQuotes(all); return sendJson(res, 200, { ok: true }); }
+  return sendJson(res, 405, { error: 'Operație necunoscută' });
+}
+
 /* ───────────── Rute ───────────── */
 async function handleLogin(req, res) {
   const body = await readJson(req);
@@ -999,9 +1423,17 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4.6, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4.7, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
+    // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
+    if (pathname === '/calculator' && req.method === 'GET') {
+      const db = loadDb(); const owner = quoteOwner(db);
+      return sendHtml(res, 200, calculatorHtml(quoteCfg(db, owner), quoteLogo(), publicBase(req)));
+    }
+    if (pathname === '/public/quote' && req.method === 'POST') return await handlePublicQuote(req, res);
+    if (pathname.startsWith('/q/')) return await handleQuotePublic(req, res, pathname, parsed);
+    if (pathname === '/quotes' || pathname.startsWith('/quotes/') || pathname === '/quote-settings') return await handleQuotesApi(req, res, pathname, parsed);
     if (pathname === '/company' && req.method === 'GET') return await handleCompany(req, res, parsed);
     if (pathname === '/clients' || pathname.startsWith('/clients/')) return await handleClients(req, res, pathname);
 
@@ -1075,4 +1507,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v4.6 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v4.7 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));

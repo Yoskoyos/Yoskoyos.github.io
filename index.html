@@ -434,6 +434,56 @@ html[data-font] .nvr-name,html[data-font] .cl-name,html[data-font] .modal-title{
   .nav .nav-tab.on{border-top-color:transparent}
 }
 
+
+/* ── Oferte ── */
+.seg{display:inline-flex;background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:3px;gap:2px;margin-bottom:14px}
+.seg button{border:0;background:transparent;color:var(--fg-2);font-family:var(--sans);font-size:13.5px;font-weight:700;padding:8px 16px;border-radius:9px;cursor:pointer;display:flex;align-items:center;gap:6px}
+.seg button.on{background:var(--bg-1);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg .cnt{font-size:11px;background:var(--err);color:#fff;border-radius:999px;padding:1px 6px;font-family:var(--mono)}
+.qt-stats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.qt-stat{background:var(--bg-1);border:1px solid var(--border);border-radius:999px;padding:7px 13px;font-size:12.5px;color:var(--fg-2)}
+.qt-stat b{color:var(--fg);font-size:14px;margin-right:4px}
+.qt-warn{font-size:12px;line-height:1.5;border-radius:10px;padding:9px 12px;background:var(--warn-dim);color:var(--warn);margin-bottom:12px}
+.qt-list{display:flex;flex-direction:column;gap:8px}
+.qt-row{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;display:grid;grid-template-columns:62px 1.4fr 1.3fr .8fr 1fr .8fr;gap:12px;align-items:center;cursor:pointer;font-size:13px}
+.qt-row:hover{border-color:var(--border-2)}
+.qt-no{font-weight:800;font-family:var(--mono);font-size:13.5px}
+.qt-name{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qt-sub{font-size:12px;color:var(--fg-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qt-sub a{color:var(--accent-ink,var(--accent));text-decoration:none}
+.qt-tot{font-weight:800;text-align:right;white-space:nowrap}
+.qt-st{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.qpill{font-size:11px;font-weight:700;border-radius:999px;padding:3px 9px;white-space:nowrap}
+.qpill.sent{background:var(--blue-dim);color:var(--blue)}
+.qpill.viewed{background:var(--accent-soft,var(--accent-dim));color:var(--accent-ink,var(--accent))}
+.qpill.accepted{background:var(--ok-dim);color:var(--ok)}
+.qpill.rejected{background:var(--err-dim);color:var(--err)}
+.qpill.clarify{background:var(--warn-dim);color:var(--warn)}
+.qpill.expired{background:var(--bg-3);color:var(--fg-3)}
+.qt-dates{font-size:12px;color:var(--fg-3);text-align:right}
+.qt-head{display:grid;grid-template-columns:62px 1.4fr 1.3fr .8fr 1fr .8fr;gap:12px;padding:0 15px 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-3)}
+.qt-head .r{text-align:right}
+#quote-modal .modal,#qset-modal .modal{max-width:640px}
+#quote-modal .modal-body,#qset-modal .modal-body{max-height:74vh}
+#qm-body a:not(.btn){color:var(--accent-ink,var(--accent));text-decoration:none}
+.qm-items{width:100%;border-collapse:collapse;font-size:13px}
+.qm-items td{padding:7px 4px;border-bottom:1px solid var(--border)}
+.qm-items td.n{text-align:right;white-space:nowrap}
+.qm-tot{text-align:right;font-size:18px;font-weight:800;margin-top:6px}
+.qm-links{display:flex;gap:8px;flex-wrap:wrap}
+.qm-links .btn{flex:1 1 140px;text-decoration:none}
+.qm-ev{display:flex;flex-direction:column;gap:6px;font-size:12.5px}
+.qm-ev div{display:flex;gap:8px}.qm-ev span{color:var(--fg-3);white-space:nowrap;font-family:var(--mono);font-size:11.5px;padding-top:1px}
+.qm-msg{background:var(--warn-dim);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.5}
+.qs-code{font-family:var(--mono);font-size:11.5px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:10px;word-break:break-all;color:var(--fg-2)}
+@media(max-width:760px){
+  .qt-head{display:none}
+  .qt-row{grid-template-columns:1fr auto;gap:4px 10px}
+  .qt-row .qt-c-no{grid-column:1/-1;display:flex;gap:8px;align-items:center}
+  .qt-row .qt-c-contact{display:none}
+  .qt-row .qt-dates{text-align:left}
+}
+
 /* ── Clienți ── */
 .cl-tools{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .cl-search{flex:1 1 200px;min-width:0;background:var(--bg-1);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;color:var(--fg);outline:none;font-family:var(--sans)}
@@ -925,6 +975,8 @@ html:not(.unlocked) .app{display:none}
     <!-- ── Alerte ── -->
     <!-- ── Clienți ── -->
     <div class="panel" id="panel-clients">
+      <div class="seg" role="tablist"><button type="button" class="on" data-v="clients">Clienți</button><button type="button" data-v="quotes">Oferte <span class="cnt" id="qt-badge" hidden></span></button></div>
+      <div id="cl-view-clients">
       <div class="section">
         <div class="section-hdr">
           <div class="section-title">Clienți</div>
@@ -947,6 +999,34 @@ html:not(.unlocked) .app{display:none}
         <div class="cl-sum" id="cl-sum"></div>
         <div class="cl-list" id="cl-list"><div class="cl-empty">Se încarcă…</div></div>
       </div>
+      </div>
+      <div id="cl-view-quotes" hidden>
+      <div class="section">
+        <div class="section-hdr">
+          <div class="section-title">Oferte de pe site</div>
+          <div class="section-action" id="qt-settings-btn" style="margin-left:auto;margin-right:16px">
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.2 4.2l2.8 2.8M17 17l2.8 2.8M1 12h4M19 12h4M4.2 19.8L7 17M17 7l2.8-2.8"/></svg>
+            Setări calculator
+          </div>
+          <div class="section-action" id="qt-refresh-btn">
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+            Reîmprospătează
+          </div>
+        </div>
+        <div class="qt-stats" id="qt-stats"></div>
+        <div id="qt-warn"></div>
+        <div class="cl-tools">
+          <input type="search" class="cl-search" id="qt-search" placeholder="Caută după nume, telefon, email, localitate, nr. ofertă…" autocomplete="off">
+          <select class="cl-chip" id="qt-status" style="padding-right:10px">
+            <option value="">Toate</option><option value="open">Deschise</option><option value="viewed">Văzute</option>
+            <option value="clarify">Cer clarificări</option><option value="accepted">Acceptate</option><option value="rejected">Refuzate</option><option value="expired">Expirate</option>
+          </select>
+        </div>
+        <div class="qt-head"><div>Nr.</div><div>Client</div><div>Contact</div><div class="r">Total</div><div>Status</div><div class="r">Valabilă / creată</div></div>
+        <div class="qt-list" id="qt-list"><div class="cl-empty">Se încarcă…</div></div>
+      </div>
+      </div>
+
     </div>
 
     <div class="panel" id="panel-alerts">
@@ -1304,6 +1384,68 @@ html:not(.unlocked) .app{display:none}
 </div>
 
 <!-- Confirm modal -->
+<!-- Ofertă -->
+<div class="overlay hidden" id="quote-modal" role="dialog" aria-modal="true" aria-labelledby="qm-title">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="qm-title">Ofertă</div><div class="modal-x" id="qm-x" role="button" aria-label="Închide">✕</div></div>
+    <div class="modal-body" id="qm-body"></div>
+    <div class="modal-foot">
+      <button class="btn cm-del" id="qm-delete" type="button">Șterge</button>
+      <button class="btn primary" id="qm-close" type="button">Închide</button>
+    </div>
+  </div>
+</div>
+<!-- Setări calculator -->
+<div class="overlay hidden" id="qset-modal" role="dialog" aria-modal="true" aria-labelledby="qs-title">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="qs-title">Setări calculator ofertă</div><div class="modal-x" id="qs-x" role="button" aria-label="Închide">✕</div></div>
+    <div class="modal-body">
+      <label class="cm-check"><input type="checkbox" id="qs-enabled"> Calculatorul de pe site este activ</label>
+      <div class="cm-sec">Prețuri (lei, pe bucată, echipament + montaj)</div>
+      <div class="f2">
+        <div class="fg"><label for="qs-in">Cameră interior</label><input id="qs-in" inputmode="decimal"></div>
+        <div class="fg"><label for="qs-ex">Cameră exterior</label><input id="qs-ex" inputmode="decimal"></div>
+      </div>
+      <div class="f2">
+        <div class="fg"><label for="qs-lift">Cameră lift</label><input id="qs-lift" inputmode="decimal"></div>
+        <div class="fg"><label for="qs-setup">Configurare / punere în funcțiune</label><input id="qs-setup" inputmode="decimal"></div>
+      </div>
+      <div class="cm-sec">Punct de stocare și control (NVR + HDD), după numărul de camere</div>
+      <div class="f2">
+        <div class="fg"><label for="qs-n4">Până la 4 camere</label><input id="qs-n4" inputmode="decimal"></div>
+        <div class="fg"><label for="qs-n8">5 – 8 camere</label><input id="qs-n8" inputmode="decimal"></div>
+      </div>
+      <div class="f2">
+        <div class="fg"><label for="qs-n16">9 – 16 camere</label><input id="qs-n16" inputmode="decimal"></div>
+        <div class="fg"><label for="qs-n32">Peste 16 camere</label><input id="qs-n32" inputmode="decimal"></div>
+      </div>
+      <div class="cm-sec">Total și valabilitate</div>
+      <div class="f2">
+        <div class="fg"><label for="qs-vat">TVA</label><select id="qs-vat"><option value="included">Prețurile includ TVA</option><option value="plus">Se adaugă TVA la prețuri</option><option value="none">Fără TVA (neplătitor)</option></select></div>
+        <div class="fg"><label for="qs-vatrate">Cota TVA (%)</label><input id="qs-vatrate" inputmode="decimal"></div>
+      </div>
+      <div class="f2">
+        <div class="fg"><label for="qs-monthly">Abonament lunar (lei, 0 = fără)</label><input id="qs-monthly" inputmode="decimal"></div>
+        <div class="fg"><label for="qs-valid">Valabilitate ofertă (zile)</label><input id="qs-valid" inputmode="numeric"></div>
+      </div>
+      <div class="cm-sec">Texte și date de contact</div>
+      <div class="f2">
+        <div class="fg"><label for="qs-company">Nume firmă</label><input id="qs-company"></div>
+        <div class="fg"><label for="qs-phone">Telefon afișat</label><input id="qs-phone" inputmode="tel"></div>
+      </div>
+      <div class="fg"><label for="qs-email">Email afișat</label><input id="qs-email" inputmode="email"></div>
+      <div class="fg"><label for="qs-intro">Text de început</label><textarea id="qs-intro" rows="2"></textarea></div>
+      <div class="fg"><label for="qs-note">Mențiuni sub total</label><textarea id="qs-note" rows="2"></textarea></div>
+      <div class="cm-sec">Pune calculatorul pe site</div>
+      <div class="cm-hint">În WordPress, deschide pagina „Calculează oferta de preț”, șterge calculatorul vechi și adaugă un bloc <b>HTML personalizat</b> cu codul de mai jos:</div>
+      <div class="qs-code" id="qs-embed"></div>
+      <div class="qm-links"><button type="button" class="btn" id="qs-copy">Copiază codul</button><a class="btn" id="qs-preview" target="_blank" rel="noopener">Vezi calculatorul</a></div>
+      <div class="cm-hint" id="qs-mail"></div>
+    </div>
+    <div class="modal-foot"><button class="btn" id="qs-cancel" type="button">Anulează</button><button class="btn primary" id="qs-save" type="button">Salvează</button></div>
+  </div>
+</div>
+
 <!-- Client modal -->
 <div class="overlay hidden" id="client-modal" role="dialog" aria-modal="true" aria-labelledby="cm-title">
   <div class="modal">
@@ -3239,7 +3381,152 @@ async function cmDeleteFile(e) {
 }
 qs('#cm-files').addEventListener('click', cmDeleteFile);
 qs('#cm-wfiles').addEventListener('click', cmDeleteFile);
-document.querySelectorAll('.nav-tab[data-tab="clients"]').forEach(t => t.addEventListener('click', () => loadClients(true)));
+
+/* ═══════════════════════════════════════
+   OFERTE (calculator site → server → pagina ofertei cu Accept / Refuz / Clarificări)
+═══════════════════════════════════════ */
+let quotes = null, quotesMail = true, qmCur = null;
+const QST = { sent: 'Trimisă', viewed: 'Văzută', accepted: 'Acceptată', rejected: 'Refuzată', clarify: 'Cere clarificări', expired: 'Expirată' };
+const fmtTs = t => t ? new Date(t).toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+const fmtTsH = t => t ? new Date(t).toLocaleString('ro-RO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+const waNum = ph => { let d = String(ph || '').replace(/\D/g, ''); if (d.startsWith('00')) d = d.slice(2); else if (d.startsWith('0')) d = '40' + d.slice(1); return d; };
+
+function showClView(v) {
+  document.querySelectorAll('#panel-clients .seg button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  qs('#cl-view-clients').hidden = v !== 'clients';
+  qs('#cl-view-quotes').hidden = v !== 'quotes';
+  try { localStorage.setItem('yca_cl_view', v); } catch {}
+  if (v === 'quotes') loadQuotes(true); else loadClients(true);
+}
+async function loadQuotes(force) {
+  if (quotes && !force) return renderQuotes();
+  const list = qs('#qt-list');
+  if (!quotes) list.innerHTML = '<div class="cl-empty">Se încarcă…</div>';
+  try { const r = await clApi('/quotes'); quotes = r.quotes || []; quotesMail = !!r.mail; renderQuotes(); }
+  catch (e) { list.innerHTML = `<div class="cl-empty">${escapeHtml(e.message)}</div>`; }
+}
+function renderQuotes() {
+  if (!quotes) return;
+  const ym = ymNow();
+  const inMonth = q => new Date(q.createdAt).toISOString().slice(0, 7) === ym;
+  const open = quotes.filter(q => ['sent', 'viewed', 'clarify'].includes(q.status));
+  const need = quotes.filter(q => q.status === 'clarify' || (q.status === 'accepted' && !q.handled));
+  const badge = qs('#qt-badge'); badge.hidden = !need.length; badge.textContent = need.length;
+  qs('#qt-stats').innerHTML = [
+    [open.length, 'deschise'], [quotes.filter(inMonth).length, 'create luna asta'],
+    [quotes.filter(q => q.status === 'accepted' && inMonth(q)).length, 'acceptate luna asta'],
+    [quotes.filter(q => q.status === 'clarify').length, 'cer clarificări'],
+  ].map(([n, l]) => `<div class="qt-stat"><b>${n}</b>${l}</div>`).join('');
+  qs('#qt-warn').innerHTML = quotesMail ? '' : '<div class="qt-warn">Emailul nu e configurat pe server, așa că ofertele <b>nu pleacă pe email</b>. Clientul își vede oferta pe ecran imediat după calcul și poate răspunde de acolo; tu primești totul pe Telegram și aici.</div>';
+  const term = (qs('#qt-search').value || '').trim().toLowerCase(), f = qs('#qt-status').value;
+  let rows = quotes;
+  if (f === 'open') rows = rows.filter(q => ['sent', 'viewed', 'clarify'].includes(q.status)); else if (f) rows = rows.filter(q => q.status === f);
+  if (term) rows = rows.filter(q => [q.no, q.customer.name, q.customer.phone, q.customer.email, q.customer.city].join(' ').toLowerCase().includes(term));
+  const list = qs('#qt-list');
+  if (!rows.length) { list.innerHTML = `<div class="cl-empty">${quotes.length ? 'Nicio ofertă găsită.' : 'Încă nu ai cereri de ofertă de pe site.<br>Apasă <b>Setări calculator</b> ca să pui prețurile și să iei codul pentru WordPress.'}</div>`; return; }
+  list.innerHTML = rows.map(q => {
+    const c = q.customer;
+    return `<div class="qt-row" role="button" tabindex="0" data-qid="${escapeHtml(q.id)}">
+      <div class="qt-c-no"><span class="qt-no">#${q.no}</span><span class="qpill ${q.status}" style="display:none"></span></div>
+      <div style="min-width:0"><div class="qt-name">${escapeHtml(c.name)}</div><div class="qt-sub">${escapeHtml(c.city)} · ${q.pricing.totalCams} cam.</div></div>
+      <div class="qt-c-contact" style="min-width:0"><div class="qt-sub"><a href="tel:${escapeHtml(c.phone.replace(/[^\d+]/g, ''))}" onclick="event.stopPropagation()">${escapeHtml(c.phone)}</a></div><div class="qt-sub">${escapeHtml(c.email)}</div></div>
+      <div class="qt-tot">${fmtLei(q.pricing.total)}</div>
+      <div class="qt-st"><span class="qpill ${q.status}">${QST[q.status] || q.status}</span>${q.viewedAt ? `<span class="qt-sub">👁 văzută ${fmtTs(q.viewedAt)}</span>` : ''}</div>
+      <div class="qt-dates">până ${fmtTs(q.validUntil)}<br>${fmtTs(q.createdAt)}</div></div>`;
+  }).join('');
+}
+function openQuote(q) {
+  qmCur = q;
+  const c = q.customer, p = q.pricing;
+  qs('#qm-title').textContent = `Oferta nr. ${q.no}`;
+  const evName = { created: 'Ofertă creată (calculator site)', viewed: 'Clientul a deschis oferta', accepted: 'Acceptată', rejected: 'Refuzată', clarify: 'Cere clarificări', extended: 'Valabilitate prelungită', sent: 'Marcată „Trimisă”', expired: 'Expirată' };
+  const wa = `https://wa.me/${waNum(c.phone)}?text=${encodeURIComponent(`Bună ziua, ${c.name.split(' ')[0]}! Oferta dumneavoastră pentru sistemul de supraveghere (nr. ${q.no}) este aici: ${q.url}`)}`;
+  qs('#qm-body').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span class="qpill ${q.status}" style="font-size:12.5px;padding:5px 12px">${QST[q.status]}</span><span class="cm-hint">creată ${fmtTsH(q.createdAt)} · valabilă până ${fmtTs(q.validUntil)}${q.views ? ` · deschisă de ${q.views} ori` : ''}</span></div>
+    ${q.response && q.response.message ? `<div class="qm-msg"><b>Mesajul clientului:</b> ${escapeHtml(q.response.message)}</div>` : ''}
+    <div class="cm-sec">Client</div>
+    <div style="font-size:14px;line-height:1.7"><b>${escapeHtml(c.name)}</b>${c.propType ? ` · ${escapeHtml(c.propType)}` : ''}<br>
+      <a href="tel:${escapeHtml(c.phone.replace(/[^\d+]/g, ''))}">${escapeHtml(c.phone)}</a> · <a href="mailto:${escapeHtml(c.email)}">${escapeHtml(c.email)}</a><br>${escapeHtml([c.address, c.city].filter(Boolean).join(', '))}
+      ${c.message ? `<br><span class="cm-hint">Mesaj la cerere: ${escapeHtml(c.message)}</span>` : ''}</div>
+    <div class="qm-links"><a class="btn" href="tel:${escapeHtml(c.phone.replace(/[^\d+]/g, ''))}">📞 Sună</a><a class="btn" href="${escapeHtml(wa)}" target="_blank" rel="noopener">WhatsApp cu oferta</a><a class="btn" href="${escapeHtml(q.url)}?own=1" target="_blank" rel="noopener">Vezi oferta</a><button type="button" class="btn" id="qm-copy">Copiază link</button></div>
+    <div class="cm-sec">Sistem · ${p.totalCams} camere</div>
+    <table class="qm-items">${p.items.map(it => `<tr><td>${escapeHtml(it.name)}</td><td class="n">${it.qty} × ${fmtLei(it.price)}</td><td class="n">${fmtLei(it.total)}</td></tr>`).join('')}</table>
+    <div class="qm-tot">Total ${fmtLei(p.total)}</div>
+    <div class="cm-hint" style="text-align:right">${p.vatMode === 'plus' ? `fără TVA ${fmtLei(p.net)} + TVA ${fmtLei(p.vat)}` : p.vatMode === 'included' ? `TVA inclus (${fmtLei(p.vat)})` : 'fără TVA'}${p.monthly ? ` · abonament ${fmtLei(p.monthly)}/lună` : ''}</div>
+    <div class="cm-sec">Istoric</div>
+    <div class="qm-ev">${q.events.slice().reverse().map(e => `<div><span>${fmtTsH(e.t)}</span><div>${evName[e.type] || e.type}${e.manual ? ' (manual)' : ''}${e.message ? ` — „${escapeHtml(e.message)}”` : ''}</div></div>`).join('')}</div>
+    <div class="cm-sec">Acțiuni</div>
+    <div class="f2">
+      <div class="fg"><label for="qm-status">Schimbă statusul</label><select id="qm-status">${['sent', 'viewed', 'clarify', 'accepted', 'rejected'].map(s => `<option value="${s}"${s === q.status ? ' selected' : ''}>${QST[s]}</option>`).join('')}${q.status === 'expired' ? '<option value="expired" selected>Expirată</option>' : ''}</select></div>
+      <div class="fg"><label>&nbsp;</label><button type="button" class="btn" id="qm-extend">Prelungește 30 de zile</button></div>
+    </div>
+    <label class="cm-check"><input type="checkbox" id="qm-handled"${q.handled ? ' checked' : ''}> Am rezolvat (am sunat / am programat)</label>
+    <div class="fg"><label for="qm-notes">Notițele mele</label><textarea id="qm-notes" rows="2">${escapeHtml(q.notes || '')}</textarea></div>
+    ${q.clientId ? '<div class="cm-hint">✓ Clientul a fost adăugat automat în lista de clienți la acceptare.</div>' : ''}`;
+  qs('#quote-modal').classList.remove('hidden');
+  qs('#qm-copy').addEventListener('click', () => { navigator.clipboard.writeText(q.url).then(() => toast('Link copiat', 'ok'), () => toast(q.url, 'info')); });
+  qs('#qm-status').addEventListener('change', e => quoteUpdate({ status: e.target.value }));
+  qs('#qm-extend').addEventListener('click', () => quoteUpdate({ extendDays: 30 }, 'Valabilitate prelungită'));
+  qs('#qm-handled').addEventListener('change', e => quoteUpdate({ handled: e.target.checked }));
+  qs('#qm-notes').addEventListener('change', e => quoteUpdate({ notes: e.target.value }, 'Notițe salvate'));
+}
+async function quoteUpdate(body, msg) {
+  if (!qmCur) return;
+  try {
+    const r = await clApi('/quotes/' + encodeURIComponent(qmCur.id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const i = quotes.findIndex(x => x.id === r.quote.id); if (i >= 0) quotes[i] = r.quote;
+    renderQuotes(); if (msg) toast(msg, 'ok');
+    if (body.status || body.extendDays) openQuote(r.quote); else qmCur = r.quote;
+  } catch (e) { toast(e.message, 'err'); }
+}
+function closeQuote() { qs('#quote-modal').classList.add('hidden'); qmCur = null; }
+
+const QS_FIELDS = { enabled: '#qs-enabled', priceInterior: '#qs-in', priceExterior: '#qs-ex', priceLift: '#qs-lift', priceSetup: '#qs-setup',
+  priceNvr4: '#qs-n4', priceNvr8: '#qs-n8', priceNvr16: '#qs-n16', priceNvr32: '#qs-n32', vatMode: '#qs-vat', vatRate: '#qs-vatrate',
+  monthly: '#qs-monthly', validDays: '#qs-valid', company: '#qs-company', phone: '#qs-phone', email: '#qs-email', intro: '#qs-intro', note: '#qs-note' };
+async function openQuoteSettings() {
+  try {
+    const r = await clApi('/quote-settings');
+    for (const [k, sel] of Object.entries(QS_FIELDS)) { const el = qs(sel); if (el.type === 'checkbox') el.checked = !!r.settings[k]; else el.value = r.settings[k] ?? ''; }
+    const url = r.base + '/calculator';
+    qs('#qs-embed').textContent = `<iframe src="${url}" title="Calculează oferta de preț" style="width:100%;min-height:1300px;border:0" loading="lazy"></iframe>`;
+    qs('#qs-preview').href = url;
+    qs('#qs-mail').innerHTML = r.mail ? '✓ Emailul este configurat: clientul primește oferta și pe email, cu butoanele Accept / Refuz / Clarificări.'
+      : '⚠ Emailul nu e configurat pe server: clientul își vede oferta pe ecran, dar nu o primește și pe email. Spune-mi dacă vrei să-l configurăm.';
+    qs('#qset-modal').classList.remove('hidden');
+  } catch (e) { toast(e.message, 'err'); }
+}
+async function saveQuoteSettings() {
+  const body = {};
+  for (const [k, sel] of Object.entries(QS_FIELDS)) { const el = qs(sel); body[k] = el.type === 'checkbox' ? el.checked : el.value; }
+  if (body.enabled && !(parseFloat(String(body.priceInterior).replace(',', '.')) > 0 || parseFloat(String(body.priceExterior).replace(',', '.')) > 0))
+    return toast('Pune cel puțin prețul pentru camera de interior sau exterior', 'warn');
+  try { await clApi('/quote-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); qs('#qset-modal').classList.add('hidden'); toast('Setări calculator salvate', 'ok'); }
+  catch (e) { toast(e.message, 'err'); }
+}
+
+document.querySelectorAll('#panel-clients .seg button').forEach(b => b.addEventListener('click', () => showClView(b.dataset.v)));
+qs('#qt-search').addEventListener('input', renderQuotes);
+qs('#qt-status').addEventListener('change', renderQuotes);
+qs('#qt-refresh-btn').addEventListener('click', () => loadQuotes(true));
+qs('#qt-settings-btn').addEventListener('click', openQuoteSettings);
+qs('#qt-list').addEventListener('click', e => { const r = e.target.closest('.qt-row'); if (!r) return; const q = (quotes || []).find(x => x.id === r.dataset.qid); if (q) openQuote(q); });
+qs('#qt-list').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('qt-row')) { e.preventDefault(); e.target.click(); } });
+qs('#qm-x').addEventListener('click', closeQuote); qs('#qm-close').addEventListener('click', closeQuote);
+qs('#quote-modal').addEventListener('click', e => { if (e.target.id === 'quote-modal') closeQuote(); });
+qs('#qm-delete').addEventListener('click', async () => {
+  if (!qmCur) return;
+  if (!(await confirmDialog({ title: 'Ștergi oferta?', html: `Oferta nr. <b>${qmCur.no}</b> (${escapeHtml(qmCur.customer.name)}) va fi ștearsă, iar linkul nu va mai funcționa pentru client.`, okLabel: 'Șterge' }))) return;
+  try { await clApi('/quotes/' + encodeURIComponent(qmCur.id), { method: 'DELETE' }); quotes = quotes.filter(x => x.id !== qmCur.id); closeQuote(); renderQuotes(); toast('Ofertă ștearsă', 'ok'); }
+  catch (e) { toast(e.message, 'err'); }
+});
+qs('#qs-x').addEventListener('click', () => qs('#qset-modal').classList.add('hidden'));
+qs('#qs-cancel').addEventListener('click', () => qs('#qset-modal').classList.add('hidden'));
+qs('#qset-modal').addEventListener('click', e => { if (e.target.id === 'qset-modal') qs('#qset-modal').classList.add('hidden'); });
+qs('#qs-save').addEventListener('click', saveQuoteSettings);
+qs('#qs-copy').addEventListener('click', () => { const t = qs('#qs-embed').textContent; navigator.clipboard.writeText(t).then(() => toast('Cod copiat', 'ok'), () => toast('Selectează codul și copiază-l manual', 'warn')); });
+
+document.querySelectorAll('.nav-tab[data-tab="clients"]').forEach(t => t.addEventListener('click', () => { let v = 'clients'; try { v = localStorage.getItem('yca_cl_view') || 'clients'; } catch {} showClView(v === 'quotes' ? 'quotes' : 'clients'); }));
 
 /* ═══════════════════════════════════════
    SETTINGS
