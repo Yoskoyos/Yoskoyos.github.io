@@ -11,6 +11,7 @@
 //                  Stare în monitor-state.json. Dezactivare: variabila de mediu MONITOR=0.
 // v4.1 (29.10.2026): GET /snap?nvr=&ch=&token= — captură din stream-ul RTSP (ffmpeg) pentru NVR-urile care nu
 //                  oferă capturi ISAPI (ex. DS-7104NI-Q1). Credențialele NVR rămân pe server.
+// v4.8: oferte doar pentru asociații de proprietari — abonament lunar fix pe durata contractului.
 // v4.7: oferte — calculator public (/calculator, pentru iframe în WordPress), POST /public/quote, pagina ofertei
 //                  /q/<token> cu Accept / Refuz / Cer clarificări, /quotes + /quote-settings (aplicație), Telegram, email.
 // v4.6: GET /clients-backup — arhivă ZIP cu toți clienții (JSON + CSV) și documentele lor.
@@ -894,15 +895,17 @@ const QUOTE_DEFAULTS = {
   enabled: true,
   company: 'Supraveghere24h',
   phone: '', email: '',
-  priceInterior: 0, priceExterior: 0, priceLift: 0,     // lei / cameră (echipament + montaj)
-  priceNvr4: 0, priceNvr8: 0, priceNvr16: 0, priceNvr32: 0,  // punct stocare și control, după nr. camere
-  priceSetup: 0,                                         // configurare + punere în funcțiune
-  monthly: 0,                                            // abonament lunar
+  // Ofertă pentru ASOCIAȚII DE PROPRIETARI: abonament lunar fix pe toată durata contractului (montaj gratuit)
+  priceInterior: 0, priceExterior: 0, priceLift: 0,     // lei / LUNĂ / cameră
+  priceNvr4: 0, priceNvr8: 0, priceNvr16: 0, priceNvr32: 0,  // lei / LUNĂ — punct stocare și control, după nr. camere
+  priceSetup: 0,                                         // taxă unică de instalare (0 = gratuit)
+  contractMonths: 0,                                     // durata contractului (luni); 0 = nu se afișează
   vatMode: 'included',                                   // 'included' | 'plus' | 'none'
   vatRate: 21,
   validDays: 30,
-  intro: 'Vă mulțumim pentru interes! Mai jos găsiți oferta estimativă pentru sistemul de supraveghere video.',
-  note: 'Oferta poate fi îmbunătățită după inspectarea locației. Prețurile includ echipamentele, montajul și configurarea.',
+  intro: 'Vă mulțumim pentru interes! Mai jos găsiți oferta pentru sistemul de supraveghere video al blocului, cu plată lunară fixă.',
+  note: 'Oferta poate fi îmbunătățită după inspectarea locației. Abonamentul lunar este singurul cost suportat de asociație pe toată durata contractului.',
+  includes: 'Supraveghere video 24/7, rezoluție 5 MP, echipamente Hikvision\nInstalare, punere în funcțiune și instruire gratuite\nGaranție extinsă pe toată durata contractului, inclusiv la furt și vandalism\nMentenanță și service pe toată durata contractului\nLa finalul contractului, echipamentele devin proprietatea asociației',
 };
 function quoteCfg(db, owner) {
   const c = (owner && db.configs[owner.username] && db.configs[owner.username].quoteCfg) || {};
@@ -914,19 +917,20 @@ function buildQuote(c, inp) {
   const n = { in: Math.min(64, Math.max(0, Math.round(qNum(inp.interior)))), ex: Math.min(64, Math.max(0, Math.round(qNum(inp.exterior)))), lift: Math.min(16, Math.max(0, Math.round(qNum(inp.lift)))) };
   const total = n.in + n.ex + n.lift;
   const items = [];
-  if (n.in)   items.push({ name: 'Cameră de interior (echipament + montaj)', qty: n.in,   price: qNum(c.priceInterior) });
-  if (n.ex)   items.push({ name: 'Cameră de exterior (echipament + montaj)', qty: n.ex,   price: qNum(c.priceExterior) });
-  if (n.lift) items.push({ name: 'Cameră pentru lift (echipament + montaj)', qty: n.lift, price: qNum(c.priceLift) || qNum(c.priceInterior) });
+  if (n.in)   items.push({ name: 'Cameră de interior', qty: n.in,   price: qNum(c.priceInterior) });
+  if (n.ex)   items.push({ name: 'Cameră de exterior', qty: n.ex,   price: qNum(c.priceExterior) });
+  if (n.lift) items.push({ name: 'Cameră pentru lift', qty: n.lift, price: qNum(c.priceLift) || qNum(c.priceInterior) });
   const nvr = total <= 4 ? ['4', c.priceNvr4] : total <= 8 ? ['8', c.priceNvr8] : total <= 16 ? ['16', c.priceNvr16] : ['32', c.priceNvr32];
   if (total) items.push({ name: `Punct de stocare și control (NVR ${nvr[0]} canale + HDD)`, qty: 1, price: qNum(nvr[1]) });
-  if (total && qNum(c.priceSetup)) items.push({ name: 'Configurare și punere în funcțiune', qty: 1, price: qNum(c.priceSetup) });
   for (const it of items) it.total = Math.round(it.qty * it.price * 100) / 100;
   const sub = Math.round(items.reduce((s, it) => s + it.total, 0) * 100) / 100;
   const rate = qNum(c.vatRate) || 21;
   let net = sub, vat = 0, gross = sub;
   if (c.vatMode === 'plus') { vat = Math.round(sub * rate) / 100; gross = Math.round((sub + vat) * 100) / 100; }
   else if (c.vatMode === 'included') { net = Math.round(sub / (1 + rate / 100) * 100) / 100; vat = Math.round((sub - net) * 100) / 100; }
-  return { cams: n, totalCams: total, items, net, vat, total: gross, vatMode: c.vatMode, vatRate: rate, monthly: qNum(c.monthly) };
+  const months = Math.round(qNum(c.contractMonths));
+  return { cams: n, totalCams: total, items, net, vat, total: gross, vatMode: c.vatMode, vatRate: rate, period: 'month',
+           months, contractTotal: months ? Math.round(gross * months * 100) / 100 : 0, setup: qNum(c.priceSetup) };
 }
 const lei = v => (Math.round(v * 100) / 100).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' lei';
 const roDate = t => new Date(t).toLocaleDateString('ro-RO', { timeZone: 'Europe/Bucharest', day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -997,6 +1001,7 @@ textarea{min-height:90px;resize:vertical}
 @media(max-width:560px){.grid{grid-template-columns:1fr}.acts{grid-template-columns:1fr}.hd .no{text-align:left}.sec,.hd{padding:18px 16px}}
 @media print{body{background:#fff}.card{box-shadow:none;border:0}.noprint{display:none!important}}
 `;
+const apt = (p, c) => { const n = parseInt(c.apartments, 10); return n > 0 ? `<div class="muted">≈ ${lei(p.total / n)} / lună / apartament (${n} apartamente)</div>` : ''; };
 function quotePageHtml(q, cfg, logo) {
   const st = quoteStatus(q);
   const c = q.customer, p = q.pricing;
@@ -1015,14 +1020,19 @@ function quotePageHtml(q, cfg, logo) {
   <div class="hd">${logo ? `<img src="${logo}" alt="${escHtml(cfg.company)}">` : `<b>${escHtml(cfg.company)}</b>`}
     <div class="no"><b>Ofertă nr. ${q.no}</b>emisă ${roDate(q.createdAt)} · valabilă până ${roDate(q.validUntil)}<br><span class="pill st-${st}">${QSTATUS[st]}</span></div></div>
   <div class="sec"><h1>Bună ziua, ${escHtml(c.name.split(' ')[0] || c.name)}!</h1><p class="muted">${escHtml(cfg.intro)}</p></div>
-  <div class="sec"><h2>Date client</h2><div class="grid">
-    <div><span>Nume:</span> ${escHtml(c.name)}</div><div><span>Telefon:</span> ${escHtml(c.phone)}</div>
+  <div class="sec"><h2>Date asociație</h2><div class="grid">
+    ${c.assoc ? `<div><span>Asociația:</span> ${escHtml(c.assoc)}</div>` : ''}${c.address ? `<div><span>Adresa blocului:</span> ${escHtml(c.address)}</div>` : ''}
+    <div><span>Persoană de contact:</span> ${escHtml(c.name)}${c.role ? ' (' + escHtml(c.role) + ')' : ''}</div><div><span>Telefon:</span> ${escHtml(c.phone)}</div>
     <div><span>Email:</span> ${escHtml(c.email)}</div><div><span>Localitate:</span> ${escHtml(c.city)}</div>
-    ${c.propType ? `<div><span>Tip imobil:</span> ${escHtml(c.propType)}</div>` : ''}${c.address ? `<div><span>Adresă:</span> ${escHtml(c.address)}</div>` : ''}
+    ${c.apartments ? `<div><span>Apartamente:</span> ${escHtml(c.apartments)}</div>` : ''}
   </div></div>
-  <div class="sec"><h2>Sistem propus · ${p.totalCams} ${p.totalCams === 1 ? 'cameră' : 'camere'}</h2>
-    <table><thead><tr><th>Descriere</th><th class="n">Cant.</th><th class="n">Preț unitar</th><th class="n">Valoare</th></tr></thead><tbody>${rows}</tbody></table>
-    <div class="tot">${vatLine}<div class="big">Total: ${lei(p.total)}</div>${p.monthly ? `<div class="muted">Abonament lunar monitorizare: <b>${lei(p.monthly)}</b>/lună</div>` : ''}</div>
+  <div class="sec"><h2>Sistem propus · ${p.totalCams} ${p.totalCams === 1 ? 'cameră' : 'camere'} · plată lunară</h2>
+    <table><thead><tr><th>Descriere</th><th class="n">Cant.</th><th class="n">Lei / lună / buc.</th><th class="n">Lei / lună</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="tot">${vatLine}<div class="big">${lei(p.total)} / lună</div>
+      ${p.months ? `<div class="muted">contract ${p.months} luni · fără alte costuri pe durata contractului</div>` : ''}
+      ${p.setup ? `<div class="muted">Taxă unică de instalare: ${lei(p.setup)}</div>` : '<div class="muted">Instalare gratuită</div>'}
+      ${apt(p, c)}</div>
+    ${cfg.includes ? `<h2 style="margin-top:18px">Ce include abonamentul</h2><ul style="padding-left:20px;font-size:14px;line-height:1.7">${String(cfg.includes).split('\n').filter(x => x.trim()).map(x => '<li>' + escHtml(x.trim()) + '</li>').join('')}</ul>` : ''}
     ${cfg.note ? `<p class="muted" style="margin-top:14px;font-size:13px">${escHtml(cfg.note)}</p>` : ''}
     ${c.message ? `<p style="margin-top:12px;font-size:13px"><b>Mesajul dumneavoastră:</b> ${escHtml(c.message)}</p>` : ''}
   </div>
@@ -1067,7 +1077,7 @@ function calculatorHtml(cfg, logo, base) {
   const priced = quotePriced(cfg);
   const P = JSON.stringify({ in: qNum(cfg.priceInterior), ex: qNum(cfg.priceExterior), lift: qNum(cfg.priceLift) || qNum(cfg.priceInterior),
     n4: qNum(cfg.priceNvr4), n8: qNum(cfg.priceNvr8), n16: qNum(cfg.priceNvr16), n32: qNum(cfg.priceNvr32), setup: qNum(cfg.priceSetup),
-    vatMode: cfg.vatMode, vatRate: qNum(cfg.vatRate) || 21, monthly: qNum(cfg.monthly) });
+    vatMode: cfg.vatMode, vatRate: qNum(cfg.vatRate) || 21, months: Math.round(qNum(cfg.contractMonths)) });
   return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Calculează oferta — ${escHtml(cfg.company)}</title><style>${PAGE_CSS}
 .wrap{padding:12px 12px 24px}
@@ -1096,20 +1106,21 @@ function calculatorHtml(cfg, logo, base) {
 </style></head><body><div class="wrap"><div class="card">
 ${!priced || !cfg.enabled ? `<div class="sec"><h1>Calculatorul nu este disponibil momentan</h1><p class="muted">Vă rugăm să ne contactați telefonic${cfg.phone ? ' la ' + escHtml(cfg.phone) : ''}.</p></div>` : `
 <form id="f" novalidate>
- <div class="sec"><h2>1 · Tipul imobilului</h2><div class="types">
-  <label><input type="radio" name="propType" value="Casă / vilă" checked><span>Casă / vilă</span></label>
-  <label><input type="radio" name="propType" value="Bloc / asociație de proprietari"><span>Bloc / asociație</span></label>
-  <label><input type="radio" name="propType" value="Firmă / spațiu comercial"><span>Firmă / spațiu comercial</span></label></div></div>
- <div class="sec"><h2>2 · Câte camere aveți nevoie?</h2>
-  <div class="step"><div><b>Camere de interior</b><small>holuri, scări, birouri, magazin</small></div><div class="ctr"><button type="button" data-d="-1" data-t="interior">−</button><input id="interior" name="interior" inputmode="numeric" value="0"><button type="button" data-d="1" data-t="interior">+</button></div></div>
-  <div class="step"><div><b>Camere de exterior</b><small>curte, intrare, parcare, perimetru</small></div><div class="ctr"><button type="button" data-d="-1" data-t="exterior">−</button><input id="exterior" name="exterior" inputmode="numeric" value="0"><button type="button" data-d="1" data-t="exterior">+</button></div></div>
-  <div class="step"><div><b>Camere pentru lift</b><small>dacă e cazul</small></div><div class="ctr"><button type="button" data-d="-1" data-t="lift">−</button><input id="lift" name="lift" inputmode="numeric" value="0"><button type="button" data-d="1" data-t="lift">+</button></div></div>
-  <div class="est"><span class="muted">Preț estimativ<br><small id="estsub"></small></span><b id="est">—</b></div>
+ <div class="sec"><h1 style="font-size:19px">Ofertă pentru asociații de proprietari</h1><p class="muted" style="font-size:14px">Sistem de supraveghere video pentru bloc, cu <b>abonament lunar fix</b>: montaj gratuit, mentenanță și garanție incluse pe toată durata contractului.</p></div>
+ <div class="sec"><h2>1 · Câte camere sunt necesare pentru bloc?</h2>
+  <div class="step"><div><b>Camere de interior</b><small>holuri, casa scării, intrare, subsol</small></div><div class="ctr"><button type="button" data-d="-1" data-t="interior">−</button><input id="interior" name="interior" inputmode="numeric" value="0"><button type="button" data-d="1" data-t="interior">+</button></div></div>
+  <div class="step"><div><b>Camere de exterior</b><small>intrarea în bloc, parcare, alei, ghene</small></div><div class="ctr"><button type="button" data-d="-1" data-t="exterior">−</button><input id="exterior" name="exterior" inputmode="numeric" value="0"><button type="button" data-d="1" data-t="exterior">+</button></div></div>
+  <div class="step"><div><b>Camere pentru lift</b><small>câte o cameră pentru fiecare lift</small></div><div class="ctr"><button type="button" data-d="-1" data-t="lift">−</button><input id="lift" name="lift" inputmode="numeric" value="0"><button type="button" data-d="1" data-t="lift">+</button></div></div>
+  <div class="est"><span class="muted">Abonament lunar estimat<br><small id="estsub"></small></span><b id="est">—</b></div>
  </div>
- <div class="sec"><h2>3 · Datele dumneavoastră</h2>
+ <div class="sec"><h2>2 · Datele asociației</h2>
+  <div class="f2"><label class="fl">Asociația de proprietari<input name="assoc" placeholder="ex. Asociația de Proprietari Bloc M2"></label><label class="fl">Nr. apartamente<input name="apartments" inputmode="numeric" placeholder="opțional"></label></div>
+  <label class="fl">Adresa blocului *<input name="address" autocomplete="street-address" placeholder="stradă, număr, bloc, scară" required></label>
+  <div class="f2"><label class="fl">Localitate / sector *<input name="city" autocomplete="address-level2" required></label><label class="fl">Calitatea dvs.<select name="role" style="width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:15px;font-family:inherit;background:#fbfcfe"><option>Președinte asociație</option><option>Administrator</option><option>Membru comitet</option><option>Proprietar / locatar</option></select></label></div>
+  <h2 style="margin-top:8px">3 · Persoana de contact</h2>
   <div class="f2"><label class="fl">Nume și prenume *<input name="name" autocomplete="name" required></label><label class="fl">Telefon *<input name="phone" type="tel" autocomplete="tel" required></label></div>
-  <div class="f2"><label class="fl">Email *<input name="email" type="email" autocomplete="email" required></label><label class="fl">Localitate / sector *<input name="city" autocomplete="address-level2" required></label></div>
-  <label class="fl">Mesaj (opțional)<textarea name="message" placeholder="Detalii despre locație, preferințe…"></textarea></label>
+  <label class="fl">Email *<input name="email" type="email" autocomplete="email" required></label>
+  <label class="fl">Mesaj (opțional)<textarea name="message" placeholder="Detalii despre bloc, zone de interes…"></textarea></label>
   <input class="hp" name="website" tabindex="-1" autocomplete="off">
   <label class="chk"><input type="checkbox" name="consent" required> Sunt de acord cu prelucrarea datelor personale în scopul ofertării și al contactării mele.</label>
   <button class="go" id="go">${goTxt}</button><div class="err" id="err"></div>
@@ -1124,10 +1135,10 @@ ${!priced || !cfg.enabled ? '' : `<script>
   function calc(){
     var i=v('interior'),e=v('exterior'),l=v('lift'),t=i+e+l;
     if(!t){document.getElementById('est').textContent='—';document.getElementById('estsub').textContent='alegeți numărul de camere';return;}
-    var s=i*P.in+e*P.ex+l*P.lift+(t<=4?P.n4:t<=8?P.n8:t<=16?P.n16:P.n32)+P.setup;
+    var s=i*P.in+e*P.ex+l*P.lift+(t<=4?P.n4:t<=8?P.n8:t<=16?P.n16:P.n32);
     if(P.vatMode==='plus') s=s*(1+P.vatRate/100);
-    document.getElementById('est').textContent=lei(s);
-    document.getElementById('estsub').textContent=t+(t===1?' cameră':' camere')+(P.vatMode==='none'?'':' · TVA inclus')+(P.monthly?' · + '+lei(P.monthly)+'/lună abonament':'');
+    document.getElementById('est').textContent=lei(s)+' / lună';
+    document.getElementById('estsub').textContent=t+(t===1?' cameră':' camere')+(P.vatMode==='none'?'':' · TVA inclus')+(P.months?' · contract '+P.months+' luni':'')+(P.setup?'':' · montaj gratuit');
   }
   [].forEach.call(document.querySelectorAll('[data-t]'),function(b){b.addEventListener('click',function(){
     var el=document.getElementById(b.getAttribute('data-t')); el.value=Math.max(0,Math.min(64,v(el.id)+parseInt(b.getAttribute('data-d'),10))); calc();});});
@@ -1137,7 +1148,7 @@ ${!priced || !cfg.enabled ? '' : `<script>
     ev.preventDefault(); var err=document.getElementById('err'); err.textContent='';
     var d={}; new FormData(f).forEach(function(val,k){d[k]=val;}); d.consent=!!f.consent.checked;
     if(!(v('interior')+v('exterior')+v('lift'))) return err.textContent='Alegeți cel puțin o cameră.';
-    if(!d.name.trim()||!d.phone.trim()||!d.email.trim()||!d.city.trim()) return err.textContent='Completați câmpurile marcate cu *.';
+    if(!d.name.trim()||!d.phone.trim()||!d.email.trim()||!d.city.trim()||!d.address.trim()) return err.textContent='Completați câmpurile marcate cu *.';
     if(!/^\\S+@\\S+\\.\\S+$/.test(d.email.trim())) return err.textContent='Adresa de email nu pare corectă.';
     if(!d.consent) return err.textContent='Bifați acordul pentru prelucrarea datelor.';
     var go=document.getElementById('go'); go.disabled=true; go.textContent='Se trimite…';
@@ -1158,9 +1169,10 @@ function quoteEmailHtml(q, cfg, url) {
   return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:auto;color:#0f1a2e">
 <h2 style="margin:0 0 6px">Oferta nr. ${q.no} — sistem de supraveghere video</h2>
 <p>Bună ziua, ${escHtml(q.customer.name)},</p><p>${escHtml(cfg.intro)}</p>
-<table style="width:100%;border-collapse:collapse;font-size:14px">${p.items.map(it => `<tr><td style="padding:6px 0;border-bottom:1px solid #e3e8ef">${escHtml(it.name)} × ${it.qty}</td><td style="padding:6px 0;border-bottom:1px solid #e3e8ef;text-align:right;white-space:nowrap">${lei(it.total)}</td></tr>`).join('')}</table>
-<p style="font-size:20px;font-weight:bold;text-align:right;margin:12px 0">Total: ${lei(p.total)}</p>
-${p.monthly ? `<p style="text-align:right;color:#4a5568;margin-top:-6px">Abonament lunar: ${lei(p.monthly)}/lună</p>` : ''}
+${q.customer.assoc || q.customer.address ? `<p style="color:#4a5568">${escHtml([q.customer.assoc, q.customer.address].filter(Boolean).join(' · '))}</p>` : ''}
+<table style="width:100%;border-collapse:collapse;font-size:14px">${p.items.map(it => `<tr><td style="padding:6px 0;border-bottom:1px solid #e3e8ef">${escHtml(it.name)} × ${it.qty}</td><td style="padding:6px 0;border-bottom:1px solid #e3e8ef;text-align:right;white-space:nowrap">${lei(it.total)} / lună</td></tr>`).join('')}</table>
+<p style="font-size:20px;font-weight:bold;text-align:right;margin:12px 0">Abonament: ${lei(p.total)} / lună</p>
+<p style="text-align:right;color:#4a5568;margin-top:-6px">${p.months ? `contract ${p.months} luni · ` : ''}${p.setup ? `instalare ${lei(p.setup)}` : 'instalare gratuită'}</p>
 <p style="color:#4a5568;font-size:13px">Oferta este valabilă până la ${roDate(q.validUntil)}. ${escHtml(cfg.note)}</p>
 <p style="margin:18px 0 6px"><b>Vă rugăm să ne transmiteți răspunsul:</b></p>
 <p>${btn('✓ Accept oferta', '#16a34a', 'accept')}${btn('? Cer clarificări', '#d97706', 'clarify')}${btn('✕ Refuz', '#dc2626', 'reject')}</p>
@@ -1178,8 +1190,9 @@ async function handlePublicQuote(req, res) {
   const cfg = quoteCfg(db, owner);
   if (!cfg.enabled || !quotePriced(cfg)) return send(503, { error: 'Calculatorul nu este disponibil momentan.' });
   const cust = { name: str(b.name, 120).trim(), phone: str(b.phone, 40).trim(), email: str(b.email, 160).trim(), city: str(b.city, 120).trim(),
-                 address: str(b.address, 300).trim(), propType: str(b.propType, 60).trim(), message: str(b.message, 2000).trim() };
-  if (!cust.name || !cust.phone || !cust.city || !/^\S+@\S+\.\S+$/.test(cust.email)) return send(400, { error: 'Completați numele, telefonul, emailul și localitatea.' });
+                 address: str(b.address, 300).trim(), assoc: str(b.assoc, 160).trim(), role: str(b.role, 60).trim(),
+                 apartments: String(Math.min(2000, Math.round(qNum(b.apartments))) || ''), propType: 'Bloc / asociație de proprietari', message: str(b.message, 2000).trim() };
+  if (!cust.name || !cust.phone || !cust.city || !cust.address || !/^\S+@\S+\.\S+$/.test(cust.email)) return send(400, { error: 'Completați numele, telefonul, emailul, adresa blocului și localitatea.' });
   if (!b.consent) return send(400, { error: 'Este necesar acordul pentru prelucrarea datelor.' });
   const pricing = buildQuote(cfg, b);
   if (!pricing.totalCams) return send(400, { error: 'Alegeți cel puțin o cameră.' });
@@ -1191,11 +1204,11 @@ async function handlePublicQuote(req, res) {
   const url = `${publicBase(req)}/q/${q.token}`;
   if (mailReady()) {
     q.emailed = await sendMail(cust.email, `Oferta nr. ${q.no} — ${cfg.company}`,
-      `Bună ziua, ${cust.name}!\n\nOferta dumneavoastră (total ${lei(pricing.total)}) poate fi văzută aici:\n${url}\n\nPe pagina ofertei o puteți accepta, refuza sau cere clarificări.\n\n${cfg.company}`,
+      `Bună ziua, ${cust.name}!\n\nOferta pentru bloc (abonament ${lei(pricing.total)} / lună) poate fi văzută aici:\n${url}\n\nPe pagina ofertei o puteți accepta, refuza sau cere clarificări.\n\n${cfg.company}`,
       quoteEmailHtml(q, cfg, url));
     const a2 = loadQuotes(); const x = a2.list.find(z => z.id === q.id); if (x) { x.emailed = q.emailed; saveQuotes(a2); }
   }
-  notifyOwner(db, owner, `🧾 <b>Cerere nouă de ofertă #${q.no}</b>\n${escHtml(cust.name)} · ${escHtml(cust.phone)}\n${escHtml(cust.city)} · ${pricing.totalCams} camere · <b>${lei(pricing.total)}</b>${q.emailed ? '' : '\n(email neconfigurat — oferta NU a fost trimisă pe mail)'}`);
+  notifyOwner(db, owner, `🧾 <b>Cerere nouă de ofertă #${q.no}</b>\n${escHtml(cust.name)} · ${escHtml(cust.phone)}${cust.assoc ? '\n' + escHtml(cust.assoc) : ''}\n${escHtml(cust.address)}, ${escHtml(cust.city)}\n${pricing.totalCams} camere · <b>${lei(pricing.total)} / lună</b>${q.emailed ? '' : '\n(email neconfigurat — oferta NU a fost trimisă pe mail)'}`);
   return send(200, { ok: true, no: q.no, url, emailed: q.emailed });
 }
 
@@ -1230,16 +1243,18 @@ async function handleQuotePublic(req, res, pathname, parsed) {
     if (act === 'accepted' && !q.clientId) {
       try {
         const cl = loadClients(); const list = userClients(cl, q.owner);
-        const c = cleanClient({ kind: 'pf', name: q.customer.name, phone: q.customer.phone, email: q.customer.email,
-          address: [q.customer.address, q.customer.city].filter(Boolean).join(', '),
-          notes: `Din oferta nr. ${q.no} acceptată pe ${roDate(Date.now())} · ${q.pricing.totalCams} camere · ${lei(q.pricing.total)}${msg ? '\nMesaj client: ' + msg : ''}`,
-          equip: { cams: q.pricing.totalCams } }, null);
+        const nx = new Date(); nx.setMonth(nx.getMonth() + 1);
+        const c = cleanClient({ kind: 'pj', name: q.customer.assoc || ('Asociația de proprietari ' + q.customer.address), contact: [q.customer.name, q.customer.role].filter(Boolean).join(' — '),
+          phone: q.customer.phone, email: q.customer.email, address: [q.customer.address, q.customer.city].filter(Boolean).join(', '),
+          notes: `Din oferta nr. ${q.no} acceptată pe ${roDate(Date.now())} · ${q.pricing.totalCams} camere · ${lei(q.pricing.total)} / lună${q.pricing.months ? ' · contract ' + q.pricing.months + ' luni' : ''}${msg ? '\nMesaj client: ' + msg : ''}`,
+          equip: { cams: q.pricing.totalCams },
+          sub: { active: true, amount: q.pricing.total, dueDay: 1, start: nx.toISOString().slice(0, 7), paid: {} } }, null);
         list.push(c); saveClients(cl); q.clientId = c.id;
       } catch (e) { console.error('Oferte: nu am putut crea clientul:', e.message); }
     }
     saveQuotes(all);
     const icon = { accepted: '✅', rejected: '❌', clarify: '❓' }[act];
-    notifyOwner(db, owner, `${icon} <b>Oferta #${q.no} — ${QSTATUS[act]}</b>\n${escHtml(q.customer.name)} · ${escHtml(q.customer.phone)} · ${lei(q.pricing.total)}${msg ? '\n„' + escHtml(msg) + '”' : ''}`);
+    notifyOwner(db, owner, `${icon} <b>Oferta #${q.no} — ${QSTATUS[act]}</b>\n${escHtml(q.customer.assoc || q.customer.address)}\n${escHtml(q.customer.name)} · ${escHtml(q.customer.phone)} · ${lei(q.pricing.total)} / lună${msg ? '\n„' + escHtml(msg) + '”' : ''}`);
     return sendJson(res, 200, { ok: true, status: act });
   }
   if (req.method !== 'GET') return sendJson(res, 405, { error: 'Metodă invalidă' });
@@ -1264,7 +1279,7 @@ async function handleQuotesApi(req, res, pathname, parsed) {
       const b = await readJson(req); const out = {};
       for (const k of Object.keys(QUOTE_DEFAULTS)) {
         if (!(k in b)) continue;
-        out[k] = typeof QUOTE_DEFAULTS[k] === 'number' ? qNum(b[k]) : typeof QUOTE_DEFAULTS[k] === 'boolean' ? !!b[k] : str(b[k], k === 'intro' || k === 'note' ? 1000 : 160);
+        out[k] = typeof QUOTE_DEFAULTS[k] === 'number' ? qNum(b[k]) : typeof QUOTE_DEFAULTS[k] === 'boolean' ? !!b[k] : str(b[k], k === 'intro' || k === 'note' || k === 'includes' ? 2000 : 160);
       }
       if (!['included', 'plus', 'none'].includes(out.vatMode)) delete out.vatMode;
       const conf = ctx.db.configs[uname] = ctx.db.configs[uname] || {};
@@ -1423,7 +1438,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4.7, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4.8, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
@@ -1507,4 +1522,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v4.7 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v4.8 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));

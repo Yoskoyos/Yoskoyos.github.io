@@ -1401,16 +1401,17 @@ html:not(.unlocked) .app{display:none}
     <div class="modal-hdr"><div class="modal-title" id="qs-title">Setări calculator ofertă</div><div class="modal-x" id="qs-x" role="button" aria-label="Închide">✕</div></div>
     <div class="modal-body">
       <label class="cm-check"><input type="checkbox" id="qs-enabled"> Calculatorul de pe site este activ</label>
-      <div class="cm-sec">Prețuri (lei, pe bucată, echipament + montaj)</div>
+      <div class="cm-hint">Calculatorul e pentru <b>asociații de proprietari</b>: clientul vede un <b>abonament lunar fix</b> pe toată durata contractului (montaj, mentenanță și garanție incluse).</div>
+      <div class="cm-sec">Abonament lunar pe cameră (lei / lună / bucată)</div>
       <div class="f2">
         <div class="fg"><label for="qs-in">Cameră interior</label><input id="qs-in" inputmode="decimal"></div>
         <div class="fg"><label for="qs-ex">Cameră exterior</label><input id="qs-ex" inputmode="decimal"></div>
       </div>
       <div class="f2">
         <div class="fg"><label for="qs-lift">Cameră lift</label><input id="qs-lift" inputmode="decimal"></div>
-        <div class="fg"><label for="qs-setup">Configurare / punere în funcțiune</label><input id="qs-setup" inputmode="decimal"></div>
+        <div class="fg"><label for="qs-setup">Taxă unică de instalare (0 = gratuit)</label><input id="qs-setup" inputmode="decimal"></div>
       </div>
-      <div class="cm-sec">Punct de stocare și control (NVR + HDD), după numărul de camere</div>
+      <div class="cm-sec">Punct de stocare și control (NVR + HDD), lei / lună, după numărul de camere</div>
       <div class="f2">
         <div class="fg"><label for="qs-n4">Până la 4 camere</label><input id="qs-n4" inputmode="decimal"></div>
         <div class="fg"><label for="qs-n8">5 – 8 camere</label><input id="qs-n8" inputmode="decimal"></div>
@@ -1425,7 +1426,7 @@ html:not(.unlocked) .app{display:none}
         <div class="fg"><label for="qs-vatrate">Cota TVA (%)</label><input id="qs-vatrate" inputmode="decimal"></div>
       </div>
       <div class="f2">
-        <div class="fg"><label for="qs-monthly">Abonament lunar (lei, 0 = fără)</label><input id="qs-monthly" inputmode="decimal"></div>
+        <div class="fg"><label for="qs-months">Durata contractului (luni)</label><input id="qs-months" inputmode="numeric" placeholder="ex. 36"></div>
         <div class="fg"><label for="qs-valid">Valabilitate ofertă (zile)</label><input id="qs-valid" inputmode="numeric"></div>
       </div>
       <div class="cm-sec">Texte și date de contact</div>
@@ -1436,6 +1437,7 @@ html:not(.unlocked) .app{display:none}
       <div class="fg"><label for="qs-email">Email afișat</label><input id="qs-email" inputmode="email"></div>
       <div class="fg"><label for="qs-intro">Text de început</label><textarea id="qs-intro" rows="2"></textarea></div>
       <div class="fg"><label for="qs-note">Mențiuni sub total</label><textarea id="qs-note" rows="2"></textarea></div>
+      <div class="fg"><label for="qs-includes">Ce include abonamentul (câte un rând pe beneficiu)</label><textarea id="qs-includes" rows="5"></textarea></div>
       <div class="cm-sec">Pune calculatorul pe site</div>
       <div class="cm-hint">În WordPress, deschide pagina „Calculează oferta de preț”, șterge calculatorul vechi și adaugă un bloc <b>HTML personalizat</b> cu codul de mai jos:</div>
       <div class="qs-code" id="qs-embed"></div>
@@ -3421,16 +3423,16 @@ function renderQuotes() {
   const term = (qs('#qt-search').value || '').trim().toLowerCase(), f = qs('#qt-status').value;
   let rows = quotes;
   if (f === 'open') rows = rows.filter(q => ['sent', 'viewed', 'clarify'].includes(q.status)); else if (f) rows = rows.filter(q => q.status === f);
-  if (term) rows = rows.filter(q => [q.no, q.customer.name, q.customer.phone, q.customer.email, q.customer.city].join(' ').toLowerCase().includes(term));
+  if (term) rows = rows.filter(q => [q.no, q.customer.name, q.customer.assoc, q.customer.address, q.customer.phone, q.customer.email, q.customer.city].join(' ').toLowerCase().includes(term));
   const list = qs('#qt-list');
   if (!rows.length) { list.innerHTML = `<div class="cl-empty">${quotes.length ? 'Nicio ofertă găsită.' : 'Încă nu ai cereri de ofertă de pe site.<br>Apasă <b>Setări calculator</b> ca să pui prețurile și să iei codul pentru WordPress.'}</div>`; return; }
   list.innerHTML = rows.map(q => {
     const c = q.customer;
     return `<div class="qt-row" role="button" tabindex="0" data-qid="${escapeHtml(q.id)}">
       <div class="qt-c-no"><span class="qt-no">#${q.no}</span><span class="qpill ${q.status}" style="display:none"></span></div>
-      <div style="min-width:0"><div class="qt-name">${escapeHtml(c.name)}</div><div class="qt-sub">${escapeHtml(c.city)} · ${q.pricing.totalCams} cam.</div></div>
+      <div style="min-width:0"><div class="qt-name">${escapeHtml(c.assoc || c.name)}</div><div class="qt-sub">${escapeHtml(c.assoc ? c.name + ' · ' : '')}${escapeHtml(c.address || c.city)} · ${q.pricing.totalCams} cam.</div></div>
       <div class="qt-c-contact" style="min-width:0"><div class="qt-sub"><a href="tel:${escapeHtml(c.phone.replace(/[^\d+]/g, ''))}" onclick="event.stopPropagation()">${escapeHtml(c.phone)}</a></div><div class="qt-sub">${escapeHtml(c.email)}</div></div>
-      <div class="qt-tot">${fmtLei(q.pricing.total)}</div>
+      <div class="qt-tot">${fmtLei(q.pricing.total)}${q.pricing.period === 'month' ? '<span class="qt-sub" style="font-weight:600"> /lună</span>' : ''}</div>
       <div class="qt-st"><span class="qpill ${q.status}">${QST[q.status] || q.status}</span>${q.viewedAt ? `<span class="qt-sub">👁 văzută ${fmtTs(q.viewedAt)}</span>` : ''}</div>
       <div class="qt-dates">până ${fmtTs(q.validUntil)}<br>${fmtTs(q.createdAt)}</div></div>`;
   }).join('');
@@ -3440,19 +3442,19 @@ function openQuote(q) {
   const c = q.customer, p = q.pricing;
   qs('#qm-title').textContent = `Oferta nr. ${q.no}`;
   const evName = { created: 'Ofertă creată (calculator site)', viewed: 'Clientul a deschis oferta', accepted: 'Acceptată', rejected: 'Refuzată', clarify: 'Cere clarificări', extended: 'Valabilitate prelungită', sent: 'Marcată „Trimisă”', expired: 'Expirată' };
-  const wa = `https://wa.me/${waNum(c.phone)}?text=${encodeURIComponent(`Bună ziua, ${c.name.split(' ')[0]}! Oferta dumneavoastră pentru sistemul de supraveghere (nr. ${q.no}) este aici: ${q.url}`)}`;
+  const wa = `https://wa.me/${waNum(c.phone)}?text=${encodeURIComponent(`Bună ziua, ${c.name.split(' ')[0]}! Oferta pentru sistemul de supraveghere al blocului (nr. ${q.no}) este aici: ${q.url}`)}`;
   qs('#qm-body').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span class="qpill ${q.status}" style="font-size:12.5px;padding:5px 12px">${QST[q.status]}</span><span class="cm-hint">creată ${fmtTsH(q.createdAt)} · valabilă până ${fmtTs(q.validUntil)}${q.views ? ` · deschisă de ${q.views} ori` : ''}</span></div>
     ${q.response && q.response.message ? `<div class="qm-msg"><b>Mesajul clientului:</b> ${escapeHtml(q.response.message)}</div>` : ''}
     <div class="cm-sec">Client</div>
-    <div style="font-size:14px;line-height:1.7"><b>${escapeHtml(c.name)}</b>${c.propType ? ` · ${escapeHtml(c.propType)}` : ''}<br>
+    <div style="font-size:14px;line-height:1.7">${c.assoc ? `<b>${escapeHtml(c.assoc)}</b><br>` : ''}${c.assoc ? '' : '<b>'}${escapeHtml(c.name)}${c.assoc ? '' : '</b>'}${c.role ? ` — ${escapeHtml(c.role)}` : ''}${c.apartments ? ` · ${escapeHtml(c.apartments)} apartamente` : ''}<br>
       <a href="tel:${escapeHtml(c.phone.replace(/[^\d+]/g, ''))}">${escapeHtml(c.phone)}</a> · <a href="mailto:${escapeHtml(c.email)}">${escapeHtml(c.email)}</a><br>${escapeHtml([c.address, c.city].filter(Boolean).join(', '))}
       ${c.message ? `<br><span class="cm-hint">Mesaj la cerere: ${escapeHtml(c.message)}</span>` : ''}</div>
     <div class="qm-links"><a class="btn" href="tel:${escapeHtml(c.phone.replace(/[^\d+]/g, ''))}">📞 Sună</a><a class="btn" href="${escapeHtml(wa)}" target="_blank" rel="noopener">WhatsApp cu oferta</a><a class="btn" href="${escapeHtml(q.url)}?own=1" target="_blank" rel="noopener">Vezi oferta</a><button type="button" class="btn" id="qm-copy">Copiază link</button></div>
     <div class="cm-sec">Sistem · ${p.totalCams} camere</div>
     <table class="qm-items">${p.items.map(it => `<tr><td>${escapeHtml(it.name)}</td><td class="n">${it.qty} × ${fmtLei(it.price)}</td><td class="n">${fmtLei(it.total)}</td></tr>`).join('')}</table>
-    <div class="qm-tot">Total ${fmtLei(p.total)}</div>
-    <div class="cm-hint" style="text-align:right">${p.vatMode === 'plus' ? `fără TVA ${fmtLei(p.net)} + TVA ${fmtLei(p.vat)}` : p.vatMode === 'included' ? `TVA inclus (${fmtLei(p.vat)})` : 'fără TVA'}${p.monthly ? ` · abonament ${fmtLei(p.monthly)}/lună` : ''}</div>
+    <div class="qm-tot">${fmtLei(p.total)}${p.period === 'month' ? ' / lună' : ''}</div>
+    <div class="cm-hint" style="text-align:right">${p.vatMode === 'plus' ? `fără TVA ${fmtLei(p.net)} + TVA ${fmtLei(p.vat)}` : p.vatMode === 'included' ? `TVA inclus (${fmtLei(p.vat)})` : 'fără TVA'}${p.months ? ` · contract ${p.months} luni (total ${fmtLei(p.contractTotal)})` : ''}${p.setup ? ` · instalare ${fmtLei(p.setup)}` : ''}${p.monthly ? ` · abonament ${fmtLei(p.monthly)}/lună` : ''}</div>
     <div class="cm-sec">Istoric</div>
     <div class="qm-ev">${q.events.slice().reverse().map(e => `<div><span>${fmtTsH(e.t)}</span><div>${evName[e.type] || e.type}${e.manual ? ' (manual)' : ''}${e.message ? ` — „${escapeHtml(e.message)}”` : ''}</div></div>`).join('')}</div>
     <div class="cm-sec">Acțiuni</div>
@@ -3483,7 +3485,7 @@ function closeQuote() { qs('#quote-modal').classList.add('hidden'); qmCur = null
 
 const QS_FIELDS = { enabled: '#qs-enabled', priceInterior: '#qs-in', priceExterior: '#qs-ex', priceLift: '#qs-lift', priceSetup: '#qs-setup',
   priceNvr4: '#qs-n4', priceNvr8: '#qs-n8', priceNvr16: '#qs-n16', priceNvr32: '#qs-n32', vatMode: '#qs-vat', vatRate: '#qs-vatrate',
-  monthly: '#qs-monthly', validDays: '#qs-valid', company: '#qs-company', phone: '#qs-phone', email: '#qs-email', intro: '#qs-intro', note: '#qs-note' };
+  contractMonths: '#qs-months', includes: '#qs-includes', validDays: '#qs-valid', company: '#qs-company', phone: '#qs-phone', email: '#qs-email', intro: '#qs-intro', note: '#qs-note' };
 async function openQuoteSettings() {
   try {
     const r = await clApi('/quote-settings');
