@@ -11,6 +11,8 @@
 //                  Stare în monitor-state.json. Dezactivare: variabila de mediu MONITOR=0.
 // v4.1 (29.10.2026): GET /snap?nvr=&ch=&token= — captură din stream-ul RTSP (ffmpeg) pentru NVR-urile care nu
 //                  oferă capturi ISAPI (ex. DS-7104NI-Q1). Credențialele NVR rămân pe server.
+// v4.9: formula de preț de pe site (Webflow): bază 189 lei pt. 3 camere + 50/cameră suplimentară + 150/cameră lift,
+//       contract 48 luni, neplătitor TVA; POST /cerere (formularul Webflow) → ofertă + redirect; GET /public/prices.
 // v4.8: oferte doar pentru asociații de proprietari — abonament lunar fix pe durata contractului.
 // v4.7: oferte — calculator public (/calculator, pentru iframe în WordPress), POST /public/quote, pagina ofertei
 //                  /q/<token> cu Accept / Refuz / Cer clarificări, /quotes + /quote-settings (aplicație), Telegram, email.
@@ -894,13 +896,15 @@ function quoteOwner(db) {
 const QUOTE_DEFAULTS = {
   enabled: true,
   company: 'Supraveghere24h',
-  phone: '', email: '',
+  phone: '0763 354 355', email: 'contact@supraveghere24h.ro',
+  // Formula de pe site: prețul de bază include primele `baseCams` camere de interior/exterior + punctul de stocare
+  basePrice: 189, baseCams: 3, extraPrice: 50, liftPrice: 150,
   // Ofertă pentru ASOCIAȚII DE PROPRIETARI: abonament lunar fix pe toată durata contractului (montaj gratuit)
   priceInterior: 0, priceExterior: 0, priceLift: 0,     // lei / LUNĂ / cameră
   priceNvr4: 0, priceNvr8: 0, priceNvr16: 0, priceNvr32: 0,  // lei / LUNĂ — punct stocare și control, după nr. camere
   priceSetup: 0,                                         // taxă unică de instalare (0 = gratuit)
-  contractMonths: 0,                                     // durata contractului (luni); 0 = nu se afișează
-  vatMode: 'included',                                   // 'included' | 'plus' | 'none'
+  contractMonths: 48,                                    // durata contractului (luni); 0 = nu se afișează
+  vatMode: 'none',                                       // Yca Solutions SRL — neplătitor de TVA                                   // 'included' | 'plus' | 'none'
   vatRate: 21,
   validDays: 30,
   intro: 'Vă mulțumim pentru interes! Mai jos găsiți oferta pentru sistemul de supraveghere video al blocului, cu plată lunară fixă.',
@@ -912,16 +916,25 @@ function quoteCfg(db, owner) {
   return { ...QUOTE_DEFAULTS, ...c };
 }
 const qNum = v => { const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isFinite(n) && n > 0 ? n : 0; };
-function quotePriced(c) { return qNum(c.priceInterior) > 0 || qNum(c.priceExterior) > 0; }
+function quotePriced(c) { return qNum(c.basePrice) > 0 || qNum(c.priceInterior) > 0 || qNum(c.priceExterior) > 0; }
 function buildQuote(c, inp) {
   const n = { in: Math.min(64, Math.max(0, Math.round(qNum(inp.interior)))), ex: Math.min(64, Math.max(0, Math.round(qNum(inp.exterior)))), lift: Math.min(16, Math.max(0, Math.round(qNum(inp.lift)))) };
-  const total = n.in + n.ex + n.lift;
+  let total = n.in + n.ex + n.lift;
   const items = [];
+  if (qNum(c.basePrice) > 0) {
+    // formula site: bază (minim baseCams camere interior/exterior, cu NVR) + camere suplimentare + camere lift
+    const bc = Math.max(1, Math.round(qNum(c.baseCams)) || 3), ie = n.in + n.ex;
+    items.push({ name: `Sistem de bază: ${bc} camere interior/exterior + punct de stocare și control (NVR + HDD)${ie < bc ? ` — minim ${bc} camere incluse` : ''}`, qty: 1, price: qNum(c.basePrice) });
+    if (ie > bc) items.push({ name: 'Cameră suplimentară (interior / exterior)', qty: ie - bc, price: qNum(c.extraPrice) });
+    if (n.lift) items.push({ name: 'Cameră pentru lift', qty: n.lift, price: qNum(c.liftPrice) });
+    total = Math.max(bc, ie) + n.lift;
+  } else {
   if (n.in)   items.push({ name: 'Cameră de interior', qty: n.in,   price: qNum(c.priceInterior) });
   if (n.ex)   items.push({ name: 'Cameră de exterior', qty: n.ex,   price: qNum(c.priceExterior) });
   if (n.lift) items.push({ name: 'Cameră pentru lift', qty: n.lift, price: qNum(c.priceLift) || qNum(c.priceInterior) });
   const nvr = total <= 4 ? ['4', c.priceNvr4] : total <= 8 ? ['8', c.priceNvr8] : total <= 16 ? ['16', c.priceNvr16] : ['32', c.priceNvr32];
   if (total) items.push({ name: `Punct de stocare și control (NVR ${nvr[0]} canale + HDD)`, qty: 1, price: qNum(nvr[1]) });
+  }
   for (const it of items) it.total = Math.round(it.qty * it.price * 100) / 100;
   const sub = Math.round(items.reduce((s, it) => s + it.total, 0) * 100) / 100;
   const rate = qNum(c.vatRate) || 21;
@@ -1021,9 +1034,9 @@ function quotePageHtml(q, cfg, logo) {
     <div class="no"><b>Ofertă nr. ${q.no}</b>emisă ${roDate(q.createdAt)} · valabilă până ${roDate(q.validUntil)}<br><span class="pill st-${st}">${QSTATUS[st]}</span></div></div>
   <div class="sec"><h1>Bună ziua, ${escHtml(c.name.split(' ')[0] || c.name)}!</h1><p class="muted">${escHtml(cfg.intro)}</p></div>
   <div class="sec"><h2>Date asociație</h2><div class="grid">
-    ${c.assoc ? `<div><span>Asociația:</span> ${escHtml(c.assoc)}</div>` : ''}${c.address ? `<div><span>Adresa blocului:</span> ${escHtml(c.address)}</div>` : ''}
+    ${c.assoc ? `<div><span>Asociația:</span> ${escHtml(c.assoc)}</div>` : ''}${c.address && c.address !== c.assoc ? `<div><span>Adresa blocului:</span> ${escHtml(c.address)}</div>` : ''}
     <div><span>Persoană de contact:</span> ${escHtml(c.name)}${c.role ? ' (' + escHtml(c.role) + ')' : ''}</div><div><span>Telefon:</span> ${escHtml(c.phone)}</div>
-    <div><span>Email:</span> ${escHtml(c.email)}</div><div><span>Localitate:</span> ${escHtml(c.city)}</div>
+    ${c.email ? `<div><span>Email:</span> ${escHtml(c.email)}</div>` : ''}${c.city ? `<div><span>Localitate:</span> ${escHtml(c.city)}</div>` : ''}
     ${c.apartments ? `<div><span>Apartamente:</span> ${escHtml(c.apartments)}</div>` : ''}
   </div></div>
   <div class="sec"><h2>Sistem propus · ${p.totalCams} ${p.totalCams === 1 ? 'cameră' : 'camere'} · plată lunară</h2>
@@ -1077,7 +1090,8 @@ function calculatorHtml(cfg, logo, base) {
   const priced = quotePriced(cfg);
   const P = JSON.stringify({ in: qNum(cfg.priceInterior), ex: qNum(cfg.priceExterior), lift: qNum(cfg.priceLift) || qNum(cfg.priceInterior),
     n4: qNum(cfg.priceNvr4), n8: qNum(cfg.priceNvr8), n16: qNum(cfg.priceNvr16), n32: qNum(cfg.priceNvr32), setup: qNum(cfg.priceSetup),
-    vatMode: cfg.vatMode, vatRate: qNum(cfg.vatRate) || 21, months: Math.round(qNum(cfg.contractMonths)) });
+    vatMode: cfg.vatMode, vatRate: qNum(cfg.vatRate) || 21, months: Math.round(qNum(cfg.contractMonths)),
+    base: qNum(cfg.basePrice), bc: Math.round(qNum(cfg.baseCams)) || 3, extra: qNum(cfg.extraPrice), lp: qNum(cfg.liftPrice) });
   return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Calculează oferta — ${escHtml(cfg.company)}</title><style>${PAGE_CSS}
 .wrap{padding:12px 12px 24px}
@@ -1135,10 +1149,11 @@ ${!priced || !cfg.enabled ? '' : `<script>
   function calc(){
     var i=v('interior'),e=v('exterior'),l=v('lift'),t=i+e+l;
     if(!t){document.getElementById('est').textContent='—';document.getElementById('estsub').textContent='alegeți numărul de camere';return;}
-    var s=i*P.in+e*P.ex+l*P.lift+(t<=4?P.n4:t<=8?P.n8:t<=16?P.n16:P.n32);
+    var s=P.base?P.base+Math.max(0,i+e-P.bc)*P.extra+l*P.lp:i*P.in+e*P.ex+l*P.lift+(t<=4?P.n4:t<=8?P.n8:t<=16?P.n16:P.n32);
+    if(P.base) t=Math.max(P.bc,i+e)+l;
     if(P.vatMode==='plus') s=s*(1+P.vatRate/100);
     document.getElementById('est').textContent=lei(s)+' / lună';
-    document.getElementById('estsub').textContent=t+(t===1?' cameră':' camere')+(P.vatMode==='none'?'':' · TVA inclus')+(P.months?' · contract '+P.months+' luni':'')+(P.setup?'':' · montaj gratuit');
+    document.getElementById('estsub').textContent=t+(t===1?' cameră':' camere')+(P.vatMode==='included'?' · TVA inclus':'')+(P.months?' · contract '+P.months+' luni':'')+(P.setup?'':' · montaj gratuit');
   }
   [].forEach.call(document.querySelectorAll('[data-t]'),function(b){b.addEventListener('click',function(){
     var el=document.getElementById(b.getAttribute('data-t')); el.value=Math.max(0,Math.min(64,v(el.id)+parseInt(b.getAttribute('data-d'),10))); calc();});});
@@ -1180,10 +1195,39 @@ ${q.customer.assoc || q.customer.address ? `<p style="color:#4a5568">${escHtml([
 <p style="color:#8a96a8;font-size:12px;margin-top:24px">${escHtml(cfg.company)}${cfg.phone ? ' · ' + escHtml(cfg.phone) : ''}${cfg.email ? ' · ' + escHtml(cfg.email) : ''}</p></div>`;
 }
 
-async function handlePublicQuote(req, res) {
-  if (pubLimited(req, 6)) { res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8', ...PUB_CORS }); return res.end(JSON.stringify({ error: 'Prea multe cereri. Încercați din nou mai târziu.' })); }
-  const send = (st, o) => { res.writeHead(st, { 'Content-Type': 'application/json; charset=utf-8', ...PUB_CORS }); res.end(JSON.stringify(o)); };
-  const b = await readJson(req);
+// formularul de pe site (Webflow): nume, telefon, email, asociatie, mesaj, acord, detalii="interior:3,exterior:1,lift:0"
+function mapSiteForm(f) {
+  const det = {}; String(f.detalii || '').replace(/(interior|exterior|lift)\s*[:=]\s*(\d+)/gi, (_, k, v) => { det[k.toLowerCase()] = v; });
+  return { name: f.nume || f.name, phone: f.telefon || f.phone, email: f.email, assoc: f.asociatie || f.assoc, address: f.adresa || f.address || f.asociatie,
+           city: f.localitate || f.city || '', message: f.mesaj || f.message, consent: f.acord || f.consent, website: f.website,
+           interior: f.interior || det.interior, exterior: f.exterior || det.exterior, lift: f.lift || det.lift, role: f.calitate || f.role, apartments: f.apartamente || f.apartments, site: true };
+}
+async function readBodyAny(req) {
+  const raw = (await readRaw(req)).toString('utf8');
+  if (/application\/x-www-form-urlencoded|multipart\/form-data/i.test(req.headers['content-type'] || '') || /^[\w%.-]+=/.test(raw)) {
+    const o = {}; for (const [k, v] of new URLSearchParams(raw)) o[k] = v; return o;
+  }
+  try { return JSON.parse(raw || '{}'); } catch { return {}; }
+}
+function handlePublicPrices(req, res) {
+  const db = loadDb(); const c = quoteCfg(db, quoteOwner(db));
+  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=300', ...PUB_CORS });
+  res.end(JSON.stringify({ enabled: !!c.enabled, basePrice: qNum(c.basePrice), baseCams: Math.round(qNum(c.baseCams)) || 3, extraPrice: qNum(c.extraPrice),
+    liftPrice: qNum(c.liftPrice), months: Math.round(qNum(c.contractMonths)), vatMode: c.vatMode }));
+}
+async function handlePublicQuote(req, res, fromSite) {
+  // formularul clasic (fără JS) primește redirect către pagina ofertei; apelurile JS primesc JSON
+  const wantsHtml = fromSite && !/json/i.test(req.headers.accept || '') && !req.headers['x-requested-with'];
+  const send = (st, o) => {
+    if (wantsHtml) {
+      if (o.url) { res.writeHead(303, { Location: o.url, ...PUB_CORS }); return res.end(); }
+      return sendHtml(res, st, `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:system-ui;padding:40px 20px;text-align:center;color:#14202E"><h2>Cererea nu a putut fi trimisă</h2><p>${escHtml(o.error || 'Eroare')}</p><p><a href="javascript:history.back()" style="color:#0284c7">« Înapoi la formular</a> · sau sunați la <a href="tel:+40763354355" style="color:#0284c7">0763 354 355</a></p></body>`);
+    }
+    res.writeHead(st, { 'Content-Type': 'application/json; charset=utf-8', ...PUB_CORS }); res.end(JSON.stringify(o));
+  };
+  if (pubLimited(req, 6)) return send(429, { error: 'Prea multe cereri. Încercați din nou mai târziu.' });
+  let b = await readBodyAny(req);
+  if (fromSite || 'nume' in b || 'telefon' in b) b = mapSiteForm(b);
   if (b.website) return send(200, { url: '/' });                                   // capcană pentru roboți
   const db = loadDb(); const owner = quoteOwner(db);
   if (!owner) return send(503, { error: 'Serviciu indisponibil' });
@@ -1192,7 +1236,11 @@ async function handlePublicQuote(req, res) {
   const cust = { name: str(b.name, 120).trim(), phone: str(b.phone, 40).trim(), email: str(b.email, 160).trim(), city: str(b.city, 120).trim(),
                  address: str(b.address, 300).trim(), assoc: str(b.assoc, 160).trim(), role: str(b.role, 60).trim(),
                  apartments: String(Math.min(2000, Math.round(qNum(b.apartments))) || ''), propType: 'Bloc / asociație de proprietari', message: str(b.message, 2000).trim() };
-  if (!cust.name || !cust.phone || !cust.city || !cust.address || !/^\S+@\S+\.\S+$/.test(cust.email)) return send(400, { error: 'Completați numele, telefonul, emailul, adresa blocului și localitatea.' });
+  if (b.site) {   // formularul de pe site are mai puține câmpuri: nume, telefon, (email), asociația / adresa
+    if (!cust.name || !cust.phone || !cust.address) return send(400, { error: 'Completați numele, telefonul și asociația sau adresa blocului.' });
+    if (cust.email && !/^\S+@\S+\.\S+$/.test(cust.email)) return send(400, { error: 'Adresa de email nu pare corectă.' });
+    if (!(qNum(b.interior) + qNum(b.exterior) + qNum(b.lift))) b.interior = 3;      // fără calculator: oferta de bază
+  } else if (!cust.name || !cust.phone || !cust.city || !cust.address || !/^\S+@\S+\.\S+$/.test(cust.email)) return send(400, { error: 'Completați numele, telefonul, emailul, adresa blocului și localitatea.' });
   if (!b.consent) return send(400, { error: 'Este necesar acordul pentru prelucrarea datelor.' });
   const pricing = buildQuote(cfg, b);
   if (!pricing.totalCams) return send(400, { error: 'Alegeți cel puțin o cameră.' });
@@ -1202,13 +1250,13 @@ async function handlePublicQuote(req, res) {
               customer: cust, pricing, status: 'sent', events: [{ t: Date.now(), type: 'created' }], emailed: false };
   all.list.push(q); saveQuotes(all);
   const url = `${publicBase(req)}/q/${q.token}`;
-  if (mailReady()) {
+  if (mailReady() && cust.email) {
     q.emailed = await sendMail(cust.email, `Oferta nr. ${q.no} — ${cfg.company}`,
       `Bună ziua, ${cust.name}!\n\nOferta pentru bloc (abonament ${lei(pricing.total)} / lună) poate fi văzută aici:\n${url}\n\nPe pagina ofertei o puteți accepta, refuza sau cere clarificări.\n\n${cfg.company}`,
       quoteEmailHtml(q, cfg, url));
     const a2 = loadQuotes(); const x = a2.list.find(z => z.id === q.id); if (x) { x.emailed = q.emailed; saveQuotes(a2); }
   }
-  notifyOwner(db, owner, `🧾 <b>Cerere nouă de ofertă #${q.no}</b>\n${escHtml(cust.name)} · ${escHtml(cust.phone)}${cust.assoc ? '\n' + escHtml(cust.assoc) : ''}\n${escHtml(cust.address)}, ${escHtml(cust.city)}\n${pricing.totalCams} camere · <b>${lei(pricing.total)} / lună</b>${q.emailed ? '' : '\n(email neconfigurat — oferta NU a fost trimisă pe mail)'}`);
+  notifyOwner(db, owner, `🧾 <b>Cerere nouă de ofertă #${q.no}</b>\n${escHtml(cust.name)} · ${escHtml(cust.phone)}${cust.assoc ? '\n' + escHtml(cust.assoc) : ''}${[cust.address !== cust.assoc ? cust.address : '', cust.city].filter(Boolean).length ? '\n' + escHtml([cust.address !== cust.assoc ? cust.address : '', cust.city].filter(Boolean).join(', ')) : ''}\n${pricing.totalCams} camere · <b>${lei(pricing.total)} / lună</b>${q.emailed ? '\n✉ trimisă și pe email' : !cust.email ? '\n(clientul nu a lăsat email)' : '\n(email neconfigurat pe server — oferta NU a fost trimisă pe mail)'}`);
   return send(200, { ok: true, no: q.no, url, emailed: q.emailed });
 }
 
@@ -1438,7 +1486,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4.8, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4.9, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
@@ -1446,7 +1494,9 @@ const server = http.createServer(async (req, res) => {
       const db = loadDb(); const owner = quoteOwner(db);
       return sendHtml(res, 200, calculatorHtml(quoteCfg(db, owner), quoteLogo(), publicBase(req)));
     }
-    if (pathname === '/public/quote' && req.method === 'POST') return await handlePublicQuote(req, res);
+    if (pathname === '/public/quote' && req.method === 'POST') return await handlePublicQuote(req, res, false);
+    if ((pathname === '/cerere' || pathname === '/public/cerere') && req.method === 'POST') return await handlePublicQuote(req, res, true);
+    if (pathname === '/public/prices' && req.method === 'GET') return handlePublicPrices(req, res);
     if (pathname.startsWith('/q/')) return await handleQuotePublic(req, res, pathname, parsed);
     if (pathname === '/quotes' || pathname.startsWith('/quotes/') || pathname === '/quote-settings') return await handleQuotesApi(req, res, pathname, parsed);
     if (pathname === '/company' && req.method === 'GET') return await handleCompany(req, res, parsed);
@@ -1522,4 +1572,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v4.8 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v4.9 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));

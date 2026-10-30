@@ -1402,24 +1402,17 @@ html:not(.unlocked) .app{display:none}
     <div class="modal-body">
       <label class="cm-check"><input type="checkbox" id="qs-enabled"> Calculatorul de pe site este activ</label>
       <div class="cm-hint">Calculatorul e pentru <b>asociații de proprietari</b>: clientul vede un <b>abonament lunar fix</b> pe toată durata contractului (montaj, mentenanță și garanție incluse).</div>
-      <div class="cm-sec">Abonament lunar pe cameră (lei / lună / bucată)</div>
+      <div class="cm-sec">Abonament lunar (aceeași formulă ca pe site)</div>
       <div class="f2">
-        <div class="fg"><label for="qs-in">Cameră interior</label><input id="qs-in" inputmode="decimal"></div>
-        <div class="fg"><label for="qs-ex">Cameră exterior</label><input id="qs-ex" inputmode="decimal"></div>
+        <div class="fg"><label for="qs-base">Preț de bază (lei / lună)</label><input id="qs-base" inputmode="decimal" placeholder="189"></div>
+        <div class="fg"><label for="qs-basecams">Camere incluse în preț (interior/exterior)</label><input id="qs-basecams" inputmode="numeric" placeholder="3"></div>
       </div>
       <div class="f2">
-        <div class="fg"><label for="qs-lift">Cameră lift</label><input id="qs-lift" inputmode="decimal"></div>
-        <div class="fg"><label for="qs-setup">Taxă unică de instalare (0 = gratuit)</label><input id="qs-setup" inputmode="decimal"></div>
+        <div class="fg"><label for="qs-extra">Cameră suplimentară (lei / lună)</label><input id="qs-extra" inputmode="decimal" placeholder="50"></div>
+        <div class="fg"><label for="qs-liftp">Cameră lift (lei / lună)</label><input id="qs-liftp" inputmode="decimal" placeholder="150"></div>
       </div>
-      <div class="cm-sec">Punct de stocare și control (NVR + HDD), lei / lună, după numărul de camere</div>
-      <div class="f2">
-        <div class="fg"><label for="qs-n4">Până la 4 camere</label><input id="qs-n4" inputmode="decimal"></div>
-        <div class="fg"><label for="qs-n8">5 – 8 camere</label><input id="qs-n8" inputmode="decimal"></div>
-      </div>
-      <div class="f2">
-        <div class="fg"><label for="qs-n16">9 – 16 camere</label><input id="qs-n16" inputmode="decimal"></div>
-        <div class="fg"><label for="qs-n32">Peste 16 camere</label><input id="qs-n32" inputmode="decimal"></div>
-      </div>
+      <div class="cm-hint">Prețul de bază include primele camere de interior/exterior și punctul de stocare (NVR + HDD). Calculatorul de pe site ia automat prețurile de aici.</div>
+      <div class="fg"><label for="qs-setup">Taxă unică de instalare (0 = gratuit)</label><input id="qs-setup" inputmode="decimal"></div>
       <div class="cm-sec">Total și valabilitate</div>
       <div class="f2">
         <div class="fg"><label for="qs-vat">TVA</label><select id="qs-vat"><option value="included">Prețurile includ TVA</option><option value="plus">Se adaugă TVA la prețuri</option><option value="none">Fără TVA (neplătitor)</option></select></div>
@@ -3483,8 +3476,8 @@ async function quoteUpdate(body, msg) {
 }
 function closeQuote() { qs('#quote-modal').classList.add('hidden'); qmCur = null; }
 
-const QS_FIELDS = { enabled: '#qs-enabled', priceInterior: '#qs-in', priceExterior: '#qs-ex', priceLift: '#qs-lift', priceSetup: '#qs-setup',
-  priceNvr4: '#qs-n4', priceNvr8: '#qs-n8', priceNvr16: '#qs-n16', priceNvr32: '#qs-n32', vatMode: '#qs-vat', vatRate: '#qs-vatrate',
+const QS_FIELDS = { enabled: '#qs-enabled', basePrice: '#qs-base', baseCams: '#qs-basecams', extraPrice: '#qs-extra', liftPrice: '#qs-liftp', priceSetup: '#qs-setup',
+  vatMode: '#qs-vat', vatRate: '#qs-vatrate',
   contractMonths: '#qs-months', includes: '#qs-includes', validDays: '#qs-valid', company: '#qs-company', phone: '#qs-phone', email: '#qs-email', intro: '#qs-intro', note: '#qs-note' };
 async function openQuoteSettings() {
   try {
@@ -3501,8 +3494,8 @@ async function openQuoteSettings() {
 async function saveQuoteSettings() {
   const body = {};
   for (const [k, sel] of Object.entries(QS_FIELDS)) { const el = qs(sel); body[k] = el.type === 'checkbox' ? el.checked : el.value; }
-  if (body.enabled && !(parseFloat(String(body.priceInterior).replace(',', '.')) > 0 || parseFloat(String(body.priceExterior).replace(',', '.')) > 0))
-    return toast('Pune cel puțin prețul pentru camera de interior sau exterior', 'warn');
+  if (body.enabled && !(parseFloat(String(body.basePrice).replace(',', '.')) > 0))
+    return toast('Pune prețul de bază al abonamentului', 'warn');
   try { await clApi('/quote-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); qs('#qset-modal').classList.add('hidden'); toast('Setări calculator salvate', 'ok'); }
   catch (e) { toast(e.message, 'err'); }
 }
