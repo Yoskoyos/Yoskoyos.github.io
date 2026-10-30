@@ -1192,8 +1192,8 @@ function quoteEmailHtml(q, cfg, url) {
   const F = "font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
   const img = (f, w, h, alt = '') => `<img src="${A}${f}" width="${w}"${h ? ` height="${h}"` : ''} alt="${alt}" style="display:block;border:0;outline:none;width:${w}px;max-width:100%;height:auto">`;
   const head = (t, ic) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 6px"><tr>
-    <td width="32" style="vertical-align:middle;width:32px;min-width:32px"><img src="${A}${ic}" width="24" height="24" alt="" style="display:block;border:0;width:24px;height:24px"></td><td style="${F}font-size:17px;font-weight:800;color:${NAVY};letter-spacing:.04em;text-transform:uppercase;vertical-align:middle;white-space:nowrap;padding-right:12px">${t}</td>
-    <td width="100%" style="vertical-align:middle"><div style="height:2px;background:${LINE};line-height:2px;font-size:0">&nbsp;</div></td></tr></table>`;
+    <td width="32" style="vertical-align:middle;width:32px;min-width:32px"><img src="${A}${ic}" width="24" height="24" alt="" style="display:block;border:0;width:24px;height:24px"></td><td style="${F}font-size:17px;font-weight:800;color:${NAVY};letter-spacing:.04em;text-transform:uppercase;vertical-align:middle;padding-right:12px">${t}</td>
+    <td width="40%" style="vertical-align:middle;min-width:24px"><div style="height:2px;background:${LINE};line-height:2px;font-size:0">&nbsp;</div></td></tr></table>`;
   const SEC = 'padding:28px 32px 8px';
   // pachetul: echipamentele, din numărul de camere calculat pe site
   const bc = Math.max(1, Math.round(qNum(cfg.baseCams)) || 3);
@@ -1235,45 +1235,45 @@ function quoteEmailHtml(q, cfg, url) {
   const tel = cfg.phone ? `<a href="tel:${escHtml(String(cfg.phone).replace(/[^\d+]/g, ''))}" style="color:#FFFFFF;text-decoration:none;font-weight:700;white-space:nowrap">${escHtml(cfg.phone)}</a>` : '';
   const mail = cfg.email ? `<a href="mailto:${escHtml(cfg.email)}" style="color:#FFFFFF;text-decoration:none;font-weight:700">${escHtml(cfg.email)}</a>` : '';
   const extra = qNum(cfg.extraPrice), liftP = qNum(cfg.liftPrice);
-  return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><title>Oferta nr. ${q.no}</title><style>@media only screen and (max-width:520px){.col{display:block!important;width:100%!important;box-sizing:border-box}.px{padding-left:18px!important;padding-right:18px!important}}</style></head>
+  return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><title>Oferta nr. ${q.no}</title><style>@media only screen and (max-width:520px){.col{display:block!important;width:100%!important;box-sizing:border-box}.px{padding-left:14px!important;padding-right:14px!important}.outer{padding:0!important}}</style></head>
 <body style="margin:0;padding:0;background:#E9EDF2">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">Oferta nr. ${q.no} · ${lei(p.total)} / lună · ${p.totalCams} camere${p.months ? ' · contract ' + p.months + ' luni' : ''} — valabilă până la ${roDate(q.validUntil)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#E9EDF2"><tr><td align="center" style="padding:24px 10px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#E9EDF2"><tr><td align="center" class="outer" style="padding:24px 10px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#FFFFFF;border-radius:14px;overflow:hidden;border-collapse:separate">
-<tr><td style="padding:18px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<tr><td class="px" style="padding:18px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
   <td style="vertical-align:middle"><a href="${escHtml(cfg.website || '#')}" style="text-decoration:none"><img src="${base}/q-logo.png" alt="${escHtml(cfg.company)}" width="170" style="display:block;width:170px;max-width:170px;height:auto;border:0"></a></td>
   <td style="${F}text-align:right;vertical-align:middle;white-space:nowrap"><div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:${MUT};font-weight:700">Ofertă de preț</div><div style="font-size:20px;font-weight:800;color:${INK}">Nr. ${q.no}</div></td></tr></table></td></tr>
 <tr><td style="font-size:0;line-height:0"><img src="${A}hero.jpg" width="640" alt="Ofertă — sistem de supraveghere video complet, pentru bloc" style="display:block;width:100%;max-width:640px;height:auto;border:0"></td></tr>
-<tr><td style="background:${NAVY};padding:26px 32px;border-top:4px solid ${ORG}">
+<tr><td class="px" style="background:${NAVY};padding:26px 32px;border-top:4px solid ${ORG}">
   <div style="${F}font-size:14px;color:#C9D4E0;margin:0 0 6px">Bună ziua, ${escHtml(c.name.split(' ')[0] || c.name)}! Abonamentul lunar propus pentru bloc:</div>
   <div style="${F}font-size:42px;line-height:1.1;font-weight:800;color:${ORG}">${lei(p.total)} <span style="font-size:18px;color:#FFFFFF;font-weight:700">/ lună</span></div>
   <div style="${F}font-size:14px;color:#FFFFFF;margin-top:10px">${facts}</div>
   ${vat ? `<div style="${F}font-size:12px;color:#9FB3C8;margin-top:6px">${vat}</div>` : ''}${nApt > 0 ? `<div style="${F}font-size:13px;color:#C9D4E0;margin-top:6px">≈ ${lei(p.total / nApt)} / lună / apartament (${nApt} apartamente)</div>` : ''}
   <div style="${F}font-size:12px;color:#9FB3C8;margin-top:14px">Emisă ${roDate(q.createdAt)} · valabilă până la <b style="color:#FFFFFF">${roDate(q.validUntil)}</b>${c.assoc ? ' · ' + escHtml(c.assoc) : ''}</div></td></tr>
-<tr><td style="padding:24px 32px 0"><div style="${F}font-size:15px;line-height:1.65;color:#3B4A5A">${escHtml(cfg.intro)}</div></td></tr>
-<tr><td style="${SEC}">${head('Pachetul include', 's-shield.png')}<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${pkRows}</table></td></tr>
-<tr><td style="${SEC}">${head('Costul abonamentului', 's-check.png')}
+<tr><td class="px" style="padding:24px 32px 0"><div style="${F}font-size:15px;line-height:1.65;color:#3B4A5A">${escHtml(cfg.intro)}</div></td></tr>
+<tr><td class="px" style="${SEC}">${head('Pachetul include', 's-shield.png')}<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${pkRows}</table></td></tr>
+<tr><td class="px" style="${SEC}">${head('Costul abonamentului', 's-check.png')}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid ${LINE};margin-top:8px"><tr>${th('Descriere', 'left')}${th('Total / lună', 'right')}</tr>${rows}
   <tr><td style="${F}font-size:12px;color:${MUT};padding:14px 10px;text-align:right;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Total abonament lunar</td><td style="${F}font-size:18px;color:${INK};padding:14px 10px;text-align:right;font-weight:800;white-space:nowrap">${lei(p.total)}</td></tr></table>
   <div style="${F}font-size:12px;color:${MUT};margin:10px 0 0">${p.months ? `Abonament fix pe toată durata contractului de ${p.months} luni, fără alte costuri. ` : ''}${p.setup ? `Taxă unică de instalare: ${lei(p.setup)}.` : 'Montajul și punerea în funcțiune sunt gratuite.'}</div></td></tr>
-<tr><td style="padding:28px 24px 8px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${SOFT};border-radius:12px"><tr><td style="padding:18px 16px 8px">
+<tr><td class="px" style="padding:28px 24px 8px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${SOFT};border-radius:12px"><tr><td style="padding:18px 16px 8px">
   <div style="padding:0 8px">${head('Beneficiile tale', 's-badge.png')}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${benRows}</table></td></tr></table></td></tr>
-${extra ? `<tr><td style="padding:20px 24px 8px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${NAVY};border-radius:12px;overflow:hidden"><tr><td style="background:${BLUE};padding:12px 22px;${F}font-size:15px;font-weight:800;color:#FFFFFF;letter-spacing:.06em;text-transform:uppercase">Cameră suplimentară</td></tr>
+${extra ? `<tr><td class="px" style="padding:20px 24px 8px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${NAVY};border-radius:12px;overflow:hidden"><tr><td style="background:${BLUE};padding:12px 22px;${F}font-size:15px;font-weight:800;color:#FFFFFF;letter-spacing:.06em;text-transform:uppercase">Cameră suplimentară</td></tr>
   <tr><td style="padding:16px 22px 18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="${F}vertical-align:middle">
     <div style="font-size:13.5px;line-height:1.5;color:#C9D4E0">Dacă doriți camere în plus, costul este de</div>
     <div style="font-size:32px;line-height:1.2;font-weight:800;color:${ORG};margin:4px 0">${lei(extra).replace(',00', '')} <span style="font-size:17px">/ lună</span></div>
     <div style="font-size:13.5px;line-height:1.5;color:#C9D4E0">pentru fiecare cameră de interior sau exterior adăugată${liftP ? `; cameră pentru lift: <b style="color:#FFFFFF">${lei(liftP).replace(',00', '')} / lună</b>` : ''}.</div></td>
     <td width="84" style="vertical-align:middle;text-align:right">${img('s-cam.png', 76, 56)}</td></tr></table></td></tr></table></td></tr>` : ''}
-<tr><td style="padding:20px 24px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${LINE};border-bottom:1px solid ${LINE}"><tr>${gcell(gar[0])}${gcell(gar[1])}</tr><tr>${gcell(gar[2])}${gcell(gar[3])}</tr></table></td></tr>
-${cfg.note || c.message ? `<tr><td style="padding:18px 32px 4px">${cfg.note ? `<div style="${F}font-size:13px;line-height:1.6;color:${MUT};background:${SOFT};border-left:3px solid ${ORG};padding:12px 14px">${escHtml(cfg.note)}</div>` : ''}${c.message ? `<div style="${F}font-size:13px;line-height:1.6;color:${INK};margin-top:12px"><b>Mesajul dumneavoastră:</b> ${escHtml(c.message)}</div>` : ''}</td></tr>` : ''}
-<tr><td style="padding:24px 32px 28px"><div style="${F}font-size:19px;font-weight:800;color:${INK};margin:0 0 4px">Ce decideți?</div>
+<tr><td class="px" style="padding:20px 24px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${LINE};border-bottom:1px solid ${LINE}"><tr>${gcell(gar[0])}${gcell(gar[1])}</tr><tr>${gcell(gar[2])}${gcell(gar[3])}</tr></table></td></tr>
+${cfg.note || c.message ? `<tr><td class="px" style="padding:18px 32px 4px">${cfg.note ? `<div style="${F}font-size:13px;line-height:1.6;color:${MUT};background:${SOFT};border-left:3px solid ${ORG};padding:12px 14px">${escHtml(cfg.note)}</div>` : ''}${c.message ? `<div style="${F}font-size:13px;line-height:1.6;color:${INK};margin-top:12px"><b>Mesajul dumneavoastră:</b> ${escHtml(c.message)}</div>` : ''}</td></tr>` : ''}
+<!--CTA--><tr><td class="px" style="padding:24px 32px 28px"><div style="${F}font-size:19px;font-weight:800;color:${INK};margin:0 0 4px">Ce decideți?</div>
   <div style="${F}font-size:13px;color:${MUT};margin:0 0 16px">Alegeți o variantă; se deschide pagina ofertei, unde confirmați răspunsul.</div>
   <a href="${url}?a=accept" style="${F}display:block;background:${ORG};color:${NAVY};text-decoration:none;font-weight:800;font-size:16px;text-align:center;padding:16px 20px;border-radius:10px">Accept oferta</a>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px"><tr>
     <td width="50%" style="padding-right:5px"><a href="${url}?a=clarify" style="${F}display:block;background:#FFFFFF;color:${NAVY};border:1.5px solid ${NAVY};text-decoration:none;font-weight:700;font-size:14px;text-align:center;padding:12px 8px;border-radius:10px">Cer clarificări</a></td>
     <td width="50%" style="padding-left:5px"><a href="${url}?a=reject" style="${F}display:block;background:#FFFFFF;color:${MUT};border:1.5px solid #C5CED8;text-decoration:none;font-weight:700;font-size:14px;text-align:center;padding:12px 8px;border-radius:10px">Refuz oferta</a></td></tr></table>
-  <div style="${F}font-size:12px;color:${MUT};margin-top:14px;text-align:center"><a href="${url}" style="color:${NAVY};font-weight:700">Vezi oferta online</a> &nbsp;·&nbsp; de acolo o puteți descărca în PDF</div></td></tr>
-<tr><td style="background:${NAVY};padding:22px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+  <div style="${F}font-size:12px;color:${MUT};margin-top:14px;text-align:center"><a href="${url}" style="color:${NAVY};font-weight:700">Vezi oferta online</a> &nbsp;·&nbsp; de acolo o puteți descărca în PDF</div></td></tr><!--/CTA-->
+<tr><td class="px" style="background:${NAVY};padding:22px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
   <td style="vertical-align:top;width:44px">${img('s-note.png', 34, 34)}</td>
   <td style="${F}vertical-align:top;font-size:13px;line-height:1.6;color:#C9D4E0;padding-left:8px">Oferta include toate materialele și accesoriile necesare pentru un sistem de supraveghere complet, funcțional și gata de utilizare.</td></tr>
   <tr><td colspan="2" style="padding-top:16px"><div style="height:1px;background:#24384F;line-height:1px;font-size:0">&nbsp;</div></td></tr>
@@ -1281,7 +1281,7 @@ ${cfg.note || c.message ? `<tr><td style="padding:18px 32px 4px">${cfg.note ? `<
   <td style="${F}vertical-align:middle;padding:16px 0 0 8px"><div style="font-size:14px;font-weight:800;color:#6FB3FF;letter-spacing:.04em;text-transform:uppercase">Siguranța blocului, prioritatea noastră!</div>
     <div style="font-size:13px;color:#C9D4E0;margin-top:4px">${[tel, mail].filter(Boolean).join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</div></td></tr></table></td></tr>
 </table>
-<div style="${F}font-size:11px;color:#8A97A8;margin-top:16px;line-height:1.6;max-width:600px">${escHtml(cfg.legal || cfg.company)}<br>Ați primit acest e-mail pentru că ați solicitat o ofertă pe ${escHtml(String(cfg.website || '').replace(/^https?:\/\//, '') || 'site-ul nostru')}.</div>
+<div style="${F}font-size:11px;color:#8A97A8;margin-top:16px;line-height:1.6;max-width:600px">${escHtml(cfg.legal || cfg.company)}<!--MAILNOTE--><br>Ați primit acest e-mail pentru că ați solicitat o ofertă pe ${escHtml(String(cfg.website || '').replace(/^https?:\/\//, '') || 'site-ul nostru')}.<!--/MAILNOTE--></div>
 </td></tr></table></body></html>`;
 }
 
@@ -1436,10 +1436,37 @@ async function handleQuotePublic(req, res, pathname, parsed) {
     if (q.status === 'sent') { q.status = 'viewed'; q.viewedAt = Date.now(); q.events.push({ t: Date.now(), type: 'viewed' }); }
     saveQuotes(all);
   }
-  let html = quotePageHtml(q, cfg, quoteLogo());
-  const pre = { accept: 'accept', reject: 'reject', clarify: 'clarify' }[parsed.query.a];
-  if (pre && ['sent', 'viewed', 'clarify'].includes(quoteStatus(q))) html = html.replace('</body>', quickAnswerHtml(q, pre) + '</body>');
+  const pre = { accept: 'accept', reject: 'reject', clarify: 'clarify' }[parsed.query.a] || null;
+  const html = quotePageV2(q, cfg, publicBase(req), pre);
   return sendHtml(res, 200, html);
+}
+
+// Pagina ofertei (linkul din e-mail): același design ca e-mailul, cu răspuns direct pe pagină (fereastra quickAnswerHtml)
+function quotePageV2(q, cfg, base, pre) {
+  const url = `${base}/q/${q.token}`;
+  const st = quoteStatus(q);
+  const open = ['sent', 'viewed', 'clarify'].includes(st);
+  let html = quoteEmailHtml(q, cfg, url);
+  const F = "font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
+  const B = { accepted: ['#DCFCE7', '#14532D', '✓', 'Ați acceptat această ofertă.', 'Vă mulțumim! Vă contactăm în cel mai scurt timp pentru programarea montajului.'],
+              rejected: ['#FEE4E2', '#7A271A', '✕', 'Ați refuzat această ofertă.', 'Vă mulțumim pentru timpul acordat. Ne puteți contacta oricând pentru o ofertă nouă.'],
+              expired:  ['#EEF2F7', '#475467', '⏱', 'Această ofertă a expirat.', 'Ne puteți contacta pentru o ofertă actualizată.'],
+              clarify:  ['#FEF3C7', '#78350F', '?', 'Am primit întrebarea dumneavoastră.', 'Vă răspundem în maxim 24 de ore. Între timp puteți accepta sau refuza oferta.'] }[st];
+  const banner = B ? `<div style="${F}background:${B[0]};color:${B[1]};border-radius:12px;padding:16px 18px;margin:0 0 ${open ? 18 : 6}px"><div style="font-size:17px;font-weight:800">${B[2]}&nbsp; ${B[3]}</div><div style="font-size:14px;line-height:1.5;margin-top:4px">${B[4]}</div>${q.response && q.response.message ? `<div style="font-size:13px;margin-top:8px;opacity:.85">Mesajul dumneavoastră: „${escHtml(q.response.message)}”</div>` : ''}</div>` : '';
+  const btn = 'cursor:pointer;display:block;width:100%;box-sizing:border-box;text-align:center;border-radius:10px;';
+  const cta = `<tr class="noprint"><td class="px" style="padding:24px 32px 28px">${banner}${open ? `<div style="${F}font-size:19px;font-weight:800;color:#14202E;margin:0 0 4px">Ce decideți?</div>
+    <div style="${F}font-size:13px;color:#5B6B7C;margin:0 0 16px">Alegeți o variantă și confirmați — durează câteva secunde.</div>
+    <button onclick="qaOpen('accept')" style="${F}${btn}background:#F5A100;color:#0D1F33;border:0;font-weight:800;font-size:17px;padding:17px 20px">Accept oferta</button>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px"><tr>
+      <td width="50%" style="padding-right:5px"><button onclick="qaOpen('clarify')" style="${F}${btn}background:#fff;color:#0D1F33;border:1.5px solid #0D1F33;font-weight:700;font-size:15px;padding:13px 8px">Cer clarificări</button></td>
+      <td width="50%" style="padding-left:5px"><button onclick="qaOpen('reject')" style="${F}${btn}background:#fff;color:#5B6B7C;border:1.5px solid #C5CED8;font-weight:700;font-size:15px;padding:13px 8px">Refuz oferta</button></td></tr></table>` : ''}
+    <div style="${F}text-align:center;margin-top:16px"><button onclick="window.print()" style="${F}background:none;border:0;color:#0D1F33;font-weight:700;font-size:13px;text-decoration:underline;cursor:pointer">Descarcă / printează oferta (PDF)</button></div></td></tr>`;
+  html = html.replace(/<!--CTA-->[\s\S]*?<!--\/CTA-->/, cta).replace(/<!--MAILNOTE-->[\s\S]*?<!--\/MAILNOTE-->/, '');
+  html = html.replace('<meta name="color-scheme" content="light only">', '<meta name="color-scheme" content="light only"><meta name="robots" content="noindex,nofollow">')
+             .replace('</style></head>', '@media print{.noprint{display:none!important}body,table{background:#fff!important}@page{margin:10mm}}</style></head>')
+             .replace(`<title>Oferta nr. ${q.no}</title>`, `<title>Oferta nr. ${q.no} — ${escHtml(cfg.company)}</title>`);
+  if (open) html = html.replace('</body>', quickAnswerHtml(q, pre) + '</body>');
+  return html;
 }
 
 // Fereastra de răspuns rapid: când clientul apasă Accept / Clarificări / Refuz în e-mail, pagina se deschide direct cu fereastra
@@ -1452,6 +1479,9 @@ function quickAnswerHtml(q, pre) {
   };
   const J = JSON.stringify(T).replace(/</g, '\\u003c');
   return `<style>
+.qa-bg,.qa-bg *{box-sizing:border-box;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif}
+.qa textarea{display:block;width:100%;border:1.5px solid #C5CED8;border-radius:12px;padding:12px 14px;color:#14202E;background:#F8FAFC;outline:none;resize:vertical}
+.qa textarea:focus{border-color:#0B5FB0;box-shadow:0 0 0 3px rgba(11,95,176,.15)}
 .qa-bg{position:fixed;inset:0;background:rgba(13,31,51,.55);z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;animation:qaf .2s ease}
 .qa{background:#fff;border-radius:18px;width:100%;max-width:440px;padding:24px 22px 20px;box-shadow:0 24px 60px -20px rgba(0,0,0,.45);animation:qau .25s ease}
 .qa h3{font-size:21px;margin:0 0 8px;color:#0D1F33;letter-spacing:-.01em}
@@ -1465,14 +1495,16 @@ function quickAnswerHtml(q, pre) {
 @keyframes qaf{from{opacity:0}to{opacity:1}}@keyframes qau{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
 @media(max-width:560px){.qa-bg{align-items:flex-end;padding:0}.qa{border-radius:20px 20px 0 0;max-width:none;padding:24px 20px calc(20px + env(safe-area-inset-bottom))}}
 </style>
-<div class="qa-bg" id="qa"><div class="qa" role="dialog" aria-modal="true"><div id="qa-in"></div></div></div>
+<div class="qa-bg" id="qa" style="display:none"><div class="qa" role="dialog" aria-modal="true"><div id="qa-in"></div></div></div>
 <script>(function(){
-var T=${J}, a=${JSON.stringify(pre)}, t=T[a], box=document.getElementById('qa'), inn=document.getElementById('qa-in');
+var T=${J}, a=null, t=null, box=document.getElementById('qa'), inn=document.getElementById('qa-in');
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
-function close(){box.remove();try{history.replaceState(null,'',location.pathname);}catch(e){}}
+function close(){box.style.display='none';try{history.replaceState(null,'',location.pathname);}catch(e){}}
+box.addEventListener('click',function(e){if(e.target===box)close();});
+window.qaOpen=function(x){ a=x; t=T[a]; box.style.display='flex';
 inn.innerHTML='<div class="ic" style="background:'+(a==='accept'?'#FFF4DC':a==='reject'?'#FEE4E2':'#E8F1FB')+'">'+(a==='accept'?'✓':a==='reject'?'✕':'?')+'</div><h3>'+t.h+'</h3><p>'+t.p+'</p><textarea id="qa-m" placeholder="'+esc(t.ph)+'"></textarea><div class="err" id="qa-e"></div><button class="go" id="qa-go" style="background:'+t.c+';color:'+t.t+'">'+t.b+'</button><button class="x" id="qa-x">Înapoi la ofertă</button>';
 var m=document.getElementById('qa-m'), go=document.getElementById('qa-go'), er=document.getElementById('qa-e');
-document.getElementById('qa-x').onclick=close; box.addEventListener('click',function(e){if(e.target===box)close();});
+document.getElementById('qa-x').onclick=close;
 if(a==='clarify') setTimeout(function(){m.focus();},300);
 go.onclick=function(){
   if(t.req && !m.value.trim()){er.textContent='Scrieți ce ați dori să clarificăm.';m.focus();return;}
@@ -1484,6 +1516,8 @@ go.onclick=function(){
      document.getElementById('qa-done').onclick=function(){location.replace(location.pathname);}; })
    .catch(function(){er.textContent='Nu s-a putut trimite. Verificați conexiunea și încercați din nou.';go.disabled=false;go.textContent=t.b;});
 };
+};
+var pre=${JSON.stringify(pre)}; if(pre) window.qaOpen(pre);
 })();</script>`;
 }
 
@@ -1655,7 +1689,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 5.7, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 5.8, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
@@ -1753,4 +1787,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v5.7 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v5.8 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
