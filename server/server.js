@@ -110,7 +110,7 @@ function mailReady() {
   if (!c || !c.host || !c.user || !c.pass) return false;
   try { require.resolve('nodemailer'); return true; } catch { return false; }
 }
-async function sendMail(to, subject, text, html) {
+async function sendMail(to, subject, text, html, attachments) {
   const c = loadMailCfg();
   if (!c || !c.host || !c.user || !c.pass) { console.error('Mail neconfigurat (lipsește mail.json)'); return false; }
   let nodemailer;
@@ -121,7 +121,7 @@ async function sendMail(to, subject, text, html) {
     auth: { user: c.user, pass: c.pass },
   });
   try {
-    await transport.sendMail({ from: c.from || c.user, to, subject, text, html });
+    await transport.sendMail({ from: c.from || c.user, to, subject, text, html, ...(attachments && attachments.length ? { attachments } : {}) });
     return true;
   } catch (e) { console.error('Eroare trimitere mail:', e.message); return false; }
 }
@@ -1182,19 +1182,20 @@ ${!priced || !cfg.enabled ? '' : `<script>
 </script>`}
 </body></html>`;
 }
-function quoteEmailHtml(q, cfg, url) {
+function quoteEmailHtml(q, cfg, url, opt = {}) {
   // e-mail cu oferta completă, în stil „broșură”: imagine de antet, pachet cu poze, beneficii cu iconițe, cameră suplimentară, garanții.
   // Doar stiluri inline + tabele (Gmail / Outlook / telefon). Imaginile stau pe site (cfg.assetBase), logo-ul pe server (/q-logo.png).
   const p = q.pricing, c = q.customer, cams = p.cams || {};
   const base = url.replace(/\/q\/[a-f0-9]+$/, '');
-  const A = String(cfg.assetBase || base + '/email-img/').replace(/\/?$/, '/');
+  const A = opt.cid ? 'cid:' : String(cfg.assetBase || base + '/email-img/').replace(/\/?$/, '/');
+  const CS = opt.cid ? '@s24' : '';   // e-mail: imaginile merg atașate (cid), ca să apară și în Gmail pe Android
   const NAVY = '#0D1F33', ORG = '#F5A100', BLUE = '#0B5FB0', INK = '#14202E', MUT = '#5B6B7C', LINE = '#E3E8EF', SOFT = '#F4F7FB';
   const F = "font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
-  const img = (f, w, h, alt = '') => `<img src="${A}${f}" width="${w}"${h ? ` height="${h}"` : ''} alt="${alt}" style="display:block;border:0;outline:none;width:${w}px;max-width:100%;height:auto">`;
+  const img = (f, w, h, alt = '') => `<img src="${A}${f}${CS}" width="${w}"${h ? ` height="${h}"` : ''} alt="${alt}" style="display:block;border:0;outline:none;width:${w}px;max-width:100%;height:auto">`;
   const head = (t, ic) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 6px"><tr>
-    <td width="32" style="vertical-align:middle;width:32px;min-width:32px"><img src="${A}${ic}" width="24" height="24" alt="" style="display:block;border:0;width:24px;height:24px"></td><td style="${F}font-size:17px;font-weight:800;color:${NAVY};letter-spacing:.04em;text-transform:uppercase;vertical-align:middle;padding-right:12px">${t}</td>
+    <td width="32" style="vertical-align:middle;width:32px;min-width:32px"><img src="${A}${ic}${CS}" width="24" height="24" alt="" style="display:block;border:0;width:24px;height:24px"></td><td style="${F}font-size:17px;font-weight:800;color:${NAVY};letter-spacing:.04em;text-transform:uppercase;vertical-align:middle;padding-right:12px">${t}</td>
     <td width="40%" style="vertical-align:middle;min-width:24px"><div style="height:2px;background:${LINE};line-height:2px;font-size:0">&nbsp;</div></td></tr></table>`;
-  const SEC = 'padding:28px 32px 8px';
+  const SEC = 'padding:26px 22px 6px';
   // pachetul: echipamentele, din numărul de camere calculat pe site
   const bc = Math.max(1, Math.round(qNum(cfg.baseCams)) || 3);
   const nLift = cams.lift || 0, nIE = Math.max(0, (p.totalCams || 0) - nLift);
@@ -1208,9 +1209,9 @@ function quoteEmailHtml(q, cfg, url) {
           ['p-sw.png', 'Switch PoE', 'Alimentare și conectivitate stabilă pentru camerele IP.', '✓'],
           ['p-cab.png', 'Toate materialele de instalare', 'Cablu UTP, doze, pat de cablu, conectori RJ45 și toate accesoriile necesare montajului — incluse.', '✓'],
           ['p-tech.png', 'Manoperă și configurare', 'Montaj, configurare, testare și instruire — fără cost.', '✓']);
-  const pkRows = pk.map(([f, t, d, n], k) => `<tr><td style="padding:14px 0;${k ? `border-top:1px solid ${LINE};` : ''}vertical-align:middle;width:120px">${img(f, 110)}</td>
-    <td style="${F}padding:14px 12px 14px 14px;${k ? `border-top:1px solid ${LINE};` : ''}vertical-align:middle"><div style="font-size:15px;font-weight:800;color:${NAVY};text-transform:uppercase;letter-spacing:.02em">${t}</div><div style="font-size:13px;line-height:1.5;color:${MUT};margin-top:4px">${d}</div></td>
-    <td style="padding:14px 0;${k ? `border-top:1px solid ${LINE};` : ''}vertical-align:middle;width:46px;text-align:right"><div style="${F}display:inline-block;width:44px;height:44px;line-height:44px;border-radius:22px;background:${n === '✓' ? '#FFF4DC' : BLUE};color:${n === '✓' ? '#B57600' : '#FFFFFF'};font-size:${n.length > 3 ? 13 : 16}px;font-weight:800;text-align:center">${n}</div></td></tr>`).join('');
+  const pkRows = pk.map(([f, t, d, n], k) => `<tr><td style="padding:14px 0;${k ? `border-top:1px solid ${LINE};` : ''}vertical-align:middle;width:92px">${img(f, 84)}</td>
+    <td style="${F}padding:14px 8px 14px 12px;${k ? `border-top:1px solid ${LINE};` : ''}vertical-align:middle"><div style="font-size:15px;font-weight:800;color:${NAVY};text-transform:uppercase;letter-spacing:.02em">${t}</div><div style="font-size:13px;line-height:1.5;color:${MUT};margin-top:4px">${d}</div></td>
+    <td style="padding:14px 0;${k ? `border-top:1px solid ${LINE};` : ''}vertical-align:middle;width:40px;text-align:right"><div style="${F}display:inline-block;width:38px;height:38px;line-height:38px;border-radius:19px;background:${n === '✓' ? '#FFF4DC' : BLUE};color:${n === '✓' ? '#B57600' : '#FFFFFF'};font-size:${n.length > 3 ? 13 : 16}px;font-weight:800;text-align:center">${n}</div></td></tr>`).join('');
   // costul
   const td = (x, al, extra = '') => `<td style="${F}font-size:14px;color:${INK};padding:11px 10px;border-bottom:1px solid ${LINE};text-align:${al};vertical-align:top;${extra}">${x}</td>`;
   const th = (x, al) => `<th style="${F}font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:${MUT};padding:10px;background:${SOFT};text-align:${al};font-weight:700;white-space:nowrap">${x}</th>`;
@@ -1225,12 +1226,12 @@ function quoteEmailHtml(q, cfg, url) {
                ['i-lock.png', 'Garanție la furt și vandalism', 'Echipamentele sunt acoperite pe toată durata contractului.'],
                ['i-wrench.png', 'Mentenanță și service', 'Incluse în abonament, fără costuri suplimentare.'],
                ['i-phone.png', 'Suport rapid', 'Ne contactați telefonic pentru orice problemă.']];
-  const cell = ([f, t, d]) => `<td width="50%" class="col" style="padding:10px 8px;vertical-align:top"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="vertical-align:top;width:52px">${img(f, 44, 44)}</td>
+  const cell = ([f, t, d]) => `<td class="col" style="padding:9px 8px;vertical-align:top"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="vertical-align:top;width:52px">${img(f, 44, 44)}</td>
     <td style="${F}vertical-align:top;padding-left:10px"><div style="font-size:14px;font-weight:800;color:${NAVY}">${t}</div><div style="font-size:12.5px;line-height:1.45;color:${MUT};margin-top:3px">${d}</div></td></tr></table></td>`;
-  const benRows = [0, 2, 4].map(k => `<tr>${cell(ben[k])}${cell(ben[k + 1])}</tr>`).join('');
+  const benRows = ben.map(b => `<tr>${cell(b)}</tr>`).join('');
   const gar = [['s-check.png', 'Instalare gratuită', 'Montaj, punere în funcțiune și instruire.'], ['s-shield.png', 'Garanție completă', 'Pe toată durata contractului.'],
                ['s-tool.png', 'Service inclus', 'Intervenim rapid la orice defecțiune.'], ['s-key.png', 'Rămân ale asociației', 'La final, echipamentele devin ale blocului.']];
-  const gcell = ([f, t, d]) => `<td width="50%" class="col" style="padding:12px 8px;vertical-align:top"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="vertical-align:top;width:40px">${img(f, 32, 32)}</td>
+  const gcell = ([f, t, d]) => `<td class="col" style="padding:10px 8px;vertical-align:top"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="vertical-align:top;width:40px">${img(f, 32, 32)}</td>
     <td style="${F}vertical-align:top;padding-left:10px"><div style="font-size:13px;font-weight:800;color:${NAVY};text-transform:uppercase;letter-spacing:.03em">${t}</div><div style="font-size:12.5px;line-height:1.45;color:${MUT};margin-top:3px">${d}</div></td></tr></table></td>`;
   const tel = cfg.phone ? `<a href="tel:${escHtml(String(cfg.phone).replace(/[^\d+]/g, ''))}" style="color:#FFFFFF;text-decoration:none;font-weight:700;white-space:nowrap">${escHtml(cfg.phone)}</a>` : '';
   const mail = cfg.email ? `<a href="mailto:${escHtml(cfg.email)}" style="color:#FFFFFF;text-decoration:none;font-weight:700">${escHtml(cfg.email)}</a>` : '';
@@ -1238,42 +1239,42 @@ function quoteEmailHtml(q, cfg, url) {
   return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><title>Oferta nr. ${q.no}</title><style>@media only screen and (max-width:520px){.col{display:block!important;width:100%!important;box-sizing:border-box}.px{padding-left:14px!important;padding-right:14px!important}.outer{padding:0!important}}</style></head>
 <body style="margin:0;padding:0;background:#E9EDF2">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">Oferta nr. ${q.no} · ${lei(p.total)} / lună · ${p.totalCams} camere${p.months ? ' · contract ' + p.months + ' luni' : ''} — valabilă până la ${roDate(q.validUntil)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#E9EDF2"><tr><td align="center" class="outer" style="padding:24px 10px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#E9EDF2"><tr><td align="center" class="outer" style="padding:16px 6px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#FFFFFF;border-radius:14px;overflow:hidden;border-collapse:separate">
-<tr><td class="px" style="padding:18px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-  <td style="vertical-align:middle"><a href="${escHtml(cfg.website || '#')}" style="text-decoration:none"><img src="${base}/q-logo.png" alt="${escHtml(cfg.company)}" width="170" style="display:block;width:170px;max-width:170px;height:auto;border:0"></a></td>
+<tr><td class="px" style="padding:16px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+  <td style="vertical-align:middle"><a href="${escHtml(cfg.website || '#')}" style="text-decoration:none"><img src="${opt.cid ? 'cid:q-logo.png@s24' : base + '/q-logo.png'}" alt="${escHtml(cfg.company)}" width="170" style="display:block;width:170px;max-width:170px;height:auto;border:0"></a></td>
   <td style="${F}text-align:right;vertical-align:middle;white-space:nowrap"><div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:${MUT};font-weight:700">Ofertă de preț</div><div style="font-size:20px;font-weight:800;color:${INK}">Nr. ${q.no}</div></td></tr></table></td></tr>
-<tr><td style="font-size:0;line-height:0"><img src="${A}hero.jpg" width="640" alt="Ofertă — sistem de supraveghere video complet, pentru bloc" style="display:block;width:100%;max-width:640px;height:auto;border:0"></td></tr>
-<tr><td class="px" style="background:${NAVY};padding:26px 32px;border-top:4px solid ${ORG}">
+<tr><td style="font-size:0;line-height:0"><img src="${A}hero.jpg${CS}" width="640" alt="Ofertă — sistem de supraveghere video complet, pentru bloc" style="display:block;width:100%;max-width:640px;height:auto;border:0"></td></tr>
+<tr><td class="px" style="background:${NAVY};padding:24px 22px;border-top:4px solid ${ORG}">
   <div style="${F}font-size:14px;color:#C9D4E0;margin:0 0 6px">Bună ziua, ${escHtml(c.name.split(' ')[0] || c.name)}! Abonamentul lunar propus pentru bloc:</div>
   <div style="${F}font-size:42px;line-height:1.1;font-weight:800;color:${ORG}">${lei(p.total)} <span style="font-size:18px;color:#FFFFFF;font-weight:700">/ lună</span></div>
   <div style="${F}font-size:14px;color:#FFFFFF;margin-top:10px">${facts}</div>
   ${vat ? `<div style="${F}font-size:12px;color:#9FB3C8;margin-top:6px">${vat}</div>` : ''}${nApt > 0 ? `<div style="${F}font-size:13px;color:#C9D4E0;margin-top:6px">≈ ${lei(p.total / nApt)} / lună / apartament (${nApt} apartamente)</div>` : ''}
   <div style="${F}font-size:12px;color:#9FB3C8;margin-top:14px">Emisă ${roDate(q.createdAt)} · valabilă până la <b style="color:#FFFFFF">${roDate(q.validUntil)}</b>${c.assoc ? ' · ' + escHtml(c.assoc) : ''}</div></td></tr>
-<tr><td class="px" style="padding:24px 32px 0"><div style="${F}font-size:15px;line-height:1.65;color:#3B4A5A">${escHtml(cfg.intro)}</div></td></tr>
+<tr><td class="px" style="padding:22px 22px 0"><div style="${F}font-size:15px;line-height:1.65;color:#3B4A5A">${escHtml(cfg.intro)}</div></td></tr>
 <tr><td class="px" style="${SEC}">${head('Pachetul include', 's-shield.png')}<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${pkRows}</table></td></tr>
 <tr><td class="px" style="${SEC}">${head('Costul abonamentului', 's-check.png')}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid ${LINE};margin-top:8px"><tr>${th('Descriere', 'left')}${th('Total / lună', 'right')}</tr>${rows}
   <tr><td style="${F}font-size:12px;color:${MUT};padding:14px 10px;text-align:right;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Total abonament lunar</td><td style="${F}font-size:18px;color:${INK};padding:14px 10px;text-align:right;font-weight:800;white-space:nowrap">${lei(p.total)}</td></tr></table>
   <div style="${F}font-size:12px;color:${MUT};margin:10px 0 0">${p.months ? `Abonament fix pe toată durata contractului de ${p.months} luni, fără alte costuri. ` : ''}${p.setup ? `Taxă unică de instalare: ${lei(p.setup)}.` : 'Montajul și punerea în funcțiune sunt gratuite.'}</div></td></tr>
-<tr><td class="px" style="padding:28px 24px 8px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${SOFT};border-radius:12px"><tr><td style="padding:18px 16px 8px">
+<tr><td class="px" style="padding:24px 14px 6px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${SOFT};border-radius:12px"><tr><td style="padding:18px 16px 8px">
   <div style="padding:0 8px">${head('Beneficiile tale', 's-badge.png')}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${benRows}</table></td></tr></table></td></tr>
-${extra ? `<tr><td class="px" style="padding:20px 24px 8px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${NAVY};border-radius:12px;overflow:hidden"><tr><td style="background:${BLUE};padding:12px 22px;${F}font-size:15px;font-weight:800;color:#FFFFFF;letter-spacing:.06em;text-transform:uppercase">Cameră suplimentară</td></tr>
+${extra ? `<tr><td class="px" style="padding:18px 14px 6px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${NAVY};border-radius:12px;overflow:hidden"><tr><td style="background:${BLUE};padding:12px 22px;${F}font-size:15px;font-weight:800;color:#FFFFFF;letter-spacing:.06em;text-transform:uppercase">Cameră suplimentară</td></tr>
   <tr><td style="padding:16px 22px 18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="${F}vertical-align:middle">
     <div style="font-size:13.5px;line-height:1.5;color:#C9D4E0">Dacă doriți camere în plus, costul este de</div>
     <div style="font-size:32px;line-height:1.2;font-weight:800;color:${ORG};margin:4px 0">${lei(extra).replace(',00', '')} <span style="font-size:17px">/ lună</span></div>
     <div style="font-size:13.5px;line-height:1.5;color:#C9D4E0">pentru fiecare cameră de interior sau exterior adăugată${liftP ? `; cameră pentru lift: <b style="color:#FFFFFF">${lei(liftP).replace(',00', '')} / lună</b>` : ''}.</div></td>
     <td width="84" style="vertical-align:middle;text-align:right">${img('s-cam.png', 76, 56)}</td></tr></table></td></tr></table></td></tr>` : ''}
-<tr><td class="px" style="padding:20px 24px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${LINE};border-bottom:1px solid ${LINE}"><tr>${gcell(gar[0])}${gcell(gar[1])}</tr><tr>${gcell(gar[2])}${gcell(gar[3])}</tr></table></td></tr>
-${cfg.note || c.message ? `<tr><td class="px" style="padding:18px 32px 4px">${cfg.note ? `<div style="${F}font-size:13px;line-height:1.6;color:${MUT};background:${SOFT};border-left:3px solid ${ORG};padding:12px 14px">${escHtml(cfg.note)}</div>` : ''}${c.message ? `<div style="${F}font-size:13px;line-height:1.6;color:${INK};margin-top:12px"><b>Mesajul dumneavoastră:</b> ${escHtml(c.message)}</div>` : ''}</td></tr>` : ''}
-<!--CTA--><tr><td class="px" style="padding:24px 32px 28px"><div style="${F}font-size:19px;font-weight:800;color:${INK};margin:0 0 4px">Ce decideți?</div>
+<tr><td class="px" style="padding:18px 14px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${LINE};border-bottom:1px solid ${LINE}">${gar.map(g => `<tr>${gcell(g)}</tr>`).join('')}</table></td></tr>
+${cfg.note || c.message ? `<tr><td class="px" style="padding:16px 22px 4px">${cfg.note ? `<div style="${F}font-size:13px;line-height:1.6;color:${MUT};background:${SOFT};border-left:3px solid ${ORG};padding:12px 14px">${escHtml(cfg.note)}</div>` : ''}${c.message ? `<div style="${F}font-size:13px;line-height:1.6;color:${INK};margin-top:12px"><b>Mesajul dumneavoastră:</b> ${escHtml(c.message)}</div>` : ''}</td></tr>` : ''}
+<!--CTA--><tr><td class="px" style="padding:22px 22px 26px"><div style="${F}font-size:19px;font-weight:800;color:${INK};margin:0 0 4px">Ce decideți?</div>
   <div style="${F}font-size:13px;color:${MUT};margin:0 0 16px">Alegeți o variantă; se deschide pagina ofertei, unde confirmați răspunsul.</div>
   <a href="${url}?a=accept" style="${F}display:block;background:${ORG};color:${NAVY};text-decoration:none;font-weight:800;font-size:16px;text-align:center;padding:16px 20px;border-radius:10px">Accept oferta</a>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px"><tr>
     <td width="50%" style="padding-right:5px"><a href="${url}?a=clarify" style="${F}display:block;background:#FFFFFF;color:${NAVY};border:1.5px solid ${NAVY};text-decoration:none;font-weight:700;font-size:14px;text-align:center;padding:12px 8px;border-radius:10px">Cer clarificări</a></td>
     <td width="50%" style="padding-left:5px"><a href="${url}?a=reject" style="${F}display:block;background:#FFFFFF;color:${MUT};border:1.5px solid #C5CED8;text-decoration:none;font-weight:700;font-size:14px;text-align:center;padding:12px 8px;border-radius:10px">Refuz oferta</a></td></tr></table>
   <div style="${F}font-size:12px;color:${MUT};margin-top:14px;text-align:center"><a href="${url}" style="color:${NAVY};font-weight:700">Vezi oferta online</a> &nbsp;·&nbsp; de acolo o puteți descărca în PDF</div></td></tr><!--/CTA-->
-<tr><td class="px" style="background:${NAVY};padding:22px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<tr><td class="px" style="background:${NAVY};padding:20px 22px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
   <td style="vertical-align:top;width:44px">${img('s-note.png', 34, 34)}</td>
   <td style="${F}vertical-align:top;font-size:13px;line-height:1.6;color:#C9D4E0;padding-left:8px">Oferta include toate materialele și accesoriile necesare pentru un sistem de supraveghere complet, funcțional și gata de utilizare.</td></tr>
   <tr><td colspan="2" style="padding-top:16px"><div style="height:1px;background:#24384F;line-height:1px;font-size:0">&nbsp;</div></td></tr>
@@ -1285,6 +1286,18 @@ ${cfg.note || c.message ? `<tr><td class="px" style="padding:18px 32px 4px">${cf
 </td></tr></table></body></html>`;
 }
 
+// imaginile referite ca cid:<nume>@s24 în e-mail → atașamente inline (din email-img/ și logo-ul ofertei)
+function emailCidAttachments(html) {
+  const out = [], seen = new Set();
+  for (const m of html.matchAll(/cid:([a-z0-9-]+\.(?:png|jpg))@s24/g)) {
+    const n = m[1]; if (seen.has(n)) continue; seen.add(n);
+    let content = null, type = n.endsWith('.jpg') ? 'image/jpeg' : 'image/png';
+    if (n === 'q-logo.png') { const d = /^data:([^;]+);base64,(.*)$/.exec(quoteLogo() || ''); if (d) { content = Buffer.from(d[2], 'base64'); type = d[1]; } }
+    else { try { content = fs.readFileSync(path.join(BASE_DIR, 'email-img', n)); } catch {} }
+    if (content) out.push({ filename: n, content, contentType: type, cid: n + '@s24', contentDisposition: 'inline' });
+  }
+  return out;
+}
 // formularul de pe site (Webflow): nume, telefon, email, asociatie, mesaj, acord, detalii="interior:3,exterior:1,lift:0"
 function mapSiteForm(f) {
   const det = {}; String(f.detalii || '').replace(/(interior|exterior|lift)\s*[:=]\s*(\d+)/gi, (_, k, v) => { det[k.toLowerCase()] = v; });
@@ -1375,9 +1388,10 @@ async function handlePublicQuote(req, res, fromSite) {
   all.list.push(q); saveQuotes(all);
   const url = `${publicBase(req)}/q/${q.token}`;
   if (mailReady() && cust.email) {
+    const mhtml = quoteEmailHtml(q, cfg, url, { cid: true });
     q.emailed = await sendMail(cust.email, `Oferta nr. ${q.no} — ${cfg.company}`,
       `Bună ziua, ${cust.name}!\n\nOferta pentru bloc (abonament ${lei(pricing.total)} / lună) poate fi văzută aici:\n${url}\n\nPe pagina ofertei o puteți accepta, refuza sau cere clarificări.\n\n${cfg.company}`,
-      quoteEmailHtml(q, cfg, url));
+      mhtml, emailCidAttachments(mhtml));
     const a2 = loadQuotes(); const x = a2.list.find(z => z.id === q.id); if (x) { x.emailed = q.emailed; saveQuotes(a2); }
   }
   notifyOwner(db, owner, `🧾 <b>Cerere nouă de ofertă #${q.no}</b>\n${escHtml(cust.name)} · ${escHtml(cust.phone)}${cust.assoc ? '\n' + escHtml(cust.assoc) : ''}${[cust.address !== cust.assoc ? cust.address : '', cust.city].filter(Boolean).length ? '\n' + escHtml([cust.address !== cust.assoc ? cust.address : '', cust.city].filter(Boolean).join(', ')) : ''}\n${pricing.totalCams} camere · <b>${lei(pricing.total)} / lună</b>${q.emailed ? '\n✉ trimisă și pe email' : !cust.email ? '\n(clientul nu a lăsat email)' : '\n(email neconfigurat pe server — oferta NU a fost trimisă pe mail)'}`);
@@ -1689,7 +1703,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 5.8, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 5.9, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
@@ -1787,4 +1801,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v5.8 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v5.9 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
