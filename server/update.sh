@@ -10,7 +10,7 @@ curl -fsSL --max-time 30 "$URL?t=$(date +%s)" -o server.new.js || { echo "EROARE
 if ! node --check server.new.js 2>/dev/null; then echo "EROARE: fișier invalid, nu instalez nimic"; rm -f server.new.js; exit 1; fi
 # imaginile din e-mailul cu oferta (servite de server la /email-img/)
 mkdir -p "$DIR/email-img"
-for f in hero.jpg i-img.png i-lock.png i-phone.png i-rec.png i-shield.png i-wrench.png p-bullet.png p-cab.png p-hdd.png p-nvr.png p-sw.png p-tech.png p-turret.png s-badge.png s-cam.png s-check.png s-gear.png s-key.png s-note.png s-shield.png s-shield2.png s-tool.png; do curl -fsSL --max-time 20 "https://raw.githubusercontent.com/Yoskoyos/Yoskoyos.github.io/$REF/server/email-img/$f" -o "$DIR/email-img/$f.tmp" && mv "$DIR/email-img/$f.tmp" "$DIR/email-img/$f"; done
+for f in hero.jpg i-img.png i-lock.png i-phone.png i-rec.png i-shield.png i-wrench.png p-bullet.png p-cab.png p-hdd.png p-mon.png p-nvr.png p-sw.png p-tech.png p-turret.png s-badge.png s-cam.png s-check.png s-gear.png s-key.png s-note.png s-shield.png s-shield2.png s-tool.png; do curl -fsSL --max-time 20 "https://raw.githubusercontent.com/Yoskoyos/Yoskoyos.github.io/$REF/server/email-img/$f" -o "$DIR/email-img/$f.tmp" && mv "$DIR/email-img/$f.tmp" "$DIR/email-img/$f"; done
 if cmp -s server.new.js server.js; then rm -f server.new.js; echo "Serverul are deja ultima versiune."; curl -s http://localhost:3000/health; echo; exit 0; fi
 if ! command -v ffmpeg >/dev/null 2>&1; then
   echo "Instalez ffmpeg (pentru imaginile din stream RTSP)..."

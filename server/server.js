@@ -1204,8 +1204,9 @@ function quoteEmailHtml(q, cfg, url) {
   if (nEx) pk.push(['p-bullet.png', 'Camere IP exterior', `Camere Hikvision de minimum 5 MP, pentru exterior, cu vedere pe timp de noapte.`, nEx + 'x']);
   if (nLift) pk.push(['p-turret.png', 'Camere pentru lift', 'Camere compacte, montate în cabina liftului.', nLift + 'x']);
   pk.push(['p-hdd.png', 'Stocare pe hard disk', 'Hard disk dedicat pentru păstrarea înregistrărilor video.', '1x'],
+          ['p-mon.png', 'Monitor', 'Monitor pentru vizualizarea live și a înregistrărilor, la fața locului.', '1x'],
           ['p-sw.png', 'Switch PoE', 'Alimentare și conectivitate stabilă pentru camerele IP.', '✓'],
-          ['p-cab.png', 'Cabluri și conectică', 'Cablu UTP, conectori RJ45 și toate accesoriile necesare montajului.', '✓'],
+          ['p-cab.png', 'Toate materialele de instalare', 'Cablu UTP, doze, pat de cablu, conectori RJ45 și toate accesoriile necesare montajului — incluse.', '✓'],
           ['p-tech.png', 'Manoperă și configurare', 'Montaj, configurare, testare și instruire — fără cost.', '✓']);
   const pkRows = pk.map(([f, t, d, n], k) => `<tr><td style="padding:14px 0;${k ? `border-top:1px solid ${LINE};` : ''}vertical-align:middle;width:120px">${img(f, 110)}</td>
     <td style="${F}padding:14px 12px 14px 14px;${k ? `border-top:1px solid ${LINE};` : ''}vertical-align:middle"><div style="font-size:15px;font-weight:800;color:${NAVY};text-transform:uppercase;letter-spacing:.02em">${t}</div><div style="font-size:13px;line-height:1.5;color:${MUT};margin-top:4px">${d}</div></td>
@@ -1609,7 +1610,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 5.5, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 5.6, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
@@ -1707,4 +1708,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v5.5 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v5.6 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
