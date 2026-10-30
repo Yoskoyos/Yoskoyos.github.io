@@ -1251,6 +1251,10 @@ async function handlePublicQuote(req, res, fromSite) {
   const wantsHtml = fromSite && !/json/i.test(req.headers.accept || '') && !req.headers['x-requested-with'];
   const send = (st, o) => {
     if (wantsHtml) {
+      // înapoi pe pagina de pe site, cu mesajul „trimis” (oferta pleacă pe email); fără Referer valid → pagina ofertei
+      let back = null;
+      try { const r = new URL(String(req.headers.referer || '')); if (SITE_HOSTS.test(r.hostname)) { r.search = ''; r.hash = ''; back = r.toString(); } } catch {}
+      if (back) { res.writeHead(303, { Location: `${back}?${o.url ? 'trimis=1' : 'eroare=' + encodeURIComponent(o.error || 'Eroare')}#contact`, ...PUB_CORS }); return res.end(); }
       if (o.url) { res.writeHead(303, { Location: o.url, ...PUB_CORS }); return res.end(); }
       return sendHtml(res, st, `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:system-ui;padding:40px 20px;text-align:center;color:#14202E"><h2>Cererea nu a putut fi trimisă</h2><p>${escHtml(o.error || 'Eroare')}</p><p><a href="javascript:history.back()" style="color:#0284c7">« Înapoi la formular</a> · sau sunați la <a href="tel:+40763354355" style="color:#0284c7">0763 354 355</a></p></body>`);
     }
@@ -1517,7 +1521,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 5.0, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 5.1, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
@@ -1604,4 +1608,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v5.0 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v5.1 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
