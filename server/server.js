@@ -1180,20 +1180,49 @@ ${!priced || !cfg.enabled ? '' : `<script>
 </body></html>`;
 }
 function quoteEmailHtml(q, cfg, url) {
-  const p = q.pricing;
-  const btn = (txt, color, a) => `<a href="${url}?a=${a}" style="display:inline-block;background:${color};color:#fff;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:10px;margin:4px 6px 4px 0">${txt}</a>`;
-  return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:auto;color:#0f1a2e">
-<h2 style="margin:0 0 6px">Oferta nr. ${q.no} — sistem de supraveghere video</h2>
-<p>Bună ziua, ${escHtml(q.customer.name)},</p><p>${escHtml(cfg.intro)}</p>
-${q.customer.assoc || q.customer.address ? `<p style="color:#4a5568">${escHtml([q.customer.assoc, q.customer.address].filter(Boolean).join(' · '))}</p>` : ''}
-<table style="width:100%;border-collapse:collapse;font-size:14px">${p.items.map(it => `<tr><td style="padding:6px 0;border-bottom:1px solid #e3e8ef">${escHtml(it.name)} × ${it.qty}</td><td style="padding:6px 0;border-bottom:1px solid #e3e8ef;text-align:right;white-space:nowrap">${lei(it.total)} / lună</td></tr>`).join('')}</table>
-<p style="font-size:20px;font-weight:bold;text-align:right;margin:12px 0">Abonament: ${lei(p.total)} / lună</p>
-<p style="text-align:right;color:#4a5568;margin-top:-6px">${p.months ? `contract ${p.months} luni · ` : ''}${p.setup ? `instalare ${lei(p.setup)}` : 'instalare gratuită'}</p>
-<p style="color:#4a5568;font-size:13px">Oferta este valabilă până la ${roDate(q.validUntil)}. ${escHtml(cfg.note)}</p>
-<p style="margin:18px 0 6px"><b>Vă rugăm să ne transmiteți răspunsul:</b></p>
-<p>${btn('✓ Accept oferta', '#16a34a', 'accept')}${btn('? Cer clarificări', '#d97706', 'clarify')}${btn('✕ Refuz', '#dc2626', 'reject')}</p>
-<p style="font-size:13px"><a href="${url}">Vezi oferta completă online</a></p>
-<p style="color:#8a96a8;font-size:12px;margin-top:24px">${escHtml(cfg.company)}${cfg.phone ? ' · ' + escHtml(cfg.phone) : ''}${cfg.email ? ' · ' + escHtml(cfg.email) : ''}</p></div>`;
+  // e-mail cu oferta completă (arată ca pagina ofertei); doar stiluri inline + tabele, ca să arate la fel în Gmail / Outlook / telefon
+  const p = q.pricing, c = q.customer;
+  const base = url.replace(/\/q\/[a-f0-9]+$/, '');
+  const F = 'font-family:Arial,Helvetica,sans-serif;';
+  const H2 = `${F}font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#64748b;font-weight:700;margin:0 0 12px`;
+  const SEC = 'padding:22px 28px;border-top:1px solid #e5e9f0';
+  const lab = (k, v) => v ? `<tr><td style="${F}font-size:14px;color:#64748b;padding:3px 10px 3px 0;white-space:nowrap;vertical-align:top">${k}</td><td style="${F}font-size:14px;color:#14202e;padding:3px 0">${escHtml(v)}</td></tr>` : '';
+  const btn = (txt, bg, a) => `<a href="${url}?a=${a}" style="${F}display:inline-block;background:${bg};color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 20px;border-radius:10px;margin:0 8px 10px 0">${txt}</a>`;
+  const td = (x, al, extra = '') => `<td style="${F}font-size:14px;color:#14202e;padding:10px 6px;border-bottom:1px solid #e5e9f0;text-align:${al};vertical-align:top;${extra}">${x}</td>`;
+  const th = (x, al) => `<th style="${F}font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#64748b;padding:8px 6px;border-bottom:1px solid #e5e9f0;text-align:${al};font-weight:700">${x}</th>`;
+  const rows = p.items.map(it => `<tr>${td(escHtml(it.name), 'left')}${td(it.qty, 'center', 'white-space:nowrap')}${td(lei(it.price), 'right', 'white-space:nowrap')}${td(lei(it.total), 'right', 'white-space:nowrap')}</tr>`).join('');
+  const nApt = parseInt(c.apartments, 10);
+  const vat = p.vatMode === 'plus' ? `Subtotal ${lei(p.net)} + TVA ${p.vatRate}% ${lei(p.vat)}<br>` : p.vatMode === 'included' ? `din care TVA ${p.vatRate}%: ${lei(p.vat)}<br>` : '';
+  const incl = cfg.includes ? String(cfg.includes).split('\n').filter(x => x.trim()).map(x => `<tr><td style="${F}font-size:14px;color:#16a34a;padding:3px 8px 3px 0;vertical-align:top">✓</td><td style="${F}font-size:14px;color:#14202e;padding:3px 0;line-height:1.5">${escHtml(x.trim())}</td></tr>`).join('') : '';
+  const contact = [cfg.phone ? `<a href="tel:${escHtml(String(cfg.phone).replace(/[^\d+]/g, ''))}" style="color:#0369a1;text-decoration:none">${escHtml(cfg.phone)}</a>` : '', cfg.email ? `<a href="mailto:${escHtml(cfg.email)}" style="color:#0369a1;text-decoration:none">${escHtml(cfg.email)}</a>` : ''].filter(Boolean).join(' · ');
+  return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Oferta nr. ${q.no}</title></head>
+<body style="margin:0;padding:0;background:#f1f4f9">
+<div style="display:none;max-height:0;overflow:hidden">Oferta nr. ${q.no}: ${p.totalCams} camere · ${lei(p.total)} / lună${p.months ? ' · contract ' + p.months + ' luni' : ''}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f4f9"><tr><td align="center" style="padding:24px 10px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#ffffff;border:1px solid #e5e9f0;border-radius:16px;border-collapse:separate">
+<tr><td style="padding:22px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+  <td style="vertical-align:middle"><img src="${base}/q-logo.png" alt="${escHtml(cfg.company)}" width="180" style="display:block;max-width:180px;height:auto;border:0"></td>
+  <td style="${F}text-align:right;vertical-align:middle"><div style="font-size:20px;font-weight:700;color:#14202e">Ofertă nr. ${q.no}</div>
+    <div style="font-size:13px;color:#64748b;margin-top:4px">emisă ${roDate(q.createdAt)} · valabilă până ${roDate(q.validUntil)}</div></td></tr></table></td></tr>
+<tr><td style="${SEC}"><div style="${F}font-size:22px;font-weight:700;color:#14202e;margin:0 0 8px">Bună ziua, ${escHtml(c.name.split(' ')[0] || c.name)}!</div>
+  <div style="${F}font-size:15px;line-height:1.6;color:#475569">${escHtml(cfg.intro)}</div></td></tr>
+<tr><td style="${SEC}"><div style="${H2}">Date asociație</div><table role="presentation" cellpadding="0" cellspacing="0">
+  ${lab('Asociația:', c.assoc)}${c.address !== c.assoc ? lab('Adresa blocului:', c.address) : ''}${lab('Persoană de contact:', c.name + (c.role ? ' (' + c.role + ')' : ''))}${lab('Telefon:', c.phone)}${lab('Email:', c.email)}${lab('Localitate:', c.city)}${lab('Apartamente:', c.apartments)}
+</table></td></tr>
+<tr><td style="${SEC}"><div style="${H2}">Sistem propus · ${p.totalCams} ${p.totalCams === 1 ? 'cameră' : 'camere'} · plată lunară</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>${th('Descriere', 'left')}${th('Cant.', 'center')}${th('Lei/lună/buc.', 'right')}${th('Lei/lună', 'right')}</tr>${rows}</table>
+  <div style="${F}text-align:right;margin-top:16px;font-size:13px;color:#64748b;line-height:1.7">${vat}
+    <div style="font-size:28px;font-weight:700;color:#14202e;line-height:1.3">${lei(p.total)} / lună</div>
+    ${p.months ? `contract ${p.months} luni · fără alte costuri pe durata contractului<br>` : ''}${p.setup ? `Taxă unică de instalare: ${lei(p.setup)}` : 'Instalare gratuită'}
+    ${nApt > 0 ? `<br>≈ ${lei(p.total / nApt)} / lună / apartament (${nApt} apartamente)` : ''}</div></td></tr>
+${incl ? `<tr><td style="${SEC}"><div style="${H2}">Ce include abonamentul</div><table role="presentation" cellpadding="0" cellspacing="0">${incl}</table></td></tr>` : ''}
+${cfg.note || c.message ? `<tr><td style="${SEC}">${cfg.note ? `<div style="${F}font-size:13px;line-height:1.6;color:#64748b">${escHtml(cfg.note)}</div>` : ''}${c.message ? `<div style="${F}font-size:13px;line-height:1.6;color:#14202e;margin-top:8px"><b>Mesajul dumneavoastră:</b> ${escHtml(c.message)}</div>` : ''}</td></tr>` : ''}
+<tr><td style="${SEC}"><div style="${F}font-size:17px;font-weight:700;color:#14202e;margin:0 0 14px">Răspunsul dumneavoastră</div>
+  ${btn('✓ Accept oferta', '#16a34a', 'accept')}${btn('? Cer clarificări', '#d97706', 'clarify')}${btn('✕ Refuz', '#dc2626', 'reject')}
+  <div style="${F}font-size:13px;color:#64748b;margin-top:6px">Butoanele deschid pagina ofertei, unde confirmați răspunsul. <a href="${url}" style="color:#0369a1">Vezi oferta online / descarcă PDF</a></div></td></tr>
+</table>
+<div style="${F}font-size:12px;color:#94a3b8;margin-top:16px;line-height:1.6">${escHtml(cfg.company)}${contact ? '<br>' + contact : ''}</div>
+</td></tr></table></body></html>`;
 }
 
 // formularul de pe site (Webflow): nume, telefon, email, asociatie, mesaj, acord, detalii="interior:3,exterior:1,lift:0"
@@ -1521,10 +1550,15 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 5.1, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 5.2, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
+    if (pathname === '/q-logo.png' && req.method === 'GET') {
+      const m = /^data:([^;]+);base64,(.*)$/.exec(quoteLogo() || '');
+      if (!m) { res.writeHead(404); return res.end(); }
+      res.writeHead(200, { 'Content-Type': m[1], 'Cache-Control': 'public, max-age=86400', ...PUB_CORS }); return res.end(Buffer.from(m[2], 'base64'));
+    }
     if (pathname === '/calculator' && req.method === 'GET') {
       const db = loadDb(); const owner = quoteOwner(db);
       return sendHtml(res, 200, calculatorHtml(quoteCfg(db, owner), quoteLogo(), publicBase(req)));
@@ -1608,4 +1642,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v5.1 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v5.2 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
