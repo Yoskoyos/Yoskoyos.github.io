@@ -1438,8 +1438,53 @@ async function handleQuotePublic(req, res, pathname, parsed) {
   }
   let html = quotePageHtml(q, cfg, quoteLogo());
   const pre = { accept: 'accept', reject: 'reject', clarify: 'clarify' }[parsed.query.a];
-  if (pre && ['sent', 'viewed', 'clarify'].includes(quoteStatus(q))) html = html.replace('</body>', `<script>setTimeout(function(){var b=document.querySelector('[data-a="${pre}"]');if(b){b.click();b.scrollIntoView({behavior:'smooth',block:'center'});}},300)</script></body>`);
+  if (pre && ['sent', 'viewed', 'clarify'].includes(quoteStatus(q))) html = html.replace('</body>', quickAnswerHtml(q, pre) + '</body>');
   return sendHtml(res, 200, html);
+}
+
+// Fereastra de răspuns rapid: când clientul apasă Accept / Clarificări / Refuz în e-mail, pagina se deschide direct cu fereastra
+// de confirmare (un singur tap). Nu acceptăm automat la simpla deschidere a linkului (filtrele anti-spam deschid linkurile singure).
+function quickAnswerHtml(q, pre) {
+  const T = {
+    accept:  { h: 'Acceptați oferta?', p: `Confirmați acceptarea ofertei nr. ${q.no} — <b>${lei(q.pricing.total)} / lună</b>. Vă contactăm pentru programarea montajului.`, ph: 'Observații (opțional) — ex. când vă putem suna', b: 'Da, accept oferta', c: '#F5A100', t: '#0D1F33', ok: 'Mulțumim! Ați acceptat oferta.', ok2: 'Vă contactăm în cel mai scurt timp pentru programarea montajului.', req: false },
+    clarify: { h: 'Ce doriți să clarificăm?', p: 'Scrieți întrebarea sau ce ați vrea schimbat (ex. o cameră în plus, alt amplasament).', ph: 'Întrebarea dumneavoastră…', b: 'Trimite întrebarea', c: '#0D1F33', t: '#FFFFFF', ok: 'Am primit întrebarea dumneavoastră.', ok2: 'Vă răspundem în maxim 24 de ore, în zilele lucrătoare.', req: true },
+    reject:  { h: 'Refuzați oferta?', p: 'Ne pare rău că oferta nu vi se potrivește. Ne spuneți motivul? Ne ajută să facem o ofertă mai bună.', ph: 'Motivul (opțional)', b: 'Confirm refuzul', c: '#B42318', t: '#FFFFFF', ok: 'Am înregistrat răspunsul dumneavoastră.', ok2: 'Vă mulțumim pentru timpul acordat.', req: false },
+  };
+  const J = JSON.stringify(T).replace(/</g, '\\u003c');
+  return `<style>
+.qa-bg{position:fixed;inset:0;background:rgba(13,31,51,.55);z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;animation:qaf .2s ease}
+.qa{background:#fff;border-radius:18px;width:100%;max-width:440px;padding:24px 22px 20px;box-shadow:0 24px 60px -20px rgba(0,0,0,.45);animation:qau .25s ease}
+.qa h3{font-size:21px;margin:0 0 8px;color:#0D1F33;letter-spacing:-.01em}
+.qa p{font-size:15px;line-height:1.55;color:#4a5568;margin:0 0 14px}
+.qa textarea{min-height:96px;font-size:16px}
+.qa .go{display:block;width:100%;border:0;border-radius:12px;padding:16px;font-size:17px;font-weight:800;margin-top:12px;cursor:pointer;font-family:inherit}
+.qa .go:disabled{opacity:.6}
+.qa .x{display:block;width:100%;background:none;border:0;color:#5B6B7C;font-size:14px;font-weight:600;padding:12px 0 2px;cursor:pointer;font-family:inherit}
+.qa .err{color:#B42318;font-size:14px;margin-top:8px;min-height:0}
+.qa .ic{width:56px;height:56px;border-radius:28px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 0 12px}
+@keyframes qaf{from{opacity:0}to{opacity:1}}@keyframes qau{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+@media(max-width:560px){.qa-bg{align-items:flex-end;padding:0}.qa{border-radius:20px 20px 0 0;max-width:none;padding:24px 20px calc(20px + env(safe-area-inset-bottom))}}
+</style>
+<div class="qa-bg" id="qa"><div class="qa" role="dialog" aria-modal="true"><div id="qa-in"></div></div></div>
+<script>(function(){
+var T=${J}, a=${JSON.stringify(pre)}, t=T[a], box=document.getElementById('qa'), inn=document.getElementById('qa-in');
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function close(){box.remove();try{history.replaceState(null,'',location.pathname);}catch(e){}}
+inn.innerHTML='<div class="ic" style="background:'+(a==='accept'?'#FFF4DC':a==='reject'?'#FEE4E2':'#E8F1FB')+'">'+(a==='accept'?'✓':a==='reject'?'✕':'?')+'</div><h3>'+t.h+'</h3><p>'+t.p+'</p><textarea id="qa-m" placeholder="'+esc(t.ph)+'"></textarea><div class="err" id="qa-e"></div><button class="go" id="qa-go" style="background:'+t.c+';color:'+t.t+'">'+t.b+'</button><button class="x" id="qa-x">Înapoi la ofertă</button>';
+var m=document.getElementById('qa-m'), go=document.getElementById('qa-go'), er=document.getElementById('qa-e');
+document.getElementById('qa-x').onclick=close; box.addEventListener('click',function(e){if(e.target===box)close();});
+if(a==='clarify') setTimeout(function(){m.focus();},300);
+go.onclick=function(){
+  if(t.req && !m.value.trim()){er.textContent='Scrieți ce ați dori să clarificăm.';m.focus();return;}
+  go.disabled=true; go.textContent='Se trimite…'; er.textContent='';
+  fetch(location.pathname+'/respond',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:a,message:m.value})})
+   .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+   .then(function(x){ if(!x.ok){er.textContent=x.j.error||'Eroare';go.disabled=false;go.textContent=t.b;return;}
+     inn.innerHTML='<div class="ic" style="background:#DCFCE7;color:#16a34a">✓</div><h3>'+t.ok+'</h3><p>'+t.ok2+'</p><button class="go" id="qa-done" style="background:#0D1F33;color:#fff">Vezi oferta</button>';
+     document.getElementById('qa-done').onclick=function(){location.replace(location.pathname);}; })
+   .catch(function(){er.textContent='Nu s-a putut trimite. Verificați conexiunea și încercați din nou.';go.disabled=false;go.textContent=t.b;});
+};
+})();</script>`;
 }
 
 async function handleQuotesApi(req, res, pathname, parsed) {
@@ -1610,7 +1655,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 5.6, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 5.7, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
@@ -1708,4 +1753,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v5.6 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v5.7 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
