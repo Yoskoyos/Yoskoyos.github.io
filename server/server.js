@@ -11,6 +11,7 @@
 //                  Stare în monitor-state.json. Dezactivare: variabila de mediu MONITOR=0.
 // v4.1 (29.10.2026): GET /snap?nvr=&ch=&token= — captură din stream-ul RTSP (ffmpeg) pentru NVR-urile care nu
 //                  oferă capturi ISAPI (ex. DS-7104NI-Q1). Credențialele NVR rămân pe server.
+// v5.0: POST /contact — formularele de contact de pe site (Home, Contact) → „mesaje” în lista de oferte + Telegram.
 // v4.9: formula de preț de pe site (Webflow): bază 189 lei pt. 3 camere + 50/cameră suplimentară + 150/cameră lift,
 //       contract 48 luni, neplătitor TVA; POST /cerere (formularul Webflow) → ofertă + redirect; GET /public/prices.
 // v4.8: oferte doar pentru asociații de proprietari — abonament lunar fix pe durata contractului.
@@ -948,7 +949,7 @@ function buildQuote(c, inp) {
 const lei = v => (Math.round(v * 100) / 100).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' lei';
 const roDate = t => new Date(t).toLocaleDateString('ro-RO', { timeZone: 'Europe/Bucharest', day: '2-digit', month: '2-digit', year: 'numeric' });
 const publicBase = req => process.env.PUBLIC_URL ? process.env.PUBLIC_URL.replace(/\/$/, '') : 'https://' + String(req.headers.host || 'proxy.supraveghere24h.ro').replace(/[^\w.:-]/g, '');
-const QSTATUS = { sent: 'Trimisă', viewed: 'Văzută', accepted: 'Acceptată', rejected: 'Refuzată', clarify: 'Cere clarificări', expired: 'Expirată' };
+const QSTATUS = { new: 'Mesaj nou', sent: 'Trimisă', viewed: 'Văzută', accepted: 'Acceptată', rejected: 'Refuzată', clarify: 'Cere clarificări', expired: 'Expirată' };
 function quoteStatus(q) { return (q.status === 'sent' || q.status === 'viewed') && Date.now() > q.validUntil ? 'expired' : q.status; }
 
 // limitare cereri publice: 6 oferte / oră / IP
@@ -1215,6 +1216,36 @@ function handlePublicPrices(req, res) {
   res.end(JSON.stringify({ enabled: !!c.enabled, basePrice: qNum(c.basePrice), baseCams: Math.round(qNum(c.baseCams)) || 3, extraPrice: qNum(c.extraPrice),
     liftPrice: qNum(c.liftPrice), months: Math.round(qNum(c.contractMonths)), vatMode: c.vatMode }));
 }
+
+// Formularele de contact de pe site (fără calculator) → mesaj în aplicație + Telegram, apoi înapoi pe site cu ?trimis=1
+const SITE_HOSTS = /(^|\.)supraveghere24h\.ro$|\.webflow\.io$/i;
+async function handleSiteContact(req, res) {
+  let back = null;
+  try { const r = new URL(String(req.headers.referer || '')); if (SITE_HOSTS.test(r.hostname)) { r.search = ''; r.hash = ''; back = r.toString(); } } catch {}
+  const done = (ok, err) => {
+    if (back) { res.writeHead(303, { Location: `${back}?${ok ? 'trimis=1' : 'eroare=' + encodeURIComponent(err || '')}#contact`, ...PUB_CORS }); return res.end(); }
+    return sendHtml(res, ok ? 200 : 400, `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:system-ui;padding:48px 20px;text-align:center;color:#14202E">${ok
+      ? '<div style="font-size:44px">✅</div><h2>Mulțumim! Am primit mesajul tău.</h2><p>Te contactăm în cel mai scurt timp, în zilele lucrătoare.</p>'
+      : '<h2>Mesajul nu a putut fi trimis</h2><p>' + escHtml(err || '') + '</p>'}<p><a href="https://supraveghere24h.ro" style="color:#0284c7">« Înapoi pe site</a> · <a href="tel:+40763354355" style="color:#0284c7">0763 354 355</a></p></body>`);
+  };
+  if (pubLimited(req, 6)) return done(false, 'Prea multe mesaje. Încercați mai târziu sau sunați-ne.');
+  const f = await readBodyAny(req);
+  if (f.website) return done(true);                                                   // capcană roboți
+  const cust = { name: str(f.nume || f.name, 120).trim(), phone: str(f.telefon || f.phone, 40).trim(), email: str(f.email, 160).trim(),
+                 assoc: str(f.asociatie || '', 160).trim(), address: str(f.adresa || f.asociatie || '', 300).trim(), city: str(f.localitate || '', 120).trim(),
+                 message: str(f.mesaj || f.message, 3000).trim(), page: back ? new URL(back).pathname : '' };
+  if (!cust.name || !cust.phone) return done(false, 'Completați numele și telefonul.');
+  if (cust.email && !/^\S+@\S+\.\S+$/.test(cust.email)) return done(false, 'Adresa de email nu pare corectă.');
+  if (!(f.acord || f.consent)) return done(false, 'Este necesar acordul pentru prelucrarea datelor.');
+  const db = loadDb(); const owner = quoteOwner(db);
+  if (!owner) return done(false, 'Serviciu indisponibil.');
+  const all = loadQuotes();
+  const q = { id: newId(), no: ++all.seq, token: crypto.randomBytes(18).toString('hex'), owner: owner.username, source: 'site-contact', kind: 'contact',
+              createdAt: Date.now(), validUntil: Date.now() + 365 * 864e5, customer: cust, pricing: null, status: 'new', events: [{ t: Date.now(), type: 'message' }] };
+  all.list.push(q); saveQuotes(all);
+  notifyOwner(db, owner, `✉️ <b>Mesaj nou de pe site #${q.no}</b>\n${escHtml(cust.name)} · ${escHtml(cust.phone)}${cust.email ? ' · ' + escHtml(cust.email) : ''}${cust.assoc ? '\n' + escHtml(cust.assoc) : ''}${cust.message ? '\n„' + escHtml(cust.message.slice(0, 500)) + '”' : ''}${cust.page ? '\n(pagina ' + escHtml(cust.page) + ')' : ''}`);
+  return done(true);
+}
 async function handlePublicQuote(req, res, fromSite) {
   // formularul clasic (fără JS) primește redirect către pagina ofertei; apelurile JS primesc JSON
   const wantsHtml = fromSite && !/json/i.test(req.headers.accept || '') && !req.headers['x-requested-with'];
@@ -1271,7 +1302,7 @@ async function handleQuotePublic(req, res, pathname, parsed) {
   const m = pathname.match(/^\/q\/([a-f0-9]{36})(\/respond)?$/);
   if (!m) return sendHtml(res, 404, '<h1>Ofertă inexistentă</h1>');
   const all = loadQuotes(); const q = all.list.find(x => x.token === m[1]);
-  if (!q) return sendHtml(res, 404, `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:system-ui;padding:40px;text-align:center"><h2>Oferta nu a fost găsită</h2><p>Linkul este greșit sau oferta a fost ștearsă.</p></body>`);
+  if (!q || q.kind === 'contact') return sendHtml(res, 404, `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:system-ui;padding:40px;text-align:center"><h2>Oferta nu a fost găsită</h2><p>Linkul este greșit sau oferta a fost ștearsă.</p></body>`);
   const db = loadDb(); const owner = db.users.find(u => u.username === q.owner) || quoteOwner(db);
   const cfg = quoteCfg(db, owner);
   if (m[2]) {
@@ -1345,7 +1376,7 @@ async function handleQuotesApi(req, res, pathname, parsed) {
   if (!q) return sendJson(res, 404, { error: 'Ofertă inexistentă' });
   if (req.method === 'PUT') {
     const b = await readJson(req);
-    if (b.status && QSTATUS[b.status] && b.status !== 'expired' && b.status !== q.status) { q.status = b.status; q.events.push({ t: Date.now(), type: b.status, manual: true }); }
+    if (b.status && QSTATUS[b.status] && b.status !== 'expired' && b.status !== q.status && (q.kind === 'contact') === (b.status === 'new')) { q.status = b.status; q.events.push({ t: Date.now(), type: b.status, manual: true }); }
     if ('notes' in b) q.notes = str(b.notes, 4000);
     if ('handled' in b) q.handled = !!b.handled;
     if (b.extendDays) { q.validUntil = Math.max(Date.now(), q.validUntil) + Math.min(365, qNum(b.extendDays)) * 864e5; q.events.push({ t: Date.now(), type: 'extended' }); }
@@ -1486,7 +1517,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 4.9, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 5.0, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
@@ -1495,6 +1526,7 @@ const server = http.createServer(async (req, res) => {
       return sendHtml(res, 200, calculatorHtml(quoteCfg(db, owner), quoteLogo(), publicBase(req)));
     }
     if (pathname === '/public/quote' && req.method === 'POST') return await handlePublicQuote(req, res, false);
+    if ((pathname === '/contact' || pathname === '/public/contact') && req.method === 'POST') return await handleSiteContact(req, res);
     if ((pathname === '/cerere' || pathname === '/public/cerere') && req.method === 'POST') return await handlePublicQuote(req, res, true);
     if (pathname === '/public/prices' && req.method === 'GET') return handlePublicPrices(req, res);
     if (pathname.startsWith('/q/')) return await handleQuotePublic(req, res, pathname, parsed);
@@ -1572,4 +1604,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v4.9 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v5.0 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
