@@ -900,7 +900,7 @@ const QUOTE_DEFAULTS = {
   phone: '0763 354 355', email: 'contact@supraveghere24h.ro',
   legal: 'Yca Solutions SRL · CUI 45211628 · J40/19754/2021 · Str. Aviator Mircea Petre nr. 10, Sector 1, București',
   website: 'https://supraveghere24h.ro',
-  assetBase: 'https://supraveghere24h.ro/email/',      // imaginile din e-mailul cu oferta (repo supraveghere24h-site, folderul email/)
+  assetBase: '',                                         // gol = imaginile din e-mail se servesc de server (/email-img/, instalate de update.sh)
   // Formula de pe site: prețul de bază include primele `baseCams` camere de interior/exterior + punctul de stocare
   basePrice: 189, baseCams: 3, extraPrice: 50, liftPrice: 150,
   // Ofertă pentru ASOCIAȚII DE PROPRIETARI: abonament lunar fix pe toată durata contractului (montaj gratuit)
@@ -1187,7 +1187,7 @@ function quoteEmailHtml(q, cfg, url) {
   // Doar stiluri inline + tabele (Gmail / Outlook / telefon). Imaginile stau pe site (cfg.assetBase), logo-ul pe server (/q-logo.png).
   const p = q.pricing, c = q.customer, cams = p.cams || {};
   const base = url.replace(/\/q\/[a-f0-9]+$/, '');
-  const A = String(cfg.assetBase || 'https://supraveghere24h.ro/email/').replace(/\/?$/, '/');
+  const A = String(cfg.assetBase || base + '/email-img/').replace(/\/?$/, '/');
   const NAVY = '#0D1F33', ORG = '#F5A100', BLUE = '#0B5FB0', INK = '#14202E', MUT = '#5B6B7C', LINE = '#E3E8EF', SOFT = '#F4F7FB';
   const F = "font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
   const img = (f, w, h, alt = '') => `<img src="${A}${f}" width="${w}"${h ? ` height="${h}"` : ''} alt="${alt}" style="display:block;border:0;outline:none;width:${w}px;max-width:100%;height:auto">`;
@@ -1609,10 +1609,16 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 5.4, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 5.5, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
+    if (pathname.startsWith('/email-img/') && req.method === 'GET') {
+      const m = /^\/email-img\/([a-z0-9-]+)\.(png|jpg)$/.exec(pathname);
+      let buf = null; try { if (m) buf = fs.readFileSync(path.join(BASE_DIR, 'email-img', m[1] + '.' + m[2])); } catch {}
+      if (!buf) { res.writeHead(404); return res.end(); }
+      res.writeHead(200, { 'Content-Type': m[2] === 'png' ? 'image/png' : 'image/jpeg', 'Cache-Control': 'public, max-age=604800', ...PUB_CORS }); return res.end(buf);
+    }
     if (pathname === '/q-logo.png' && req.method === 'GET') {
       const m = /^data:([^;]+);base64,(.*)$/.exec(quoteLogo() || '');
       if (!m) { res.writeHead(404); return res.end(); }
@@ -1701,4 +1707,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v5.4 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v5.5 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
