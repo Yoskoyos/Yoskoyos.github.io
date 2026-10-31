@@ -1121,18 +1121,6 @@ html:not(.unlocked) .app{display:none}
           </div>
           <div class="toggle" id="s-notif"></div>
         </div>
-        <div class="form-row">
-          <div>
-            <div class="form-label">Alertă HDD la</div>
-            <div class="form-hint">Procent utilizare disc</div>
-          </div>
-          <select class="form-input" id="s-hdd-thresh" style="width:120px">
-            <option value="80">80%</option>
-            <option value="85" selected>85%</option>
-            <option value="90">90%</option>
-            <option value="95">95%</option>
-          </select>
-        </div>
       </div>
 
       <div class="settings-section">
@@ -3605,7 +3593,6 @@ document.querySelectorAll('.nav-tab[data-tab="clients"]').forEach(t => t.addEven
    SETTINGS
 ═══════════════════════════════════════ */
 qs('#s-interval').value = String(cfg.interval);
-qs('#s-hdd-thresh').value = String(cfg.hddThresh||85);
 qs('#s-theme').value = cfg.theme||'';
 qs('#s-proxy-url').value = cfg.proxyUrl||'';
 qs('#s-proxy-url').addEventListener('change', e=>{
@@ -3624,10 +3611,6 @@ qs('#s-interval').addEventListener('change', e=>{
   save(SK.cfg, cfg);
   startMonitor();
   toast('Interval actualizat', 'ok');
-});
-qs('#s-hdd-thresh').addEventListener('change', e=>{
-  cfg.hddThresh = parseInt(e.target.value);
-  save(SK.cfg, cfg);
 });
 applyBg(cfg.bg);
 applyFont(cfg.font);
@@ -4340,7 +4323,6 @@ function applyServerSettings(d, serverT){
 function refreshSettingsForm(){
   try {
     qs('#s-interval').value = String(cfg.interval);
-    qs('#s-hdd-thresh').value = String(cfg.hddThresh || 85);
     qs('#s-theme').value = cfg.theme || '';
     qs('#s-proxy-url').value = cfg.proxyUrl || '';
     qs('#s-tg-token').value = cfg.tgToken || '';
