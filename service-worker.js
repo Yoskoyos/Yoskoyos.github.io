@@ -41,3 +41,21 @@ self.addEventListener('fetch', e => {
   // iconițe, manifest: internet, cu rezervă din cache
   e.respondWith(fetch(req).catch(() => caches.match(req)));
 });
+
+// Notificări push trimise de server (alerte NVR, cereri de ofertă, mesaje de pe site)
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { title: 'CCTV Monitor', body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'CCTV Monitor', {
+    body: d.body || '', tag: d.tag || 'yca', renotify: true,
+    icon: '/icon-192.png', badge: '/icon-192.png', data: { url: d.url || '/' }
+  }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = new URL((e.notification.data && e.notification.data.url) || '/', self.location.origin).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    for (const c of list) if (c.url.startsWith(self.location.origin)) { c.focus(); return; }
+    return self.clients.openWindow(url);
+  }));
+});

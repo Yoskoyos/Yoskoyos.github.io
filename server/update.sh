@@ -33,6 +33,7 @@ if [ -n "$NG" ] && ! grep -q "X-Forwarded-For" "$NG"; then
   if nginx -t >/dev/null 2>&1; then systemctl reload nginx; echo "nginx: IP real vizitatori"; else cp /root/nginx-nvr-proxy.conf.bak2 "$NG"; echo "ATENȚIE: nu am putut adăuga X-Forwarded-For (restaurat)"; fi
 fi
 [ -d node_modules/nodemailer ] || npm install --silent nodemailer@latest >/dev/null 2>&1 || true
+[ -d node_modules/web-push ] || { echo "Instalez modulul pentru notificări push..."; npm install --silent web-push@latest >/dev/null 2>&1 || echo "ATENȚIE: web-push nu s-a instalat — notificările push nu vor merge"; }
 cp server.js server.js.prev
 mv server.new.js server.js
 systemctl restart nvr-proxy

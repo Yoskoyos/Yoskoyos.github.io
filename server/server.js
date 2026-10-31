@@ -455,6 +455,66 @@ function tgSend(ucfg, text) {
 }
 const bucNow = () => new Date().toLocaleString('ro-RO', { timeZone: 'Europe/Bucharest' });
 
+/* ───────────── Notificări push pe telefon (Web Push / VAPID) ─────────────
+   Cheile VAPID se generează o singură dată în vapid.json (nu ajung în repo); abonamentele în push-subs.json.
+   Necesită modulul „web-push” (update.sh îl instalează). Fără el, restul serverului merge normal. */
+const PUSH_FILE = path.join(BASE_DIR, 'push-subs.json');
+const VAPID_FILE = path.join(BASE_DIR, 'vapid.json');
+let _wp; let _vapid = null;
+function webPush() {
+  if (_wp !== undefined) return _wp;
+  try {
+    const wp = require('web-push');
+    try { _vapid = JSON.parse(fs.readFileSync(VAPID_FILE, 'utf8')); } catch {}
+    if (!_vapid || !_vapid.publicKey) { _vapid = wp.generateVAPIDKeys(); fs.writeFileSync(VAPID_FILE, JSON.stringify(_vapid), { mode: 0o600 }); }
+    wp.setVapidDetails('mailto:contact@supraveghere24h.ro', _vapid.publicKey, _vapid.privateKey);
+    _wp = wp;
+  } catch (e) { console.error('Push: lipsește modulul web-push (rulează update.sh)'); _wp = null; }
+  return _wp;
+}
+function loadPush() { try { return JSON.parse(fs.readFileSync(PUSH_FILE, 'utf8')); } catch { return {}; } }
+function savePush(d) { const tmp = PUSH_FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(d), { mode: 0o600 }); fs.renameSync(tmp, PUSH_FILE); }
+const pushText = t => String(t).replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+async function pushSend(user, title, body, opt = {}) {
+  const wp = webPush(); if (!wp) return 0;
+  const all = loadPush(); const list = all[user] || []; if (!list.length) return 0;
+  const payload = JSON.stringify({ title: pushText(title).slice(0, 120), body: pushText(body).slice(0, 900), tag: opt.tag || 'yca', url: opt.url || '/' });
+  let ok = 0; const dead = new Set();
+  await Promise.all(list.map(sub => wp.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, payload, { TTL: 6 * 3600, urgency: opt.urgency || 'high' })
+    .then(() => { ok++; }).catch(e => { if (e && (e.statusCode === 404 || e.statusCode === 410)) dead.add(sub.endpoint); else console.error('Push:', e && (e.statusCode || e.message)); })));
+  if (dead.size) { const a2 = loadPush(); a2[user] = (a2[user] || []).filter(x => !dead.has(x.endpoint)); savePush(a2); }
+  return ok;
+}
+async function handlePush(req, res, pathname) {
+  const ctx = requireUser(req, res); if (!ctx) return;
+  const user = ctx.user.username;
+  if (pathname === '/push/key' && req.method === 'GET') {
+    const wp = webPush(); const all = loadPush();
+    return sendJson(res, 200, { ready: !!wp, key: wp ? _vapid.publicKey : null, devices: (all[user] || []).length });
+  }
+  if (req.method !== 'POST') return sendJson(res, 405, { error: 'Metodă invalidă' });
+  const b = await readJson(req);
+  if (pathname === '/push/subscribe') {
+    if (!webPush()) return sendJson(res, 503, { error: 'Serverul nu are încă notificările push — rulează actualizarea serverului' });
+    const sub = b && b.subscription;
+    if (!sub || typeof sub.endpoint !== 'string' || !/^https:\/\//.test(sub.endpoint) || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) return sendJson(res, 400, { error: 'Abonament invalid' });
+    const all = loadPush(); const list = (all[user] || []).filter(x => x.endpoint !== sub.endpoint);
+    list.push({ endpoint: sub.endpoint, keys: { p256dh: String(sub.keys.p256dh), auth: String(sub.keys.auth) }, device: str(b.device || '', 80), at: Date.now() });
+    all[user] = list.slice(-10); savePush(all);
+    return sendJson(res, 200, { ok: true, devices: all[user].length });
+  }
+  if (pathname === '/push/unsubscribe') {
+    const all = loadPush(); all[user] = (all[user] || []).filter(x => x.endpoint !== (b && b.endpoint)); savePush(all);
+    return sendJson(res, 200, { ok: true, devices: all[user].length });
+  }
+  if (pathname === '/push/test') {
+    const n = await pushSend(user, '🔔 Test CCTV Monitor', 'Notificările merg. Vei primi aici alertele NVR, cererile de ofertă și mesajele de pe site, 24/7.', { tag: 'yca-test' });
+    return n ? sendJson(res, 200, { ok: true, sent: n }) : sendJson(res, 400, { error: 'Nu am putut trimite notificarea pe niciun dispozitiv' });
+  }
+  return sendJson(res, 404, { error: 'Necunoscut' });
+}
+
+
 async function monitorRun() {
   if (monRunning) return;
   monRunning = true;
@@ -492,6 +552,11 @@ async function monitorRun() {
       for (const b of blocks) for (const l of b.lines) console.log(`[monitor] ${user} · ${b.nvr.name}: ${l.text}`);
       const sent = await tgSend(ucfg, text);
       if (!sent && ucfg.tgEnabled) console.error(`[monitor] Telegram nu a putut trimite pentru ${user}`);
+      try {
+        const ptitle = blocks.length === 1 ? `${anyCrit ? '🚨' : '✅'} ${blocks[0].nvr.name}` : `${anyCrit ? '🚨' : '✅'} ${blocks.length} NVR-uri`;
+        const pbody = blocks.map(b => (blocks.length > 1 ? b.nvr.name + ': ' : '') + b.lines.map(l => l.text).join(' · ')).join('\n');
+        await pushSend(user, ptitle, pbody, { tag: 'yca-mon-' + Date.now(), urgency: anyCrit ? 'high' : 'normal' });
+      } catch (e) { console.error('[monitor] push:', e.message); }
     }
 
     // raport zilnic
@@ -973,6 +1038,7 @@ function sendHtml(res, status, html) {
 }
 async function notifyOwner(db, owner, text) {
   try { const ucfg = (db.configs[owner.username] || {}).cfg || {}; await tgSend(ucfg, text); } catch {}
+  try { const t = pushText(text).split('\n'); await pushSend(owner.username, t[0], t.slice(1).join('\n'), { tag: 'yca-q-' + Date.now(), urgency: 'normal' }); } catch {}
 }
 
 const PAGE_CSS = `
@@ -1703,7 +1769,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 5.9, mail: mailReady(), rtsp: hasFfmpeg(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 6.0, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
@@ -1730,6 +1796,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/quotes' || pathname.startsWith('/quotes/') || pathname === '/quote-settings') return await handleQuotesApi(req, res, pathname, parsed);
     if (pathname === '/company' && req.method === 'GET') return await handleCompany(req, res, parsed);
     if (pathname === '/clients' || pathname.startsWith('/clients/')) return await handleClients(req, res, pathname);
+    if (pathname.startsWith('/push/')) return await handlePush(req, res, pathname);
 
     // Starea monitorizării pentru utilizatorul logat
     if (pathname === '/monitor' && req.method === 'GET') {
@@ -1801,4 +1868,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v5.9 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v6.0 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));

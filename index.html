@@ -878,6 +878,7 @@ html:not(.unlocked) .app{display:none}
 /* text accent lizibil în tema deschisă */
 :root[data-theme="light"] .section-action,:root[data-theme="light"] .cm-sec,:root[data-theme="light"] .cl-chip{font-weight:700}
 @media (prefers-color-scheme: light){:root:not([data-theme="dark"]) .section-action,:root:not([data-theme="dark"]) .cm-sec,:root:not([data-theme="dark"]) .cl-chip{font-weight:700}}
+.form-row[hidden]{display:none!important}
 </style>
 </head>
 <body>
@@ -1117,9 +1118,13 @@ html:not(.unlocked) .app{display:none}
         <div class="form-row">
           <div>
             <div class="form-label">Notificări push</div>
-            <div class="form-hint">Alertă pe telefon când pică ceva</div>
+            <div class="form-hint" id="s-notif-hint">Alerte direct pe telefon, 24/7, chiar și cu aplicația închisă: NVR / camere căzute, cereri de ofertă, mesaje de pe site</div>
           </div>
           <div class="toggle" id="s-notif"></div>
+        </div>
+        <div class="form-row" id="s-notif-test-row" hidden>
+          <div><div class="form-hint" id="s-notif-status" style="color:var(--ok)"></div></div>
+          <button class="btn" id="s-notif-test" type="button">Trimite un test</button>
         </div>
       </div>
 
@@ -2952,10 +2957,7 @@ function scheduleDailyReport(){
 /* ═══════════════════════════════════════
    PUSH NOTIFICATIONS
 ═══════════════════════════════════════ */
-function pushNotif(title, body){
-  if (!cfg.notif || Notification.permission !== 'granted') return;
-  try { new Notification('⚠ ' + title, { body, tag:'yca-alert', renotify:true }); } catch{}
-}
+function pushNotif(title, body){ /* alertele vin acum ca notificări push de la server (24/7) */ }
 
 async function sendTelegram(text, force){
   const token = cfg.tgToken;
@@ -2971,28 +2973,59 @@ async function sendTelegram(text, force){
   } catch(e){ addLog('err', 'Telegram: eroare trimitere mesaj'); }
 }
 
-async function enableNotif(){
-  if (!('Notification' in window)) { toast('Browserul nu suportă notificări', 'err'); return; }
+/* Notificări push adevărate: serverul le trimite pe telefon (Web Push), 24/7, și cu aplicația închisă */
+const PUSH = { on: false };
+function pushSupport() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+function isIOS() { return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function isStandalone() { return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
+function b64u(s) { const p = '='.repeat((4 - s.length % 4) % 4); const b = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(b, c => c.charCodeAt(0)); }
+function deviceName() { const ua = navigator.userAgent; return /iphone/i.test(ua) ? 'iPhone' : /ipad/i.test(ua) ? 'iPad' : /android/i.test(ua) ? 'Android' : /mac/i.test(ua) ? 'Mac' : /windows/i.test(ua) ? 'Windows' : 'Browser'; }
+function setPushUI(on, status) {
+  PUSH.on = on;
+  qs('#s-notif').classList.toggle('on', on);
+  qs('#btn-bell').classList.toggle('active', on);
+  qs('#s-notif-test-row').hidden = !on;
+  if (status !== undefined) qs('#s-notif-status').textContent = status;
+}
+async function pushRefresh() {
+  if (isIOS() && !isStandalone()) qs('#s-notif-hint').textContent = 'Pe iPhone: adaugă aplicația pe ecranul principal (Partajează → „Adaugă pe ecranul principal”), apoi activează de acolo';
+  if (!pushSupport()) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    setPushUI(!!sub && Notification.permission === 'granted', sub ? 'Activ pe acest dispozitiv' : '');
+  } catch {}
+}
+async function pushEnable() {
+  if (isIOS() && !isStandalone()) { toast('Pe iPhone: Partajează → „Adaugă pe ecranul principal”, deschide aplicația de pe ecran și activează de acolo', 'info'); return; }
+  if (!pushSupport()) { toast('Acest browser nu suportă notificări push', 'err'); return; }
   const perm = await Notification.requestPermission();
-  if (perm === 'granted') {
-    cfg.notif = true; save(SK.cfg, cfg);
-    qs('#s-notif').classList.add('on');
-    qs('#btn-bell').classList.add('active');
-    toast('Notificări activate ✓', 'ok');
-    addLog('info', 'Notificări push activate');
-  } else {
-    toast('Notificări blocate de browser', 'err');
+  if (perm !== 'granted') { toast('Notificările sunt blocate — permite-le din setările telefonului sau ale browserului', 'err'); return; }
+  try {
+    const k = await clApi('/push/key');
+    if (!k.ready || !k.key) throw new Error('Serverul nu are încă notificările push — actualizează serverul');
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (sub) { try { await sub.unsubscribe(); } catch {} }
+    sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(k.key) });
+    const r = await clApi('/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub.toJSON(), device: deviceName() }) });
+    setPushUI(true, 'Activ pe acest dispozitiv · ' + r.devices + (r.devices === 1 ? ' dispozitiv' : ' dispozitive') + ' în total');
+    toast('Notificări push activate ✓', 'ok'); addLog('info', 'Notificări push activate pe ' + deviceName());
+  } catch (e) {
+    const m = (e && e.message) || '';
+    toast(/permission|denied|NotAllowed/i.test(m) ? 'Notificările sunt blocate pentru aplicație — permite-le din setările telefonului / browserului' : /push service|AbortError/i.test(m) ? 'Serviciul de notificări al telefonului nu răspunde — încearcă din nou' : (m || 'Nu am putut activa notificările'), 'err');
   }
 }
-
-qs('#btn-bell').addEventListener('click', ()=>{
-  if (cfg.notif) {
-    cfg.notif = false; save(SK.cfg, cfg);
-    qs('#s-notif').classList.remove('on');
-    qs('#btn-bell').classList.remove('active');
-    toast('Notificări dezactivate', 'info');
-  } else { enableNotif(); }
-});
+async function pushDisable() {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) { try { await clApi('/push/unsubscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) }); } catch {} await sub.unsubscribe(); }
+  } catch {}
+  setPushUI(false, '');
+  toast('Notificări dezactivate pe acest dispozitiv', 'info');
+}
+qs('#btn-bell').addEventListener('click', () => PUSH.on ? pushDisable() : pushEnable());
 
 /* ═══════════════════════════════════════
    TABS
@@ -3600,10 +3633,6 @@ qs('#s-proxy-url').addEventListener('change', e=>{
   save(SK.cfg, cfg);
   toast('Proxy URL salvat', 'ok');
 });
-if (cfg.notif && Notification.permission==='granted') {
-  qs('#s-notif').classList.add('on');
-  qs('#btn-bell').classList.add('active');
-}
 if (cfg.theme) document.documentElement.dataset.theme = cfg.theme;
 
 qs('#s-interval').addEventListener('change', e=>{
@@ -3630,10 +3659,12 @@ qs('#s-theme').addEventListener('change', e=>{
   if (cfg.theme) document.documentElement.dataset.theme = cfg.theme;
   else delete document.documentElement.dataset.theme;
 });
-qs('#s-notif').addEventListener('click', ()=>{
-  if (cfg.notif) qs('#btn-bell').click();
-  else enableNotif();
+qs('#s-notif').addEventListener('click', () => PUSH.on ? pushDisable() : pushEnable());
+qs('#s-notif-test').addEventListener('click', async () => {
+  try { const r = await clApi('/push/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); toast('Notificare de test trimisă pe ' + r.sent + (r.sent === 1 ? ' dispozitiv' : ' dispozitive'), 'ok'); }
+  catch (e) { toast(e.message, 'err'); }
 });
+pushRefresh();
 // Telegram settings
 qs('#s-tg-token').value = cfg.tgToken||'';
 qs('#s-tg-chatid').value = cfg.tgChatId||'';
