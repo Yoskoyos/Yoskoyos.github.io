@@ -180,7 +180,7 @@ function getAuth(req) {
   if (!tok) {   // <img src> nu poate trimite antete → tokenul poate veni și în ?token= (doar pentru /snap)
     try {
       const q = url.parse(req.url, true);
-      const tokOk = q.pathname === '/snap' || (req.method === 'GET' && (q.pathname === '/clients-backup' || /^\/clients\/[\w-]+\/contracts\/[\w-]+$/.test(q.pathname || '')));
+      const tokOk = q.pathname === '/snap' || (req.method === 'GET' && (q.pathname === '/clients-backup' || /^\/clients\/[\w-]+\/contracts\/[\w-]+$/.test(q.pathname || '') || /^\/company-docs\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '')));
       if (tokOk && q.query.token) tok = String(q.query.token);
     } catch {}
   }
@@ -576,6 +576,8 @@ async function monitorRun() {
       await tgSend(ucfg, `📊 <b>Raport zilnic — YCA CCTV Monitor</b>\n🕐 ${bucNow()}\n\n✅ NVR online: <b>${on}/${conf.nvrs.length}</b>\n\n${rows.join('\n')}`);
     }
 
+    try { await cdocReminders(db); } catch (e) { console.error('[acte] remindere:', e.message); }
+
     monLastRun = new Date().toISOString();
     saveMonState();
   } catch (e) {
@@ -793,6 +795,134 @@ async function handleClients(req, res, pathname) {
 }
 
 
+/* ═════════════ Actele firmei (CUI, licențe, avize, asigurări…) ═════════════
+   company-docs.json: { user: [doc] }; fișierele în company-docs/<user>/<docId>/<fileId>.<ext>
+   Remindere: cu 30, 7 și 1 zile înainte de expirare + în ziua expirării (Telegram + push), o singură dată pe prag. */
+const CDOCS_FILE = path.join(BASE_DIR, 'company-docs.json');
+const CDOCS_DIR = path.join(BASE_DIR, 'company-docs');
+const CDOC_CATS = ['inregistrare', 'licente', 'fiscal', 'banca', 'asigurari', 'contracte', 'personal', 'altele'];
+function loadCDocs() { try { const c = JSON.parse(fs.readFileSync(CDOCS_FILE, 'utf8')); return c && typeof c === 'object' ? c : {}; } catch { return {}; } }
+function saveCDocs(all) { const tmp = CDOCS_FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(all, null, 2), { mode: 0o600 }); fs.renameSync(tmp, CDOCS_FILE); }
+function cleanCDoc(b, prev) {
+  const exp = ymd(b.expires);
+  return {
+    id: prev ? prev.id : newId(),
+    title: str(b.title, 200).trim(), cat: CDOC_CATS.includes(b.cat) ? b.cat : 'altele',
+    number: str(b.number, 120), issuer: str(b.issuer, 200), issued: ymd(b.issued), expires: exp, notes: str(b.notes, 4000),
+    files: prev ? (prev.files || []) : [],
+    reminded: prev && prev.expires === exp ? (prev.reminded || {}) : {},
+    createdAt: prev ? prev.createdAt : Date.now(), updatedAt: Date.now(),
+  };
+}
+function fileKind(buf, name) {
+  const h = buf.slice(0, 8);
+  if (h.slice(0, 5).toString('latin1') === '%PDF-') return 'pdf';
+  if (h[0] === 0xFF && h[1] === 0xD8 && h[2] === 0xFF) return 'jpg';
+  if (h.slice(0, 4).toString('hex') === '89504e47') return 'png';
+  if (h.slice(0, 4).toString('hex') === '504b0304') { const m = /\.(docx|xlsx)$/i.exec(name || ''); return m ? m[1].toLowerCase() : null; }
+  return null;
+}
+const CT = { pdf: 'application/pdf', jpg: 'image/jpeg', png: 'image/png',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+async function handleCompanyDocs(req, res, pathname) {
+  const ctx = requireUser(req, res); if (!ctx) return;
+  const uname = ctx.user.username;
+  const all = loadCDocs(); const list = Array.isArray(all[uname]) ? all[uname] : (all[uname] = []);
+  const parts = pathname.split('/').filter(Boolean);          // company-docs[/id[/files[/fid]]]
+  const id = parts[1], fid = parts[3];
+  if (id && !/^[\w-]+$/.test(id)) return sendJson(res, 400, { error: 'ID invalid' });
+  const d = id ? list.find(x => x.id === id) : null;
+  if (id && !d) return sendJson(res, 404, { error: 'Document inexistent' });
+  const dir = id ? path.join(CDOCS_DIR, uname.replace(/[^\w.-]/g, '_'), id) : null;
+  if (parts.length === 1) {
+    if (req.method === 'GET') return sendJson(res, 200, { docs: list });
+    if (req.method === 'POST') {
+      const b = await readJson(req);
+      if (!str(b.title).trim()) return sendJson(res, 400, { error: 'Scrie denumirea actului' });
+      const doc = cleanCDoc(b, null); list.push(doc); saveCDocs(all);
+      return sendJson(res, 200, { doc });
+    }
+  }
+  if (parts.length === 2) {
+    if (req.method === 'PUT' || req.method === 'POST') {
+      const b = await readJson(req);
+      if (!str(b.title).trim()) return sendJson(res, 400, { error: 'Scrie denumirea actului' });
+      const doc = cleanCDoc(b, d); list[list.indexOf(d)] = doc; saveCDocs(all);
+      return sendJson(res, 200, { doc });
+    }
+    if (req.method === 'DELETE') {
+      all[uname] = list.filter(x => x !== d); saveCDocs(all);
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+      return sendJson(res, 200, { ok: true });
+    }
+  }
+  if (parts[2] === 'files') {
+    if (parts.length === 3 && req.method === 'POST') {
+      let buf;
+      try { buf = await readRaw(req, MAX_PDF); } catch { return sendJson(res, 413, { error: 'Fișierul e prea mare (maxim 20 MB)' }); }
+      const q = url.parse(req.url, true).query;
+      const nm = str(q.name, 150).replace(/[\\/:*?"<>|\r\n]/g, '_').trim();
+      const ext = fileKind(buf, nm);
+      if (!ext) return sendJson(res, 400, { error: 'Acceptăm PDF, JPG, PNG, Word (.docx) sau Excel (.xlsx)' });
+      const f = { id: newId(), ext, name: nm || ('document.' + ext), size: buf.length, uploadedAt: Date.now() };
+      if (!new RegExp('\\.' + (ext === 'jpg' ? 'jpe?g' : ext) + '$', 'i').test(f.name)) f.name += '.' + ext;
+      fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+      fs.writeFileSync(path.join(dir, f.id + '.' + ext), buf, { mode: 0o600 });
+      d.files = (d.files || []).concat(f); d.updatedAt = Date.now(); saveCDocs(all);
+      return sendJson(res, 200, { doc: d });
+    }
+    if (parts.length === 4) {
+      if (!/^[\w-]+$/.test(fid || '')) return sendJson(res, 400, { error: 'ID invalid' });
+      const f = (d.files || []).find(x => x.id === fid);
+      if (!f) return sendJson(res, 404, { error: 'Fișier inexistent' });
+      const fp = path.join(dir, f.id + '.' + f.ext);
+      if (req.method === 'GET') {
+        let data; try { data = fs.readFileSync(fp); } catch { return sendJson(res, 404, { error: 'Fișierul lipsește de pe server' }); }
+        const ascii = f.name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '');
+        const inline = !url.parse(req.url, true).query.dl && ['pdf', 'jpg', 'png'].includes(f.ext);
+        res.writeHead(200, { 'Content-Type': CT[f.ext] || 'application/octet-stream', 'Content-Length': data.length, 'Cache-Control': 'private, no-store',
+          'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(f.name)}`, ...CORS });
+        return res.end(data);
+      }
+      if (req.method === 'DELETE') {
+        try { fs.unlinkSync(fp); } catch {}
+        d.files = d.files.filter(x => x !== f); d.updatedAt = Date.now(); saveCDocs(all);
+        return sendJson(res, 200, { ok: true, doc: d });
+      }
+    }
+  }
+  return sendJson(res, 405, { error: 'Operație necunoscută' });
+}
+// remindere de expirare — rulează din monitor; o dată pe zi după 09:00
+const cdocDaysLeft = exp => Math.round((Date.parse(exp + 'T00:00:00Z') - Date.parse(new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' }) + 'T00:00:00Z')) / 864e5);
+async function cdocReminders(db) {
+  const hm = new Date().toLocaleTimeString('ro-RO', { timeZone: 'Europe/Bucharest', hour: '2-digit', minute: '2-digit', hour12: false });
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' });
+  if (hm < '09:00' || monState.cdocDay === today) return;
+  monState.cdocDay = today;
+  const all = loadCDocs(); let changed = false;
+  for (const [user, list] of Object.entries(all)) {
+    const ucfg = ((db.configs || {})[user] || {}).cfg || {};
+    const lines = [];
+    for (const d of (list || [])) {
+      if (!d.expires) continue;
+      const left = cdocDaysLeft(d.expires);
+      const thr = left <= 0 ? 0 : left <= 1 ? 1 : left <= 7 ? 7 : left <= 30 ? 30 : null;
+      if (thr === null || left < -1) continue;
+      d.reminded = d.reminded || {};
+      if (d.reminded[thr]) continue;
+      d.reminded[thr] = today; changed = true;
+      const dt = d.expires.split('-').reverse().join('.');
+      lines.push(left < 0 ? `🔴 ${d.title} — a expirat (${dt})` : left === 0 ? `🔴 ${d.title} — expiră azi (${dt})` : `🟠 ${d.title} — expiră în ${left} ${left === 1 ? 'zi' : 'zile'} (${dt})`);
+    }
+    if (!lines.length) continue;
+    await tgSend(ucfg, `📄 <b>Acte firmă — expirări</b>\n\n${lines.map(escHtml).join('\n')}`);
+    await pushSend(user, '📄 Acte firmă — expirări', lines.join('\n'), { tag: 'yca-cdoc-' + today, urgency: 'normal' });
+  }
+  if (changed) saveCDocs(all);
+}
+
+
 /* ═════════════ Date firmă după CUI (ANAF, serviciu public) ═════════════ */
 const ANAF_URL = process.env.ANAF_URL || 'https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva';
 const anafCache = new Map();           // cui → { t, data }  (24 h)
@@ -932,10 +1062,22 @@ function handleClientsBackup(req, res) {
       z.add(`${root}${d}/${sub}/${fn}`, data);
     }
   }
+  // actele firmei, în același ZIP
+  const cdocs = (loadCDocs()[uname] || []);
+  if (cdocs.length) {
+    z.add(root + 'acte-firma/acte.json', Buffer.from(JSON.stringify(cdocs, null, 2), 'utf8'));
+    const cdir = path.join(CDOCS_DIR, uname.replace(/[^\w.-]/g, '_'));
+    const used = new Set();
+    for (const d of cdocs) for (const f of (d.files || [])) {
+      let data; try { data = fs.readFileSync(path.join(cdir, d.id, f.id + '.' + f.ext)); } catch { missing++; continue; }
+      let fn = safeName(d.title) + ' - ' + safeName(f.name), n = 2; while (used.has(fn.toLowerCase())) fn = safeName(d.title) + ' - ' + n++ + ' - ' + safeName(f.name);
+      used.add(fn.toLowerCase()); z.add(root + 'acte-firma/' + fn, data);
+    }
+  }
   z.add(root + 'CITESTE-MA.txt', Buffer.from(
     `Copie de siguranță — evidența clienților YCA CCTV Monitor\r\nCreată: ${new Date().toLocaleString('ro-RO')}\r\n` +
     `Clienți: ${list.length}\r\n\r\nclienti.csv  — se deschide în Excel (date de bază, echipamente, abonament)\r\n` +
-    `clienti.json — toate datele, pentru restaurare\r\n<Client>/contracte, <Client>/garantii — documentele încărcate\r\n` +
+    `clienti.json — toate datele, pentru restaurare\r\n<Client>/contracte, <Client>/garantii — documentele încărcate\r\nacte-firma/ — actele firmei (CUI, licențe, avize etc.)\r\n` +
     (missing ? `\r\nATENȚIE: ${missing} fișiere lipseau de pe server.\r\n` : ''), 'utf8'));
   z.end();
 }
@@ -1769,7 +1911,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 6.0, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 6.1, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
@@ -1797,6 +1939,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/company' && req.method === 'GET') return await handleCompany(req, res, parsed);
     if (pathname === '/clients' || pathname.startsWith('/clients/')) return await handleClients(req, res, pathname);
     if (pathname.startsWith('/push/')) return await handlePush(req, res, pathname);
+    if (pathname === '/company-docs' || pathname.startsWith('/company-docs/')) return await handleCompanyDocs(req, res, pathname);
 
     // Starea monitorizării pentru utilizatorul logat
     if (pathname === '/monitor' && req.method === 'GET') {
@@ -1868,4 +2011,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v6.0 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v6.1 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));

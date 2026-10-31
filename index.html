@@ -514,6 +514,12 @@ html[data-font] .nvr-name,html[data-font] .cl-name,html[data-font] .modal-title{
 .cl-pay.soon{background:var(--warn-dim);color:var(--warn);border-color:var(--warn)}
 .cl-pay.late{background:var(--err-dim);color:var(--err);border-color:var(--err)}
 .cl-empty{text-align:center;padding:40px 16px;color:var(--fg-3);font-size:13px;line-height:1.6}
+#cdoc-modal .modal{max-width:560px}
+#cdoc-modal .modal-body{max-height:74vh}
+.cd-grp{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--fg-3);margin:14px 2px 6px}
+.cd-grp:first-child{margin-top:0}
+.cd-ic{width:38px;height:38px;border-radius:10px;background:var(--bg-3);color:var(--fg-2);display:grid;place-items:center;flex-shrink:0}
+#cd-alert:not(:empty){background:var(--warn-dim);border:1px solid var(--warn);color:var(--fg);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.5;margin-bottom:10px}
 #client-modal .modal{max-width:620px}
 #client-modal .modal-body{max-height:74vh}
 .cm-sec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent-tx);margin-top:6px;padding-top:12px;border-top:1px solid var(--border)}
@@ -1020,7 +1026,7 @@ html:not(.unlocked) .app{display:none}
     <!-- ── Alerte ── -->
     <!-- ── Clienți ── -->
     <div class="panel" id="panel-clients">
-      <div class="seg" role="tablist"><button type="button" class="on" data-v="clients">Clienți</button><button type="button" data-v="quotes">Oferte <span class="cnt" id="qt-badge" hidden></span></button></div>
+      <div class="seg" role="tablist"><button type="button" class="on" data-v="clients">Clienți</button><button type="button" data-v="quotes">Oferte <span class="cnt" id="qt-badge" hidden></span></button><button type="button" data-v="docs">Acte firmă <span class="cnt" id="cd-badge" hidden></span></button></div>
       <div id="cl-view-clients">
       <div class="section">
         <div class="section-hdr">
@@ -1072,6 +1078,23 @@ html:not(.unlocked) .app{display:none}
       </div>
       </div>
 
+      <div id="cl-view-docs" hidden>
+      <div class="section">
+        <div class="section-hdr">
+          <div class="section-title">Actele firmei</div>
+          <div class="section-action" id="cd-add-btn" style="margin-left:auto">
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            Adaugă act
+          </div>
+        </div>
+        <div class="cl-tools">
+          <input type="search" class="cl-search" id="cd-search" placeholder="Caută: CUI, licență, asigurare, număr…" autocomplete="off">
+        </div>
+        <div id="cd-alert"></div>
+        <div class="cl-list" id="cd-list"><div class="cl-empty">Se încarcă…</div></div>
+        <div class="cm-hint" style="margin-top:12px">Actele se păstrează doar pe serverul tău, se deschid numai după autentificare și intră în „Copie de siguranță” de la Clienți. Primești alertă pe Telegram și pe telefon cu 30, 7 și 1 zile înainte să expire un act.</div>
+      </div>
+      </div>
     </div>
 
     <div class="panel" id="panel-alerts">
@@ -1485,6 +1508,41 @@ html:not(.unlocked) .app{display:none}
 </div>
 
 <!-- Client modal -->
+<div class="overlay hidden" id="cdoc-modal" role="dialog" aria-modal="true" aria-labelledby="cd-title">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title" id="cd-title">Act nou</div>
+      <div class="modal-x" id="cd-x" role="button" aria-label="Închide">✕</div>
+    </div>
+    <div class="modal-body">
+      <div class="fg"><label for="cd-name">Denumire</label><input type="text" id="cd-name" list="cd-names" placeholder="ex. Licență Poliție (IGP)" autocomplete="off">
+        <datalist id="cd-names"><option value="Certificat de înregistrare (CUI)"><option value="Certificat constatator ONRC"><option value="Act constitutiv / Statut"><option value="Licență Poliție (IGP) — sisteme de securitate"><option value="Certificat de atestare fiscală"><option value="Extras de cont / confirmare IBAN"><option value="Contract sediu / comodat"><option value="Asigurare de răspundere civilă profesională"><option value="Contract furnizor"><option value="Certificat de garanție echipamente"><option value="Atestat personal tehnic"></datalist></div>
+      <div class="f2">
+        <div class="fg"><label for="cd-cat">Categorie</label><select id="cd-cat"></select></div>
+        <div class="fg"><label for="cd-number">Număr / serie</label><input type="text" id="cd-number" autocomplete="off"></div>
+      </div>
+      <div class="fg"><label for="cd-issuer">Emis de</label><input type="text" id="cd-issuer" placeholder="ex. IGP, ONRC, ANAF, bancă, asigurător" autocomplete="off"></div>
+      <div class="f2">
+        <div class="fg"><label for="cd-issued">Data emiterii</label><input type="date" id="cd-issued"></div>
+        <div class="fg"><label for="cd-expires">Valabil până la</label><input type="date" id="cd-expires"></div>
+      </div>
+      <div class="cm-hint">Lasă „Valabil până la” gol dacă actul nu expiră. Dacă are dată, primești alertă înainte de expirare.</div>
+      <div class="fg"><label for="cd-notes">Observații</label><textarea id="cd-notes" rows="2"></textarea></div>
+      <div class="cm-sec">Fișiere</div>
+      <div class="cm-files" id="cd-files"></div>
+      <div class="cm-upload">
+        <button type="button" class="btn" id="cd-up" style="flex:1 1 100%"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>Încarcă fișiere (PDF, poză, Word, Excel)</button>
+        <input type="file" id="cd-file" multiple accept="application/pdf,.pdf,image/jpeg,image/png,.jpg,.jpeg,.png,.docx,.xlsx" hidden>
+      </div>
+      <div class="cm-hint">Poți încărca mai multe fișiere pe același act (ex. toate paginile). Maxim 20 MB pe fișier.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn cm-del" id="cd-delete" type="button">Șterge</button>
+      <button class="btn" id="cd-cancel" type="button">Anulează</button>
+      <button class="btn primary" id="cd-save" type="button">Salvează</button>
+    </div>
+  </div>
+</div>
 <div class="overlay hidden" id="client-modal" role="dialog" aria-modal="true" aria-labelledby="cm-title">
   <div class="modal">
     <div class="modal-hdr">
@@ -3449,6 +3507,143 @@ qs('#cm-files').addEventListener('click', cmDeleteFile);
 qs('#cm-wfiles').addEventListener('click', cmDeleteFile);
 
 /* ═══════════════════════════════════════
+   ACTE FIRMĂ (CUI, licențe, avize, asigurări…) — fișiere pe server, alerte de expirare
+═══════════════════════════════════════ */
+let cdocs = null, cdDraft = null;
+const CD_CATS = { inregistrare: 'Înregistrare firmă', licente: 'Licențe și autorizații', fiscal: 'Fiscal (ANAF)', banca: 'Bancă',
+                  asigurari: 'Asigurări', contracte: 'Contracte (furnizori, sediu)', personal: 'Personal', altele: 'Altele' };
+const CD_IC = { inregistrare: '<path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/>', licente: '<path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z"/><path d="M9 12l2 2 4-4"/>',
+  fiscal: '<path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 1 .7V2l-1 .7-3-2-3 2-3-2-3 2z"/><path d="M8 8h8M8 12h8M8 16h5"/>', banca: '<path d="M3 10h18M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18M12 3l9 5H3z"/>',
+  asigurari: '<path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z"/>', contracte: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
+  personal: '<circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11l2 2 4-4"/>', altele: '<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>' };
+qs('#cd-cat').innerHTML = Object.entries(CD_CATS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+const cdDays = exp => Math.round((new Date(exp + 'T00:00:00') - new Date(todayYmd() + 'T00:00:00')) / 864e5);
+function cdState(d) {
+  if (!d.expires) return { cls: 'ok', txt: 'fără expirare', n: 9999 };
+  const n = cdDays(d.expires);
+  return n < 0 ? { cls: 'late', txt: 'expirat ' + fmtDate(d.expires), n } : n === 0 ? { cls: 'late', txt: 'expiră azi', n }
+       : n <= 30 ? { cls: 'soon', txt: `expiră în ${n} ${n === 1 ? 'zi' : 'zile'}`, n } : { cls: 'ok', txt: 'valabil până ' + fmtDate(d.expires), n };
+}
+function cdUpdateBadge() {
+  const n = (cdocs || []).filter(d => d.expires && cdDays(d.expires) <= 30).length;
+  const b = qs('#cd-badge'); b.hidden = !n; b.textContent = n;
+}
+async function loadCDocs(force) {
+  if (cdocs && !force) return renderCDocs();
+  const list = qs('#cd-list');
+  if (!cdocs) list.innerHTML = '<div class="cl-empty">Se încarcă…</div>';
+  try { const r = await clApi('/company-docs'); cdocs = r.docs || []; renderCDocs(); }
+  catch (e) { list.innerHTML = `<div class="cl-empty">${escapeHtml(/HTTP 40[45]/.test(e.message) ? 'Serverul nu are încă secțiunea „Acte firmă” — actualizează serverul' : e.message)}</div>`; }
+}
+function renderCDocs() {
+  if (!cdocs) return;
+  cdUpdateBadge();
+  const q = qs('#cd-search').value.trim().toLowerCase();
+  const list = cdocs.filter(d => !q || [d.title, d.number, d.issuer, d.notes, CD_CATS[d.cat]].join(' ').toLowerCase().includes(q));
+  const warn = cdocs.filter(d => d.expires && cdDays(d.expires) <= 30).sort((a, b) => a.expires.localeCompare(b.expires));
+  qs('#cd-alert').innerHTML = warn.length ? '⚠️ ' + warn.map(d => `<b>${escapeHtml(d.title)}</b> — ${escapeHtml(cdState(d).txt)}`).join('<br>') : '';
+  if (!cdocs.length) { qs('#cd-list').innerHTML = '<div class="cl-empty">Niciun act încă.<br>Apasă „Adaugă act” și încarcă primul document — de exemplu certificatul de înregistrare sau licența de la Poliție.</div>'; return; }
+  if (!list.length) { qs('#cd-list').innerHTML = '<div class="cl-empty">Niciun act găsit.</div>'; return; }
+  let html = '';
+  for (const cat of Object.keys(CD_CATS)) {
+    const g = list.filter(d => d.cat === cat).sort((a, b) => a.title.localeCompare(b.title, 'ro'));
+    if (!g.length) continue;
+    html += `<div class="cd-grp">${CD_CATS[cat]}</div>` + g.map(d => {
+      const st = cdState(d), nf = (d.files || []).length;
+      const sub = [d.number ? 'Nr. ' + d.number : '', d.issuer, nf ? nf + (nf === 1 ? ' fișier' : ' fișiere') : 'fără fișier'].filter(Boolean).map(escapeHtml).join(' · ');
+      return `<div class="cl-card" role="button" tabindex="0" data-did="${escapeHtml(d.id)}"><div class="cd-ic"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${CD_IC[d.cat] || CD_IC.altele}</svg></div>
+        <div class="cl-main"><div class="cl-name"><span>${escapeHtml(d.title)}</span></div><div class="cl-sub">${sub}</div></div>
+        ${d.expires ? `<span class="cl-pay ${st.cls}">${escapeHtml(st.txt)}</span>` : ''}</div>`;
+    }).join('');
+  }
+  qs('#cd-list').innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">${html}</div>`;
+}
+function renderCdFiles() {
+  const auth = getAuth(), files = (cdDraft && cdDraft.files) || [];
+  qs('#cd-files').innerHTML = files.length ? files.map(f => {
+    const href = `${getProxyBase()}/company-docs/${encodeURIComponent(cdDraft.id)}/files/${encodeURIComponent(f.id)}?token=${encodeURIComponent(auth ? auth.token : '')}`;
+    const img = f.ext === 'jpg' || f.ext === 'png';
+    const icon = img ? '<path d="M21 19V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2z"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>'
+                     : '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/>';
+    const size = f.size < 1048576 ? Math.max(1, Math.round(f.size / 1024)) + ' KB' : (f.size / 1048576).toFixed(1) + ' MB';
+    return `<div class="cm-file"><svg class="cm-file-ic" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9">${icon}</svg>
+      <div class="cm-file-main"><div class="cm-file-name">${escapeHtml(f.name)}</div><div class="cm-file-meta">${size} · încărcat ${fmtTs(f.uploadedAt)}</div></div>
+      <a href="${escapeHtml(href)}" target="_blank" rel="noopener">Deschide</a><button type="button" class="del" data-fid="${escapeHtml(f.id)}">Șterge</button></div>`;
+  }).join('') : '<div class="cm-hint">Niciun fișier încărcat.</div>';
+}
+function openCdocModal(d) {
+  cdDraft = d ? JSON.parse(JSON.stringify(d)) : { id: null, title: '', cat: 'altele', files: [] };
+  qs('#cd-title').textContent = d ? d.title : 'Act nou';
+  qs('#cd-name').value = cdDraft.title || ''; qs('#cd-cat').value = cdDraft.cat || 'altele';
+  qs('#cd-number').value = cdDraft.number || ''; qs('#cd-issuer').value = cdDraft.issuer || '';
+  qs('#cd-issued').value = cdDraft.issued || ''; qs('#cd-expires').value = cdDraft.expires || ''; qs('#cd-notes').value = cdDraft.notes || '';
+  qs('#cd-delete').style.display = d ? '' : 'none'; renderCdFiles();
+  qs('#cdoc-modal').classList.remove('hidden');
+  if (!d) setTimeout(() => qs('#cd-name').focus(), 50);
+}
+function closeCdocModal() { qs('#cdoc-modal').classList.add('hidden'); cdDraft = null; }
+async function cdSave(stay) {
+  const title = qs('#cd-name').value.trim();
+  if (!title) { toast('Scrie denumirea actului', 'warn'); qs('#cd-name').focus(); return false; }
+  const body = { title, cat: qs('#cd-cat').value, number: qs('#cd-number').value.trim(), issuer: qs('#cd-issuer').value.trim(),
+                 issued: qs('#cd-issued').value, expires: qs('#cd-expires').value, notes: qs('#cd-notes').value.trim() };
+  try {
+    const r = cdDraft.id ? await clApi('/company-docs/' + encodeURIComponent(cdDraft.id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+                         : await clApi('/company-docs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const i = cdocs.findIndex(x => x.id === r.doc.id); if (i >= 0) cdocs[i] = r.doc; else cdocs.push(r.doc);
+    cdDraft = JSON.parse(JSON.stringify(r.doc)); qs('#cd-title').textContent = r.doc.title; qs('#cd-delete').style.display = '';
+    renderCDocs();
+    if (!stay) { closeCdocModal(); toast('Act salvat', 'ok'); }
+    return true;
+  } catch (e) { toast(e.message, 'err'); return false; }
+}
+async function cdUpload(files) {
+  files = [...files]; if (!files.length || !cdDraft) return;
+  const bad = files.find(f => !/\.(pdf|jpe?g|png|docx|xlsx)$/i.test(f.name) && !/^(application\/pdf|image\/(jpeg|png))$/.test(f.type));
+  if (bad) return toast(`„${bad.name}” nu e PDF, poză, Word sau Excel`, 'warn');
+  const big = files.find(f => f.size > 20 * 1048576); if (big) return toast(`„${big.name}” e prea mare (maxim 20 MB)`, 'warn');
+  if (!cdDraft.id && !(await cdSave(true))) return;
+  const btn = qs('#cd-up'), old = btn.innerHTML; btn.disabled = true;
+  try {
+    for (let k = 0; k < files.length; k++) {
+      btn.textContent = files.length > 1 ? `Se încarcă ${k + 1} din ${files.length}…` : 'Se încarcă…';
+      const f = files[k];
+      const r = await clApi(`/company-docs/${encodeURIComponent(cdDraft.id)}/files?name=${encodeURIComponent(f.name)}`, { method: 'POST', headers: { 'Content-Type': f.type || 'application/octet-stream' }, body: f });
+      cdDraft.files = r.doc.files; const i = cdocs.findIndex(x => x.id === r.doc.id); if (i >= 0) cdocs[i].files = r.doc.files;
+      renderCdFiles();
+    }
+    renderCDocs(); toast(files.length > 1 ? `${files.length} fișiere încărcate` : 'Fișier încărcat', 'ok');
+  } catch (e) { toast(e.message, 'err'); }
+  finally { btn.disabled = false; btn.innerHTML = old; }
+}
+qs('#cd-add-btn').addEventListener('click', () => openCdocModal(null));
+qs('#cd-search').addEventListener('input', renderCDocs);
+qs('#cd-list').addEventListener('click', e => { const c = e.target.closest('[data-did]'); if (c) openCdocModal(cdocs.find(x => x.id === c.dataset.did)); });
+qs('#cd-list').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset.did) { e.preventDefault(); e.target.click(); } });
+qs('#cd-x').addEventListener('click', closeCdocModal); qs('#cd-cancel').addEventListener('click', closeCdocModal);
+qs('#cdoc-modal').addEventListener('click', e => { if (e.target.id === 'cdoc-modal') closeCdocModal(); });
+qs('#cd-save').addEventListener('click', () => cdSave(false));
+qs('#cd-up').addEventListener('click', () => qs('#cd-file').click());
+qs('#cd-file').addEventListener('change', e => { const f = e.target.files; cdUpload(f).finally(() => { e.target.value = ''; }); });
+qs('#cd-files').addEventListener('click', async e => {
+  const b = e.target.closest('button.del'); if (!b || !cdDraft) return;
+  const f = cdDraft.files.find(x => x.id === b.dataset.fid); if (!f) return;
+  if (!(await confirmDialog({ title: 'Ștergi fișierul?', html: `<b>${escapeHtml(f.name)}</b> va fi șters definitiv de pe server.`, okLabel: 'Șterge' }))) return;
+  try {
+    const r = await clApi(`/company-docs/${encodeURIComponent(cdDraft.id)}/files/${encodeURIComponent(f.id)}`, { method: 'DELETE' });
+    cdDraft.files = r.doc.files; const i = cdocs.findIndex(x => x.id === r.doc.id); if (i >= 0) cdocs[i].files = r.doc.files;
+    renderCdFiles(); renderCDocs();
+  } catch (err) { toast(err.message, 'err'); }
+});
+qs('#cd-delete').addEventListener('click', async () => {
+  if (!cdDraft || !cdDraft.id) return;
+  const n = (cdDraft.files || []).length;
+  if (!(await confirmDialog({ title: 'Ștergi actul?', html: `<b>${escapeHtml(cdDraft.title)}</b> va fi șters definitiv${n ? `, împreună cu <b>${n} ${n === 1 ? 'fișier' : 'fișiere'}</b>` : ''}.`, okLabel: 'Șterge' }))) return;
+  try { await clApi('/company-docs/' + encodeURIComponent(cdDraft.id), { method: 'DELETE' }); cdocs = cdocs.filter(x => x.id !== cdDraft.id); closeCdocModal(); renderCDocs(); toast('Act șters', 'ok'); }
+  catch (e) { toast(e.message, 'err'); }
+});
+
+/* ═══════════════════════════════════════
    OFERTE (calculator site → server → pagina ofertei cu Accept / Refuz / Clarificări)
 ═══════════════════════════════════════ */
 let quotes = null, quotesMail = true, qmCur = null;
@@ -3461,8 +3656,9 @@ function showClView(v) {
   document.querySelectorAll('#panel-clients .seg button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   qs('#cl-view-clients').hidden = v !== 'clients';
   qs('#cl-view-quotes').hidden = v !== 'quotes';
+  qs('#cl-view-docs').hidden = v !== 'docs';
   try { localStorage.setItem('yca_cl_view', v); } catch {}
-  if (v === 'quotes') loadQuotes(true); else loadClients(true);
+  if (v === 'quotes') loadQuotes(true); else if (v === 'docs') loadCDocs(true); else loadClients(true);
 }
 async function loadQuotes(force) {
   if (quotes && !force) return renderQuotes();
@@ -3620,7 +3816,7 @@ qs('#qset-modal').addEventListener('click', e => { if (e.target.id === 'qset-mod
 qs('#qs-save').addEventListener('click', saveQuoteSettings);
 qs('#qs-copy').addEventListener('click', () => { const t = qs('#qs-embed').textContent; navigator.clipboard.writeText(t).then(() => toast('Cod copiat', 'ok'), () => toast('Selectează codul și copiază-l manual', 'warn')); });
 
-document.querySelectorAll('.nav-tab[data-tab="clients"]').forEach(t => t.addEventListener('click', () => { let v = 'clients'; try { v = localStorage.getItem('yca_cl_view') || 'clients'; } catch {} showClView(v === 'quotes' ? 'quotes' : 'clients'); }));
+document.querySelectorAll('.nav-tab[data-tab="clients"]').forEach(t => t.addEventListener('click', () => { let v = 'clients'; try { v = localStorage.getItem('yca_cl_view') || 'clients'; } catch {} showClView(['quotes', 'docs'].includes(v) ? v : 'clients'); }));
 
 /* ═══════════════════════════════════════
    SETTINGS
