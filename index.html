@@ -82,13 +82,13 @@ header{
   flex-shrink:0;
   background:var(--bg-1);
   border-bottom:1px solid var(--border);
-  padding:6px max(16px,env(safe-area-inset-right,0px)) 0;
+  padding:calc(6px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 0;
   padding-left:max(16px,env(safe-area-inset-left,0px));
   display:flex;flex-direction:column;align-items:stretch;gap:0;
-  position:sticky;top:env(safe-area-inset-top,0px);z-index:50;
+  position:relative;z-index:50;   /* antetul stă deasupra zonei care se derulează (.main); nu mai acoperă conținutul pe iPhone */
 }
 .hdr-top{display:flex;align-items:center;gap:12px;height:54px;}
-body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg-1);z-index:51}
+
 
 .logo{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-weight:600;font-size:13px;letter-spacing:.04em;color:var(--fg)}
 .logo-mark{width:28px;height:28px;border:1.5px solid var(--accent);border-radius:5px;display:grid;place-items:center;flex-shrink:0}
