@@ -347,6 +347,8 @@ async function probeNvr(nvr, cred) {
       const id = b[1].match(/<id\b[^>]*>\s*(\d+)\s*<\/id>/);
       const on = b[1].match(/<online\b[^>]*>\s*(true|false)\s*<\/online>/);
       if (id && on) per[parseInt(id[1], 10)] = on[1] === 'true';
+      const ipa = b[1].match(/<ipAddress\b[^>]*>\s*([^<\s]+)\s*<\/ipAddress>/);
+      if (id && ipa) (out.camIp || (out.camIp = {}))[parseInt(id[1], 10)] = ipa[1];
     }
     if (Object.keys(per).length) out.cams = per;
   }
@@ -429,7 +431,7 @@ async function recCheck(key, nvr, cred) {
     const found = await recSearch(nvr, cred, t.id, wall, t.cont ? REC_WINDOW_MIN : REC_MOT_WINDOW_MIN);
     if (found === null) continue;
     if (found) {
-      if (st.recBad[ch]) lines.push({ kind: 'info', text: `🟢 CH${ch} — înregistrează din nou` });
+      if (st.recBad[ch]) lines.push({ kind: 'info', text: `🟢 ${chLbl(st, ch)} — înregistrează din nou` });
       st.recMiss[ch] = 0; st.recBad[ch] = false;
     } else {
       st.recMiss[ch] = (st.recMiss[ch] || 0) + 1;
@@ -437,20 +439,22 @@ async function recCheck(key, nvr, cred) {
       if (st.recMiss[ch] >= need && !st.recBad[ch]) {
         st.recBad[ch] = true;
         lines.push({ kind: 'crit', text: t.cont
-          ? `🔴 CH${ch} — NU ÎNREGISTREAZĂ (nicio înregistrare în ultimele 2 ore, deși camera e online)`
-          : `🔴 CH${ch} — NU ÎNREGISTREAZĂ (înregistrare la mișcare: nimic în ultimele 12 ore, deși camera e online)` });
+          ? `🔴 ${chLbl(st, ch)} — NU ÎNREGISTREAZĂ (nicio înregistrare în ultimele 2 ore, deși camera e online)`
+          : `🔴 ${chLbl(st, ch)} — NU ÎNREGISTREAZĂ (înregistrare la mișcare: nimic în ultimele 12 ore, deși camera e online)` });
       }
     }
   }
   return lines;
 }
 
+const chLbl = (st, ch) => `CH${ch}${st && st.camIp && st.camIp[ch] ? ' · ' + st.camIp[ch] : ''}`;   // „CH14 · 192.168.0.222”
 const HDD_OK = new Set(['ok', 'idle', 'unknown', 'normal', 'sleep', 'standby']);
 
 // Compară rezultatul cu starea anterioară și întoarce liniile de alertă
 function evaluateNvr(key, nvr, res) {
   const st = monState.nvr[key] || (monState.nvr[key] = { status: 'unknown', fail: 0, cams: {}, camFail: {}, seen: {}, hdd: {}, rec: {} });
   st.name = nvr.name; st.addr = `${nvr.ip}:${nvr.port}`;
+  if (res.camIp) st.camIp = res.camIp;
   const lines = [];
   const now = new Date().toISOString();
 
@@ -474,13 +478,13 @@ function evaluateNvr(key, nvr, res) {
       const ch = parseInt(chS, 10);
       if (!on && !st.seen[ch] && appSeen[ch]) st.seen[ch] = true;
       if (on) {
-        if (st.cams[ch] === 'err') lines.push({ kind: 'info', text: `🟢 CH${ch} — cameră revenită online` });
+        if (st.cams[ch] === 'err') lines.push({ kind: 'info', text: `🟢 ${chLbl(st, ch)} — cameră revenită online` });
         st.cams[ch] = 'ok'; st.camFail[ch] = 0; st.seen[ch] = true;
       } else if (st.seen[ch]) {
         st.camFail[ch] = (st.camFail[ch] || 0) + 1;
         if (st.cams[ch] !== 'err' && st.camFail[ch] >= MON_CONFIRM) {
           st.cams[ch] = 'err';
-          lines.push({ kind: 'crit', text: `🔴 CH${ch} — cameră offline` });
+          lines.push({ kind: 'crit', text: `🔴 ${chLbl(st, ch)} — cameră offline` });
         }
       }
     }
@@ -508,8 +512,8 @@ function evaluateNvr(key, nvr, res) {
     for (const [chS, on] of Object.entries(res.rec)) {
       const ch = parseInt(chS, 10);
       if (st.cams[ch] !== 'ok') continue;
-      if (on === false && st.rec[ch] === true) lines.push({ kind: 'crit', text: `🔴 CH${ch} — a oprit înregistrarea!` });
-      if (on === true && st.rec[ch] === false) lines.push({ kind: 'info', text: `🟢 CH${ch} — înregistrare reluată` });
+      if (on === false && st.rec[ch] === true) lines.push({ kind: 'crit', text: `🔴 ${chLbl(st, ch)} — a oprit înregistrarea!` });
+      if (on === true && st.rec[ch] === false) lines.push({ kind: 'info', text: `🟢 ${chLbl(st, ch)} — înregistrare reluată` });
       st.rec[ch] = on;
     }
   }
@@ -1993,7 +1997,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 6.4, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 6.5, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
@@ -2093,4 +2097,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v6.4 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v6.5 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
