@@ -1308,17 +1308,6 @@ html:not(.unlocked) .app{display:none}
 
     <!-- ── Setări ── -->
     <div class="panel" id="panel-settings">
-      <div class="settings-section" id="an-cfg">
-        <div class="settings-section-title">Statistici site (Cloudflare)</div>
-        <div class="form-hint" id="an-cfg-state" style="margin-bottom:10px">Se verifică…</div>
-        <div class="fg"><label for="an-token">① Lipește aici tokenul din Cloudflare</label><input class="form-input" type="password" id="an-token" placeholder="începe cu cfut_… — se păstrează doar pe server" autocomplete="off" spellcheck="false"></div>
-        <details style="margin:-2px 0 10px"><summary class="form-hint" style="cursor:pointer">Avansat (Account ID / Site tag, deja completate)</summary>
-        <div class="f2" style="margin-top:8px">
-          <div class="fg"><label for="an-acc">Account ID</label><input class="form-input" type="text" id="an-acc" value="2e72c3a803a6e5971800705fda1c72ac" autocomplete="off" spellcheck="false"></div>
-          <div class="fg"><label for="an-tag">Site tag (opțional)</label><input class="form-input" type="text" id="an-tag" placeholder="se găsește automat" autocomplete="off" spellcheck="false"></div>
-        </div></details>
-        <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn primary" id="an-save">Conectează</button><button type="button" class="btn" id="an-del" hidden>Deconectează</button></div>
-      </div>
       <div class="settings-section">
         <div class="settings-section-title">Jurnal</div>
         <div class="form-row">
@@ -1535,6 +1524,17 @@ html:not(.unlocked) .app{display:none}
       <div style="text-align:center;padding:20px;font-size:10px;color:var(--fg-3);font-family:var(--mono)">
         YCA Solutions CCTV Monitor v3.1 · Hikvision ISAPI<br>
         <span id="footer-sync-status">Date stocate local pe acest dispozitiv</span>
+      </div>
+          <div class="settings-section" id="an-cfg">
+        <div class="settings-section-title">Statistici site (Cloudflare)</div>
+        <div class="form-hint" id="an-cfg-state" style="margin-bottom:10px">Se verifică…</div>
+        <div class="fg"><label for="an-token">① Lipește aici tokenul din Cloudflare</label><input class="form-input" type="password" id="an-token" placeholder="începe cu cfut_… — se păstrează doar pe server" autocomplete="off" spellcheck="false"></div>
+        <details style="margin:-2px 0 10px"><summary class="form-hint" style="cursor:pointer">Avansat (Account ID / Site tag, deja completate)</summary>
+        <div class="f2" style="margin-top:8px">
+          <div class="fg"><label for="an-acc">Account ID</label><input class="form-input" type="text" id="an-acc" value="2e72c3a803a6e5971800705fda1c72ac" autocomplete="off" spellcheck="false"></div>
+          <div class="fg"><label for="an-tag">Site tag (opțional)</label><input class="form-input" type="text" id="an-tag" placeholder="se găsește automat" autocomplete="off" spellcheck="false"></div>
+        </div></details>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn primary" id="an-save">Conectează</button><button type="button" class="btn" id="an-del" hidden>Deconectează</button></div>
       </div>
     </div>
 
