@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Diagnostic înregistrare: ce răspunde un NVR la programul de înregistrare și la căutarea de înregistrări.
-// Folosire:  node diag-rec.js "Depozit" 14,22 24   (NVR, canale, câte ore în urmă; rulat MANUAL pe VPS; nu modifică nimic, nu afișează parole)
+// Folosire:  node diag-rec.js "Depozit" 14,22 24   sau   node diag-rec.js "Depozit" toate 24   (NVR, canale, câte ore în urmă; rulat MANUAL pe VPS; nu modifică nimic, nu afișează parole)
 'use strict';
 const fs = require('fs'), http = require('http'), crypto = require('crypto'), path = require('path');
 const DIR = process.env.NVR_PROXY_DIR || '/opt/nvr-proxy';
@@ -36,7 +36,8 @@ function req(nvr, cred, method, uri, body) {
 }
 const short = (b, n) => b.replace(/<\?xml[^>]*>/, '').replace(/\s+/g, ' ').replace(/ xmlns="[^"]*"/g, '').slice(0, n || 1500);
 const pad2 = n => String(n).padStart(2, '0');
-const chs = String(process.argv[3] || '1').split(',').map(x => parseInt(x, 10)).filter(Boolean);
+const ALL = String(process.argv[3] || '').toLowerCase() === 'toate';
+let chs = String(process.argv[3] || '1').split(',').map(x => parseInt(x, 10)).filter(Boolean);
 const hours = parseFloat(process.argv[4] || '1') || 1;
 (async () => {
   let found = 0;
@@ -51,6 +52,15 @@ const hours = parseFloat(process.argv[4] || '1') || 1;
     const wall = new Date(m[1] + 'T' + m[2] + ':' + m[3] + ':' + m[4] + 'Z');
     console.log('Ora NVR: ' + m[1] + ' ' + m[2] + ':' + m[3]);
     const st = await req(nvr, cred, 'GET', '/ISAPI/ContentMgmt/InputProxy/channels/status');
+    const di = await req(nvr, cred, 'GET', '/ISAPI/System/deviceInfo');
+    const an = await req(nvr, cred, 'GET', '/ISAPI/System/Video/inputs/channels');
+    const ip = [...st.b.matchAll(/<InputProxyChannelStatus\b[^>]*>[\s\S]*?<id>(\d+)<\/id>/g)].map(x => +x[1]);
+    console.log(`Model: ${(/<model>([^<]*)/.exec(di.b) || [])[1] || '?'} · tip: ${(/<deviceType>([^<]*)/.exec(di.b) || [])[1] || '?'} · canale analogice: ${[...an.b.matchAll(/<VideoInputChannel\b/g)].length} · canale IP: ${ip.length} (id-uri ${ip.join(',')})`);
+    if (ALL) {
+      const tl = await req(nvr, cred, 'GET', '/ISAPI/ContentMgmt/record/tracks');
+      chs = [...tl.b.matchAll(/<Track\b[^>]*>[\s\S]*?<id>(\d+)<\/id>/g)].map(x => +x[1]).filter(id => id % 100 === 1).map(id => Math.floor(id / 100));
+      console.log('Track-uri principale: ' + chs.map(c => c * 100 + 1).join(','));
+    }
     const f = d => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}T${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}Z`;
     for (const ch of chs) {
       const id = ch * 100 + 1;
@@ -62,7 +72,7 @@ const hours = parseFloat(process.argv[4] || '1') || 1;
       console.log(`\nCH${ch} (track ${id}) — HTTP ${tr.s} · online: ${on} · program: ${JSON.stringify(modes)} · implicit: ${(/<DefaultRecordingMode>([^<]*)/.exec(tr.b) || [])[1] || '-'}`);
       const body = `<?xml version="1.0" encoding="UTF-8"?><CMSearchDescription><searchID>${crypto.randomUUID()}</searchID><trackList><trackID>${id}</trackID></trackList><timeSpanList><timeSpan><startTime>${f(new Date(wall - hours * 3600e3))}</startTime><endTime>${f(wall)}</endTime></timeSpan></timeSpanList><maxResults>40</maxResults><searchResultPostion>0</searchResultPostion><metadataList><metadataDescriptor>//recordType.meta.std-cgi.com</metadataDescriptor></metadataList></CMSearchDescription>`;
       const r = await req(nvr, cred, 'POST', '/ISAPI/ContentMgmt/search', body);
-      const items = [...r.b.matchAll(/<startTime>([^<]*)<\/startTime>\s*<endTime>([^<]*)<\/endTime>/g)].map(x => x[1].slice(5, 16).replace('T', ' ') + '→' + x[2].slice(11, 16));
+      const items = [...r.b.matchAll(/<startTime>([^<]*)<\/startTime>\s*<endTime>([^<]*)<\/endTime>/g)].map(x => x[1].slice(5, 16).replace('T', ' ') + '→' + x[2].slice(11, 16)).sort();
       console.log(`  căutare ultimele ${hours} h → HTTP ${r.s} · ${(/<responseStatusStrg>([^<]*)/.exec(r.b) || [])[1] || ''} · ${(/<numOfMatches>(\d+)/.exec(r.b) || [])[1] || 0} rezultate${items.length ? ' · ultimele: ' + items.slice(-4).join(', ') : ''}`);
       if (r.s !== 200) console.log('  ' + short(r.b, 300));
     }
