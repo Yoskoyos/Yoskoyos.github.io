@@ -953,21 +953,47 @@ html:not(.unlocked) .app{display:none}
 .op-banner.err{background:var(--err-dim);border-color:var(--err)}
 .al-work{margin-left:auto;align-self:center;border:1px solid var(--border);background:var(--bg-1);color:var(--fg);border-radius:9px;padding:6px 10px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:var(--sans)}
 
-/* ── Vizitatori site (Cloudflare) ── */
+/* ── Statistici site (Cloudflare) ── */
 .an-mob{display:none;border:0;background:none;font-family:inherit;cursor:pointer}
 @media(max-width:600px){.nav-tab.nav-desk{display:none!important}.an-mob{display:flex}}
-.an-chart{display:flex;align-items:flex-end;gap:3px;height:86px;padding:8px 2px 0;border-bottom:1px solid var(--border);margin:4px 0 4px}
-.an-bar{flex:1 1 0;min-width:3px;background:var(--accent);border-radius:4px 4px 0 0;position:relative;opacity:.85}
-.an-bar:hover{opacity:1}
-.an-axis{display:flex;justify-content:space-between;font-size:10.5px;color:var(--fg-3);margin-bottom:12px;font-variant-numeric:tabular-nums}
-.an-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-@media(max-width:600px){.an-grid{grid-template-columns:1fr}}
-.an-box{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;min-width:0}
-.an-box h4{margin:0 0 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--fg-3)}
-.an-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;font-size:13px;padding:5px 0;position:relative}
-.an-row span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.an-row b{font-variant-numeric:tabular-nums}
-.an-row i{position:absolute;left:0;bottom:1px;height:2px;background:var(--accent);border-radius:2px;opacity:.45}
+.an-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.an-kpi{background:var(--bg-1);border:1px solid var(--border);border-radius:14px;padding:14px 16px;min-width:0}
+.an-kpi-l{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;color:var(--fg-3);text-transform:uppercase;letter-spacing:.06em}
+.an-kpi-l svg{width:15px;height:15px;flex-shrink:0}
+.an-kpi-v{font-size:30px;font-weight:800;line-height:1.1;margin-top:8px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:var(--fg)}
+.an-kpi-s{font-size:12px;color:var(--fg-3);margin-top:3px}
+.an-card{background:var(--bg-1);border:1px solid var(--border);border-radius:14px;padding:14px 16px;min-width:0}
+.an-card h4{margin:0 0 12px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-3);display:flex;justify-content:space-between;gap:8px}
+.an-card h4 span{text-transform:none;letter-spacing:0;font-weight:600}
+.an-chartwrap{position:relative}
+.an-chartwrap svg{display:block;width:100%;height:auto;overflow:visible}
+.an-tip{position:absolute;pointer-events:none;background:var(--fg);color:var(--bg-1);border-radius:8px;padding:6px 9px;font-size:12px;line-height:1.35;white-space:nowrap;transform:translate(-50%,-110%);opacity:0;transition:opacity .12s;font-variant-numeric:tabular-nums}
+.an-tip b{font-weight:800}
+.an-empty{display:flex;align-items:center;justify-content:center;height:150px;color:var(--fg-3);font-size:13px;text-align:center;border:1px dashed var(--border);border-radius:10px}
+.an-funnel{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.an-step{border-radius:10px;padding:10px 12px;background:var(--bg-2);min-width:0}
+.an-step b{display:block;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.an-step span{font-size:12px;color:var(--fg-2)}
+.an-step small{display:block;font-size:11px;color:var(--fg-3);margin-top:2px}
+.an-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+.an-grid3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.an-li{display:grid;grid-template-columns:22px minmax(0,1fr) auto 44px;align-items:center;gap:8px;padding:7px 0;font-size:13.5px}
+.an-li+.an-li{border-top:1px solid var(--border)}
+.an-li .ic{font-size:15px;text-align:center;color:var(--fg-3)}
+.an-li .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.an-li .tr{grid-column:2/-1;height:4px;border-radius:4px;background:var(--bg-2);overflow:hidden;margin-top:-2px}
+.an-li .tr i{display:block;height:100%;border-radius:4px;background:var(--blue)}
+.an-li b{font-variant-numeric:tabular-nums}
+.an-li em{font-style:normal;font-size:12px;color:var(--fg-3);text-align:right;font-variant-numeric:tabular-nums}
+.an-seg{display:flex;height:10px;border-radius:6px;overflow:hidden;gap:2px;margin:4px 0 12px}
+.an-seg i{display:block;height:100%}
+.an-legend{display:flex;flex-direction:column;gap:8px}
+.an-legend div{display:flex;align-items:center;gap:8px;font-size:13.5px}
+.an-legend s{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.an-legend b{margin-left:auto;font-variant-numeric:tabular-nums}
+.an-foot{font-size:11.5px;color:var(--fg-3);margin-top:10px}
+@media(max-width:900px){.an-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.an-grid3{grid-template-columns:1fr}}
+@media(max-width:600px){.an-grid{grid-template-columns:1fr}.an-kpi-v{font-size:26px}.an-step{padding:9px 10px}.an-step b{font-size:19px}.an-step span{font-size:11.5px}}
 </style>
 </head>
 <body>
@@ -5580,21 +5606,82 @@ let anBusy = false;
 async function loadAnalytics() {
   const body = qs('#an-body'); if (!body || anBusy || !getAuth()) return; anBusy = true;
   const days = +qs('#an-days').value;
+  const I = { users: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>',
+    eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>', layers: '<path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>',
+    inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/>' };
+  const ic = n => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${I[n]}</svg>`;
+  const N = n => Number(n || 0).toLocaleString('ro-RO');
   try {
     const a = await clApi('/analytics?days=' + days);
     if (!a.configured) { body.innerHTML = '<div class="cm-hint">Conectează Cloudflare din <b>Setări → Statistici site</b> ca să vezi aici câți oameni intră pe site, ce pagini citesc și de unde vin.</div>'; return; }
     const since = Math.max(Date.parse(a.since || 0) || 0, days ? Date.now() - days * 864e5 : 0);
     const qn = (quotes || []).filter(q => q.createdAt >= since), offers = qn.filter(q => q.kind !== 'contact').length, msgs = qn.length - offers;
-    const conv = a.visits ? ((offers + msgs) / a.visits * 100) : 0;
-    const max = Math.max(1, ...a.daily.map(d => d.visits));
-    const chart = (days === 0 || days > 1) && a.daily.length > 1 ? `<div class="an-chart" role="img" aria-label="Vizite pe zile">${a.daily.map(d => `<div class="an-bar" style="height:${Math.max(3, d.visits / max * 100)}%" title="${fmtDate(d.date)}: ${d.visits} vizite, ${d.views} afișări"></div>`).join('')}</div>
-      <div class="an-axis"><span>${fmtDate(a.daily[0].date).slice(0, 5)}</span><span>maxim ${max} vizite / zi</span><span>${fmtDate(a.daily[a.daily.length - 1].date).slice(0, 5)}</span></div>` : '';
-    const list = (title, rows, name) => { const m = Math.max(1, ...rows.map(r => r.visits || r.views)); return `<div class="an-box"><h4>${title}</h4>${rows.length ? rows.slice(0, 6).map(r => `<div class="an-row"><span title="${escapeHtml(r.name)}">${escapeHtml(name(r.name))}</span><b>${r.visits || r.views}</b><i style="width:${(r.visits || r.views) / m * 100}%"></i></div>`).join('') : '<div class="cm-hint">Încă nimic.</div>'}</div>`; };
-    body.innerHTML = `<div class="qt-stats">${[[a.visits, 'vizite'], [a.views, 'pagini văzute'], [offers, 'cereri de ofertă'], [msgs, 'mesaje'], [conv.toFixed(1).replace('.', ',') + '%', 'din vizite au cerut ceva']].map(([n, l]) => `<div class="qt-stat"><b>${n}</b> ${l}</div>`).join('')}</div>
-      ${chart}<div class="an-grid">${list('Pagini citite', a.pages.map(p => ({ ...p, visits: p.views })), anPage)}${list('De unde vin', a.refs, n => n ? n.replace(/^www\./, '').replace(/^(.*\.)?google\..*$/, 'Google').replace(/^(l\.|m\.|lm\.)?facebook\.com$/, 'Facebook').replace(/^supraveghere24h\.ro$/, 'din site (navigare)') : 'Direct / WhatsApp / aplicații')}
-      ${list('Țări', a.countries, n => n || 'Necunoscut')}${list('Dispozitive', a.devices, n => AN_DEV[n] || n || 'Altul')}</div>
-      <div class="cm-hint" style="margin-top:8px">Datele vin din Cloudflare și se actualizează la 10 minute. O „vizită” = o persoană care intră pe site (poate vedea mai multe pagini). Fără roboți. Se numără doar de la lansarea site-ului (${new Date(a.since || Date.now()).toLocaleString('ro-RO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}).</div>`;
-  } catch (e) { body.innerHTML = `<div class="cm-hint">${escapeHtml(/HTTP 40[45]|Operație/.test(e.message) ? 'Serverul nu are încă statisticile — actualizează serverul (v7.0)' : e.message)}</div>`; }
+    const leads = offers + msgs, conv = a.visits ? leads / a.visits * 100 : 0, ppv = a.visits ? a.views / a.visits : 0;
+    const pct = (x, t) => t ? Math.round(x / t * 100) + '%' : '—';
+    const kpis = `<div class="an-kpis">
+      <div class="an-kpi"><div class="an-kpi-l">${ic('users')}Vizite</div><div class="an-kpi-v">${N(a.visits)}</div><div class="an-kpi-s">persoane care au intrat pe site</div></div>
+      <div class="an-kpi"><div class="an-kpi-l">${ic('eye')}Pagini văzute</div><div class="an-kpi-v">${N(a.views)}</div><div class="an-kpi-s">în total</div></div>
+      <div class="an-kpi"><div class="an-kpi-l">${ic('layers')}Pagini / vizită</div><div class="an-kpi-v">${ppv.toFixed(1).replace('.', ',')}</div><div class="an-kpi-s">cât de mult citesc</div></div>
+      <div class="an-kpi"><div class="an-kpi-l">${ic('inbox')}Cereri primite</div><div class="an-kpi-v">${N(leads)}</div><div class="an-kpi-s">${offers} ${offers === 1 ? 'ofertă' : 'oferte'} · ${msgs} ${msgs === 1 ? 'mesaj' : 'mesaje'} · ${conv.toFixed(1).replace('.', ',')}% din vizite</div></div></div>`;
+    // grafic: vizite pe zile (linie + suprafață, o singură serie)
+    let chart;
+    const D = a.daily || [];
+    if (D.length < 2) chart = `<div class="an-empty">Graficul pe zile apare de mâine,<br>după prima zi întreagă de date.</div>`;
+    else {
+      const W = Math.round(Math.max(300, Math.min(1100, (body.clientWidth || 640) - 34))), H = W < 500 ? 170 : 210, L = 30, R = 10, T = 10, B = 24, max = Math.max(4, ...D.map(d => d.visits)), step = Math.ceil(max / 4), top = step * 4;
+      const x = i => L + i * (W - L - R) / (D.length - 1), y = v => T + (H - T - B) * (1 - v / top);
+      const pts = D.map((d, i) => `${x(i).toFixed(1)},${y(d.visits).toFixed(1)}`).join(' ');
+      const grid = [0, 1, 2, 3, 4].map(k => `<line x1="${L}" x2="${W - R}" y1="${y(k * step)}" y2="${y(k * step)}" stroke="var(--border)" stroke-width="1"/><text x="${L - 6}" y="${y(k * step) + 4}" text-anchor="end" font-size="10.5" fill="var(--fg-3)">${k * step}</text>`).join('');
+      const every = Math.ceil(D.length / (W < 500 ? 4 : 8));
+      const xl = D.map((d, i) => i % every && i !== D.length - 1 ? '' : `<text x="${x(i)}" y="${H - 6}" text-anchor="middle" font-size="10.5" fill="var(--fg-3)">${fmtDate(d.date).slice(0, 5)}</text>`).join('');
+      chart = `<div class="an-chartwrap"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Vizite pe zile">${grid}${xl}
+        <polygon points="${x(0)},${y(0)} ${pts} ${x(D.length - 1)},${y(0)}" fill="var(--blue)" opacity=".12"/>
+        <polyline points="${pts}" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <line id="an-x" y1="${T}" y2="${H - B}" stroke="var(--fg-3)" stroke-width="1" stroke-dasharray="3 3" opacity="0"/>
+        <circle id="an-dot" r="4.5" fill="var(--blue)" stroke="var(--bg-1)" stroke-width="2" opacity="0"/>
+        <circle cx="${x(D.length - 1)}" cy="${y(D[D.length - 1].visits)}" r="4" fill="var(--blue)" stroke="var(--bg-1)" stroke-width="2"/>
+        <rect x="${L}" y="0" width="${W - L - R}" height="${H}" fill="transparent" id="an-hit"/></svg><div class="an-tip" id="an-tip"></div></div>`;
+      setTimeout(() => {
+        const svg = body.querySelector('.an-chartwrap svg'), hit = qs('#an-hit'), tip = qs('#an-tip'); if (!hit) return;
+        const move = ev => { const r = svg.getBoundingClientRect(), px = ((ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left) / r.width * W;
+          const i = Math.max(0, Math.min(D.length - 1, Math.round((px - L) / ((W - L - R) / (D.length - 1))))), d = D[i], sx = r.width / W;
+          qs('#an-x').setAttribute('x1', x(i)); qs('#an-x').setAttribute('x2', x(i)); qs('#an-x').setAttribute('opacity', 1);
+          qs('#an-dot').setAttribute('cx', x(i)); qs('#an-dot').setAttribute('cy', y(d.visits)); qs('#an-dot').setAttribute('opacity', 1);
+          tip.innerHTML = `${fmtDate(d.date)}<br><b>${N(d.visits)}</b> vizite · ${N(d.views)} pagini`; tip.style.left = x(i) * sx + 'px'; tip.style.top = y(d.visits) * sx + 'px'; tip.style.opacity = 1; };
+        const out = () => { tip.style.opacity = 0; qs('#an-x').setAttribute('opacity', 0); qs('#an-dot').setAttribute('opacity', 0); };
+        hit.addEventListener('mousemove', move); hit.addEventListener('touchmove', move, { passive: true }); hit.addEventListener('touchstart', move, { passive: true });
+        hit.addEventListener('mouseleave', out); hit.addEventListener('touchend', () => setTimeout(out, 1500));
+      }, 0);
+    }
+    // drumul spre ofertă
+    const calc = (a.pages || []).find(p => p.name === '/calculator-pret.html'), calcV = calc ? (calc.visits || calc.views) : 0;
+    const funnel = `<div class="an-funnel">
+      <div class="an-step"><b>${N(a.visits)}</b><span>au intrat pe site</span><small>100%</small></div>
+      <div class="an-step"><b>${N(calcV)}</b><span>au deschis calculatorul</span><small>${pct(calcV, a.visits)} din vizite</small></div>
+      <div class="an-step"><b>${N(offers)}</b><span>au cerut ofertă</span><small>${pct(offers, calcV || a.visits)} din ${calcV ? 'cei de la calculator' : 'vizite'}</small></div></div>`;
+    // liste
+    const tot = rows => rows.reduce((s, r) => s + (r.visits || r.views || 0), 0) || 1;
+    const lst = (rows, nameFn, icFn) => { const t = tot(rows), m = Math.max(1, ...rows.map(r => r.visits || r.views || 0));
+      return rows.length ? rows.slice(0, 6).map(r => { const v = r.visits || r.views || 0;
+        return `<div class="an-li"><span class="ic">${icFn(r.name)}</span><span class="nm" title="${escapeHtml(r.name || '')}">${escapeHtml(nameFn(r.name))}</span><b>${N(v)}</b><em>${Math.round(v / t * 100)}%</em><span class="tr"><i style="width:${v / m * 100}%"></i></span></div>`; }).join('')
+        : '<div class="cm-hint">Încă nu sunt date.</div>'; };
+    const src = n => !n ? 'Direct (link, WhatsApp, aplicații)' : /google\./.test(n) ? 'Google' : /facebook\.com$/.test(n) ? 'Facebook' : /instagram\.com$/.test(n) ? 'Instagram' : /^(www\.)?supraveghere24h\.ro$/.test(n) ? 'Din site (navigare între pagini)' : n.replace(/^www\./, '');
+    const srcIc = n => !n ? '🔗' : /google\./.test(n) ? '🔍' : /facebook|instagram/.test(n) ? '💬' : /supraveghere24h/.test(n) ? '↪︎' : '🌐';
+    let dn = null; try { dn = new Intl.DisplayNames(['ro'], { type: 'region' }); } catch {}
+    const cName = c => !c ? 'Necunoscut' : (/^[A-Z]{2}$/.test(c) && dn ? dn.of(c) : c);
+    const flag = c => /^[A-Z]{2}$/.test(c || '') ? String.fromCodePoint(...[...c].map(ch => 127397 + ch.charCodeAt(0))) : '🌍';
+    const pages = (a.pages || []).map(p => ({ ...p, visits: p.views }));
+    const DEVC = { mobile: ['Telefon', 'var(--blue)'], desktop: ['Calculator', '#F5A100'], tablet: ['Tabletă', 'var(--fg-3)'] };
+    const dv = a.devices || [], dt = tot(dv);
+    const dev = dv.length ? `<div class="an-seg">${dv.map(d => `<i style="width:${(d.visits || 0) / dt * 100}%;background:${(DEVC[d.name] || [0, 'var(--border)'])[1]}"></i>`).join('')}</div>
+      <div class="an-legend">${dv.map(d => `<div><s style="background:${(DEVC[d.name] || [0, 'var(--border)'])[1]}"></s>${escapeHtml((DEVC[d.name] || [d.name || 'Altul'])[0])}<b>${N(d.visits)} · ${Math.round((d.visits || 0) / dt * 100)}%</b></div>`).join('')}</div>` : '<div class="cm-hint">Încă nu sunt date.</div>';
+    const per = days ? (days === 1 ? 'ultimele 24 de ore' : `ultimele ${days} zile`) : 'de la lansare';
+    body.innerHTML = kpis + `<div class="an-card"><h4>Vizite pe zile <span>${per}</span></h4>${chart}</div>
+      <div class="an-grid"><div class="an-card"><h4>Drumul spre ofertă</h4>${funnel}</div><div class="an-card"><h4>Dispozitive</h4>${dev}</div></div>
+      <div class="an-grid an-grid3"><div class="an-card"><h4>Pagini citite</h4>${lst(pages, anPage, () => '📄')}</div><div class="an-card"><h4>De unde vin</h4>${lst(a.refs || [], src, srcIc)}</div>
+      <div class="an-card"><h4>Țări</h4>${lst(a.countries || [], cName, flag)}</div></div>
+      <div class="an-foot">Date din Cloudflare Web Analytics, actualizate la 10 minute, fără roboți. Se numără de la lansarea site-ului (${new Date(a.since || Date.now()).toLocaleString('ro-RO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}).</div>`;
+  } catch (e) { body.innerHTML = `<div class="cm-hint">${escapeHtml(/HTTP 40[45]|Operație/.test(e.message) ? 'Serverul nu are încă statisticile — actualizează serverul' : e.message)}</div>`; }
   finally { anBusy = false; }
 }
 qs('#an-days').addEventListener('change', loadAnalytics);
