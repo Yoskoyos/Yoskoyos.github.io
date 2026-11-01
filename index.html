@@ -2377,8 +2377,10 @@ function nvrCardHTML(n, showDetail){
       const probs = camsArr.map((c, i) => c === 'err' ? [i + 1, camReasonLabel((n.camReasons || {})[i + 1])] : null).filter(x => x && x[1]);
       const noSnapNote = nvrHasNoSnap(n) && n.status !== 'offline'
         ? `<span class="nosnap">ℹ Acest NVR nu oferă capturi de imagine prin rețea — vezi starea camerelor aici, iar imaginea în Hik-Connect / iVMS.</span>` : '';
-      if (!probs.length || n.status === 'offline') return noSnapNote ? `<div class="nvr-infobar">${noSnapNote}</div>` : '';
-      return `<div class="nvr-warnbar">${probs.map(([ch, why]) => { const h = camReasonHint(why); return `<span>⚠ <b>CH${ch}</b> — ${escapeHtml(why)}${h ? `<small>${escapeHtml(h)}</small>` : ''}</span>`; }).join('')}${noSnapNote}</div>`;
+      const rb = n.status === 'offline' ? [] : (recBadMap[n.id] || []);
+      const recRows = rb.map(x => `<span>⏺ <b>CH${x.ch}${x.ip ? ' · ' + escapeHtml(x.ip) : ''}</b> — nu înregistrează<small>${x.mode === 'continuu' ? 'Setată pe înregistrare continuă, dar nu are înregistrări în ultimele 2 ore.' : 'Setată pe înregistrare la mișcare, dar n-a înregistrat nimic în ultimele 12 ore.'} Verifică în NVR: Configurare → Eveniment → Detecție mișcare (Activare + „Declanșare înregistrare” pe canal) sau pune programul pe Continuu.</small></span>`).join('');
+      if ((!probs.length || n.status === 'offline') && !recRows) return noSnapNote ? `<div class="nvr-infobar">${noSnapNote}</div>` : '';
+      return `<div class="nvr-warnbar">${n.status === 'offline' ? '' : probs.map(([ch, why]) => { const h = camReasonHint(why); return `<span>⚠ <b>CH${ch}</b> — ${escapeHtml(why)}${h ? `<small>${escapeHtml(h)}</small>` : ''}</span>`; }).join('')}${recRows}${noSnapNote}</div>`;
     })()}
     <div class="nvr-detail ${detailOpen}">
       <div class="nvr-row"><span class="nvr-row-k"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/></svg>Adresă</span><span class="nvr-row-v">${n.ip}:${n.port}</span></div>
@@ -2489,6 +2491,8 @@ function renderSummary(){
         probs.push({ n, sev: 1, txt: (off === 1 ? '1 cameră offline' : `${off} camere offline`) + (whys.length === 1 ? ' · ' + whys[0] : '') });
       }
       if (hddBad) probs.push({ n, sev: 1, txt: hddBad === 1 ? 'HDD cu eroare' : `${hddBad} HDD-uri cu eroare` });
+      const rb = recBadMap[n.id] || [];
+      if (rb.length) probs.push({ n, sev: 1, txt: (rb.length === 1 ? '1 cameră nu înregistrează' : `${rb.length} camere nu înregistrează`) + ' · ' + rb.map(x => 'CH' + x.ch).join(', ') });
     }
   }
   if (!probs.length) {
@@ -4480,6 +4484,21 @@ function setMsg(el, text, kind) {
 const SYNC_MTIME_KEY = 'yca_settings_mtime';
 function serverMonitors(){ const a = getAuth(); return !!(a && a.monitor); }
 function renderMonitorNote(){ const el = qs('#s-monitor-note'); if (el) el.hidden = !serverMonitors(); }
+/* Camere care nu înregistrează — le află serverul (căutare în înregistrările NVR); le arătăm pe Acasă și pe cardul NVR-ului */
+let recBadMap = {};   // nvrId → [{ch, ip, mode}]
+async function refreshRecStatus(){
+  const auth = getAuth(); if (!auth) return;
+  try {
+    const r = await fetch(getProxyBase() + '/monitor', { headers: { 'Authorization': 'Bearer ' + auth.token } });
+    if (!r.ok) return;
+    const d = await readJsonSafe(r); const m = {};
+    for (const x of (d.nvrs || [])) if (x.recBad && x.recBad.length) m[x.id] = x.recBad;
+    const changed = JSON.stringify(m) !== JSON.stringify(recBadMap);
+    recBadMap = m;
+    if (changed) { try { renderSummary(); renderDashNvrs(); } catch {} }
+  } catch {}
+}
+setTimeout(refreshRecStatus, 2500); setInterval(refreshRecStatus, 120000);
 async function refreshMonitorHint(){
   const auth = getAuth(); if (!auth) return;
   try {

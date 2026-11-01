@@ -1997,7 +1997,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 6.5, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 6.6, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
@@ -2033,7 +2033,10 @@ const server = http.createServer(async (req, res) => {
       const conf = ctx.db.configs[ctx.user.username] || {};
       const list = (conf.nvrs || []).map(n => {
         const st = monState.nvr[ctx.user.username + ':' + n.id] || {};
-        return { id: n.id, name: n.name, status: st.status || 'unknown', camsOk: st.camsOk != null ? st.camsOk : null, camsTotal: st.camsTotal != null ? st.camsTotal : null, lastCheck: st.lastCheck || null, since: st.since || null };
+        const modes = {}; for (const t of (Array.isArray(st.recTracks) ? st.recTracks : [])) if (t && typeof t === 'object') modes[Math.floor(t.id / 100)] = t.cont ? 'continuu' : 'mișcare';
+        const recBad = Object.entries(st.recBad || {}).filter(([, b]) => b).map(([ch]) => ({ ch: +ch, ip: (st.camIp || {})[ch] || '', mode: modes[ch] || '' })).sort((a, b) => a.ch - b.ch);
+        return { id: n.id, name: n.name, status: st.status || 'unknown', camsOk: st.camsOk != null ? st.camsOk : null, camsTotal: st.camsTotal != null ? st.camsTotal : null, lastCheck: st.lastCheck || null, since: st.since || null,
+                 recBad, recChecked: Object.keys(modes).length };
       });
       return sendJson(res, 200, { enabled: MONITOR_ENABLED, lastRun: monLastRun, telegram: !!(conf.cfg && conf.cfg.tgEnabled && conf.cfg.tgToken && conf.cfg.tgChatId), nvrs: list });
     }
@@ -2097,4 +2100,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v6.5 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v6.6 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
