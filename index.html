@@ -954,11 +954,14 @@ html:not(.unlocked) .app{display:none}
 .al-work{margin-left:auto;align-self:center;border:1px solid var(--border);background:var(--bg-1);color:var(--fg);border-radius:9px;padding:6px 10px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:var(--sans)}
 
 /* ── Vizitatori site (Cloudflare) ── */
+.an-mob{display:none;border:0;background:none;font-family:inherit;cursor:pointer}
+@media(max-width:600px){.nav-tab.nav-desk{display:none!important}.an-mob{display:flex}}
 .an-chart{display:flex;align-items:flex-end;gap:3px;height:86px;padding:8px 2px 0;border-bottom:1px solid var(--border);margin:4px 0 4px}
 .an-bar{flex:1 1 0;min-width:3px;background:var(--accent);border-radius:4px 4px 0 0;position:relative;opacity:.85}
 .an-bar:hover{opacity:1}
 .an-axis{display:flex;justify-content:space-between;font-size:10.5px;color:var(--fg-3);margin-bottom:12px;font-variant-numeric:tabular-nums}
-.an-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.an-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media(max-width:600px){.an-grid{grid-template-columns:1fr}}
 .an-box{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;min-width:0}
 .an-box h4{margin:0 0 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--fg-3)}
 .an-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;font-size:13px;padding:5px 0;position:relative}
@@ -1001,6 +1004,7 @@ html:not(.unlocked) .app{display:none}
     <div class="nav-tab" data-tab="clients"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg><span class="lbl-l">Clienți</span><span class="lbl-s">Clienți</span></div>
     <div class="nav-tab" data-tab="quotes"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg><span class="lbl-l">Cereri ofertă</span><span class="lbl-s">Oferte</span><span class="lbl-d">Cereri ofertă</span> <span class="badge" id="qt-badge" style="display:none">0</span></div>
     <div class="nav-tab" data-tab="works"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg><span class="lbl-l">Lucrări</span><span class="lbl-s">Lucrări</span> <span class="badge" id="wk-badge" style="display:none">0</span></div>
+    <div class="nav-tab nav-desk" data-tab="stats"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg><span class="lbl-l">Statistici site</span><span class="lbl-s">Statistici site</span></div>
     <div class="nav-tab" data-tab="alerts"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg><span class="lbl-l">Alerte</span><span class="lbl-s">Alerte</span> <span class="badge" id="alert-badge" style="display:none">0</span></div>
     <div class="nav-tab" data-tab="settings"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span class="lbl-l">Setări</span><span class="lbl-s">Setări</span></div>
    </nav>
@@ -1208,19 +1212,23 @@ html:not(.unlocked) .app{display:none}
       </div>
     </div>
 
-    <!-- ── Cereri ofertă ── -->
-    <div class="panel" id="panel-quotes">
+    <!-- ── Statistici site ── -->
+    <div class="panel" id="panel-stats">
       <div class="section" id="an-sec">
         <div class="section-hdr">
-          <div class="section-title">Vizitatori site</div>
+          <div class="section-title">Statistici site · supraveghere24h.ro</div>
           <select class="cl-chip" id="an-days" style="margin-left:auto;padding-right:10px" aria-label="Perioada"><option value="1">Ultimele 24 de ore</option><option value="7" selected>Ultimele 7 zile</option><option value="30">Ultimele 30 de zile</option></select>
         </div>
         <div id="an-body"><div class="cl-empty">Se încarcă…</div></div>
       </div>
+    </div>
+
+    <!-- ── Cereri ofertă ── -->
+    <div class="panel" id="panel-quotes">
       <div id="cl-view-quotes">
       <div class="section">
         <div class="section-hdr">
-          <div class="section-title">Cereri de ofertă și mesaje de pe site</div>
+          <div class="section-title">Cereri de ofertă și mesaje de pe site</div><button type="button" class="section-action an-mob" id="an-open">📊 Statistici site</button>
           <div class="section-action" id="qt-settings-btn" style="margin-left:auto;margin-right:16px">
             <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.2 4.2l2.8 2.8M17 17l2.8 2.8M1 12h4M19 12h4M4.2 19.8L7 17M17 7l2.8-2.8"/></svg>
             Setări calculator
@@ -5589,10 +5597,11 @@ async function loadAnalytics() {
   finally { anBusy = false; }
 }
 qs('#an-days').addEventListener('change', loadAnalytics);
-document.querySelectorAll('.nav-tab[data-tab="quotes"]').forEach(t => t.addEventListener('click', () => setTimeout(loadAnalytics, 400)));
+document.querySelectorAll('.nav-tab[data-tab="stats"]').forEach(t => t.addEventListener('click', () => { if (!quotes) loadQuotes(true).then(loadAnalytics); else loadAnalytics(); }));
+qs('#an-open').addEventListener('click', () => { document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('on')); document.querySelectorAll('.panel').forEach(x => x.classList.remove('on')); qs('#panel-stats').classList.add('on'); window.scrollTo(0, 0); loadAnalytics(); });
 async function anCfgLoad() {
   const st = qs('#an-cfg-state'); if (!getAuth()) return;
-  try { const r = await clApi('/analytics/config'); st.innerHTML = r.configured ? '✓ <b>Conectat</b> la Cloudflare. Statisticile apar la <b>Oferte</b>, sus.' : 'Neconectat. Completează datele de mai jos (pașii sunt în mesajul de la Claude).';
+  try { const r = await clApi('/analytics/config'); st.innerHTML = r.configured ? '✓ <b>Conectat</b> la Cloudflare. Statisticile apar în meniu, la <b>Statistici site</b>.' : 'Neconectat. Completează datele de mai jos (pașii sunt în mesajul de la Claude).';
     qs('#an-acc').value = r.accountId || ''; qs('#an-del').hidden = !r.configured; }
   catch (e) { st.textContent = /403/.test(e.message) || /administrator/.test(e.message) ? 'Doar administratorul poate conecta Cloudflare.' : /HTTP 40[45]|Operație/.test(e.message) ? 'Serverul nu are încă această funcție — actualizează serverul (v7.0).' : e.message; }
 }
