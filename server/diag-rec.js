@@ -75,6 +75,16 @@ const hours = parseFloat(process.argv[4] || '1') || 1;
       const items = [...r.b.matchAll(/<startTime>([^<]*)<\/startTime>\s*<endTime>([^<]*)<\/endTime>/g)].map(x => x[1].slice(5, 16).replace('T', ' ') + '→' + x[2].slice(11, 16)).sort();
       console.log(`  căutare ultimele ${hours} h → HTTP ${r.s} · ${(/<responseStatusStrg>([^<]*)/.exec(r.b) || [])[1] || ''} · ${(/<numOfMatches>(\d+)/.exec(r.b) || [])[1] || 0} rezultate${items.length ? ' · ultimele: ' + items.slice(-4).join(', ') : ''}`);
       if (r.s !== 200) console.log('  ' + short(r.b, 300));
+      const n0 = parseInt((/<numOfMatches>(\d+)/.exec(r.b) || [])[1] || '0', 10);
+      if (!n0 && !ALL) {   // nimic pe fluxul principal → încercăm și alte variante (flux secundar, fără filtru de tip)
+        for (const [tid, meta] of [[ch * 100 + 2, true], [ch * 100 + 3, true], [id, false]]) {
+          const b2 = body.replace(`<trackID>${id}</trackID>`, `<trackID>${tid}</trackID>`).replace(meta ? '' : /<metadataList>[\s\S]*<\/metadataList>/, '');
+          const r2 = await req(nvr, cred, 'POST', '/ISAPI/ContentMgmt/search', b2);
+          console.log(`  variantă track ${tid}${meta ? '' : ' fără filtru'} → HTTP ${r2.s} · ${(/<responseStatusStrg>([^<]*)/.exec(r2.b) || [])[1] || ''} · ${(/<numOfMatches>(\d+)/.exec(r2.b) || [])[1] || 0} rezultate`);
+        }
+        const ipc = await req(nvr, cred, 'GET', '/ISAPI/ContentMgmt/InputProxy/channels/' + ch);
+        console.log(`  cameră: nume „${(/<name>([^<]*)/.exec(ipc.b) || [])[1] || '?'}” · IP ${(/<ipAddress>([^<]*)/.exec(ipc.b) || [])[1] || '?'}`);
+      }
     }
   }
   if (!found) console.log('Niciun NVR nu se potrivește cu: ' + q);
