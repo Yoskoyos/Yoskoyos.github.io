@@ -1701,7 +1701,7 @@ function quoteEmailHtml(q, cfg, url, opt = {}) {
   const pk = [['p-nvr.png', 'NVR (Hikvision, Dahua sau HiLook)', 'Unitatea de înregistrare și gestionare video, de înaltă performanță.', '1x']];
   if (nIn) pk.push(['p-turret.png', 'Camere IP interior', `Camere Hikvision, Dahua sau HiLook de minimum 4 MP (2560 × 1440) pentru scări, holuri și intrări.`, nIn + 'x']);
   if (nEx) pk.push(['p-bullet.png', 'Camere IP exterior', `Camere Hikvision, Dahua sau HiLook de minimum 4 MP (2560 × 1440), pentru exterior, cu vedere pe timp de noapte.`, nEx + 'x']);
-  if (nLift) pk.push(['p-turret.png', 'Camere pentru lift', 'Camere compacte, montate în cabina liftului.', nLift + 'x']);
+  if (nLift) pk.push([fs.existsSync(path.join(BASE_DIR, 'email-img', 'p-lift.png')) ? 'p-lift.png' : 'p-turret.png', 'Camere pentru lift', 'Camere mini-dome compacte și antivandal, montate în cabina liftului.', nLift + 'x']);
   pk.push(['p-hdd.png', 'Stocare pe hard disk', 'Hard disk dedicat pentru păstrarea înregistrărilor video.', '1x'],
           ['p-mon.png', 'Monitor', 'Monitor pentru vizualizarea live și a înregistrărilor, la fața locului.', '1x'],
           ['p-sw.png', 'Switch PoE', 'Alimentare și conectivitate stabilă pentru camerele IP.', '✓'],
