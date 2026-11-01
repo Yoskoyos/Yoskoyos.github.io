@@ -313,6 +313,7 @@ header{
 
 /* ── Settings panel ── */
 .settings-section{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
+#an-cfg{padding-bottom:16px}#an-cfg>:not(.settings-section-title){margin-left:16px;margin-right:16px}#an-cfg>#an-cfg-state{margin-top:12px}
 .settings-section-title{padding:12px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--fg-3);border-bottom:1px solid var(--border);background:var(--bg-2)}
 .form-row{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:16px}
 .form-row:last-child{border-bottom:none}
@@ -1521,11 +1522,7 @@ html:not(.unlocked) .app{display:none}
         </div>
       </div>
 
-      <div style="text-align:center;padding:20px;font-size:10px;color:var(--fg-3);font-family:var(--mono)">
-        YCA Solutions CCTV Monitor v3.1 · Hikvision ISAPI<br>
-        <span id="footer-sync-status">Date stocate local pe acest dispozitiv</span>
-      </div>
-          <div class="settings-section" id="an-cfg">
+      <div class="settings-section" id="an-cfg">
         <div class="settings-section-title">Statistici site (Cloudflare)</div>
         <div class="form-hint" id="an-cfg-state" style="margin-bottom:10px">Se verifică…</div>
         <div class="fg"><label for="an-token">① Lipește aici tokenul din Cloudflare</label><input class="form-input" type="password" id="an-token" placeholder="începe cu cfut_… — se păstrează doar pe server" autocomplete="off" spellcheck="false"></div>
@@ -1535,6 +1532,11 @@ html:not(.unlocked) .app{display:none}
           <div class="fg"><label for="an-tag">Site tag (opțional)</label><input class="form-input" type="text" id="an-tag" placeholder="se găsește automat" autocomplete="off" spellcheck="false"></div>
         </div></details>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn primary" id="an-save">Conectează</button><button type="button" class="btn" id="an-del" hidden>Deconectează</button></div>
+      </div>
+
+      <div style="text-align:center;padding:20px;font-size:10px;color:var(--fg-3);font-family:var(--mono)">
+        YCA Solutions CCTV Monitor v3.1 · Hikvision ISAPI<br>
+        <span id="footer-sync-status">Date stocate local pe acest dispozitiv</span>
       </div>
     </div>
 
