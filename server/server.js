@@ -294,11 +294,13 @@ function saveMonState() {
 }
 
 // Cerere GET directă către NVR (cu Digest auth), întoarce {status, body}; status 0 = nu răspunde
-function nvrGet(nvr, cred, pathName, timeoutMs) {
+function nvrGet(nvr, cred, pathName, timeoutMs) { return nvrRequest(nvr, cred, 'GET', pathName, null, timeoutMs); }
+function nvrRequest(nvr, cred, method, pathName, body, timeoutMs) {
   return new Promise(resolve => {
     let finished = false;
     const done = (status, body) => { if (!finished) { finished = true; resolve({ status, body: body || '' }); } };
-    const opts = { hostname: String(nvr.ip).trim(), port: parseInt(nvr.port, 10) || 80, path: pathName, method: 'GET', timeout: timeoutMs || 8000, headers: {} };
+    const bodyHeaders = body ? { 'Content-Type': 'application/xml; charset=UTF-8', 'Content-Length': Buffer.byteLength(body) } : {};
+    const opts = { hostname: String(nvr.ip).trim(), port: parseInt(nvr.port, 10) || 80, path: pathName, method, timeout: timeoutMs || 8000, headers: { ...bodyHeaders } };
     const collect = (res) => {
       let b = ''; res.setEncoding('utf8');
       res.on('data', d => { if (b.length < 300000) b += d; });
@@ -313,11 +315,11 @@ function nvrGet(nvr, cred, pathName, timeoutMs) {
           res1.resume();
           if (!wa.toLowerCase().includes('digest')) return done(401, '');
           const user = cred.user || 'admin';
-          const h = buildDigestAuth(user, cred.pass || '', 'GET', pathName, wa);
-          const r2 = http.request({ ...opts, headers: { Authorization: h } }, collect);
+          const h = buildDigestAuth(user, cred.pass || '', method, pathName, wa);
+          const r2 = http.request({ ...opts, headers: { ...bodyHeaders, Authorization: h } }, collect);
           r2.on('error', () => done(0, ''));
           r2.on('timeout', () => { r2.destroy(); done(0, ''); });
-          r2.end();
+          r2.end(body || undefined);
           return;
         }
         collect(res1);
@@ -325,7 +327,7 @@ function nvrGet(nvr, cred, pathName, timeoutMs) {
     } catch { return done(0, ''); }
     r1.on('error', () => done(0, ''));
     r1.on('timeout', () => { r1.destroy(); done(0, ''); });
-    r1.end();
+    r1.end(body || undefined);
   });
 }
 
@@ -362,6 +364,62 @@ async function probeNvr(nvr, cred) {
     }
   }
   return out;
+}
+
+/* Verificare înregistrare: o dată la 15 minute caută în NVR înregistrări din ultima oră pe fiecare cameră
+   setată pe înregistrare continuă. Dacă de 2 ori la rând nu găsește nimic (cameră online, HDD bun) → alertă. */
+const REC_EVERY_MS = parseInt(process.env.REC_EVERY_MS || '900000', 10), REC_TRACKS_EVERY_MS = 6 * 3600e3, REC_WINDOW_MIN = 60;
+const pad2 = n => String(n).padStart(2, '0');
+function nvrWall(xml) {   // <localTime>2026-11-01T11:00:00+02:00</localTime> → ora de pe ceasul NVR-ului
+  const m = /<localTime>(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/.exec(xml || '');
+  return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])) : null;
+}
+const hikTime = d => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}T${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}Z`;
+async function recCheck(key, nvr, cred) {
+  const st = monState.nvr[key]; if (!st) return [];
+  const now = Date.now(); const lines = [];
+  if (st.recAt && now - st.recAt < REC_EVERY_MS) return [];
+  st.recAt = now; st.recMiss = st.recMiss || {}; st.recBad = st.recBad || {};
+  if (Object.values(st.hdd || {}).includes('bad')) return [];            // HDD stricat → are deja alertă proprie
+  if (!st.recTracks || !st.recTracksAt || now - st.recTracksAt > REC_TRACKS_EVERY_MS) {
+    const t = await nvrGet(nvr, cred, '/ISAPI/ContentMgmt/record/tracks', 9000);
+    if (t.status !== 200) return [];
+    const cont = [];
+    for (const m of t.body.matchAll(/<Track\b[^>]*>([\s\S]*?)<\/Track>/g)) {
+      const id = parseInt((/<id>(\d+)<\/id>/.exec(m[1]) || [])[1], 10);
+      if (!id || id % 100 !== 1) continue;                                   // doar fluxul principal (101, 201…)
+      if (/<Enable>\s*false\s*<\/Enable>/i.test(m[1])) continue;
+      if (/>\s*(CMR|continuous)\s*</i.test(m[1])) cont.push(id);            // programare de înregistrare continuă
+    }
+    st.recTracks = cont; st.recTracksAt = now;
+  }
+  if (!st.recTracks.length) return [];
+  const tm = await nvrGet(nvr, cred, '/ISAPI/System/time', 6000);
+  const wall = nvrWall(tm.body); if (!wall) return [];
+  const from = hikTime(new Date(wall.getTime() - REC_WINDOW_MIN * 60e3)), to = hikTime(wall);
+  for (const id of st.recTracks) {
+    const ch = Math.floor(id / 100);
+    if (st.cams && st.cams[ch] !== 'ok') { st.recMiss[ch] = 0; continue; } // camera căzută are deja alertă
+    const sid = crypto.randomUUID ? crypto.randomUUID() : newId();
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><CMSearchDescription><searchID>${sid}</searchID><trackList><trackID>${id}</trackID></trackList>` +
+      `<timeSpanList><timeSpan><startTime>${from}</startTime><endTime>${to}</endTime></timeSpan></timeSpanList><maxResults>5</maxResults>` +
+      `<searchResultPostion>0</searchResultPostion><metadataList><metadataDescriptor>//recordType.meta.std-cgi.com</metadataDescriptor></metadataList></CMSearchDescription>`;
+    const r = await nvrRequest(nvr, cred, 'POST', '/ISAPI/ContentMgmt/search', xml, 12000);
+    if (r.status !== 200) continue;                                           // NVR-ul nu răspunde la căutare → nu tragem concluzii
+    const n = parseInt((/<numOfMatches>(\d+)<\/numOfMatches>/.exec(r.body) || [])[1] || '0', 10);
+    const found = n > 0 || /<searchMatchItem>/.test(r.body);
+    if (found) {
+      if (st.recBad[ch]) lines.push({ kind: 'info', text: `🟢 CH${ch} — înregistrează din nou` });
+      st.recMiss[ch] = 0; st.recBad[ch] = false;
+    } else {
+      st.recMiss[ch] = (st.recMiss[ch] || 0) + 1;
+      if (st.recMiss[ch] >= MON_CONFIRM && !st.recBad[ch]) {
+        st.recBad[ch] = true;
+        lines.push({ kind: 'crit', text: `🔴 CH${ch} — NU ÎNREGISTREAZĂ (nicio înregistrare în ultima oră, deși camera e online)` });
+      }
+    }
+  }
+  return lines;
 }
 
 const HDD_OK = new Set(['ok', 'idle', 'unknown', 'normal', 'sleep', 'standby']);
@@ -538,7 +596,8 @@ async function monitorRun() {
         const t = tasks[i++];
         let res;
         try { res = await probeNvr(t.nvr, t.cred); } catch { res = { online: false }; }
-        const lines = evaluateNvr(t.key, t.nvr, res);
+        let lines = evaluateNvr(t.key, t.nvr, res);
+        if (res.online && res.authOk) { try { lines = lines.concat(await recCheck(t.key, t.nvr, t.cred)); } catch (e) { console.error('[monitor] înregistrare:', e.message); } }
         if (lines.length) (out[t.user] || (out[t.user] = { ucfg: t.ucfg, blocks: [] })).blocks.push({ nvr: t.nvr, lines });
       }
     }));
@@ -1911,7 +1970,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 6.1, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 6.2, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
@@ -2011,4 +2070,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v6.1 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v6.2 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
