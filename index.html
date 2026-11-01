@@ -5713,6 +5713,24 @@ qs('#open-log-btn').addEventListener('click', () => {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('on')); document.querySelectorAll('.panel').forEach(x => x.classList.remove('on'));
   qs('#panel-log').classList.add('on'); try { renderLog(); } catch {} window.scrollTo(0, 0);
 });
+
+/* ═══ Deschidere din notificare: /?q=<id ofertă> · /?tab=alerts|works|clients&v=docs ═══ */
+function goTab(tab) { const t = document.querySelector('.nav-tab[data-tab="' + tab + '"]'); if (t) t.click(); window.scrollTo(0, 0); }
+async function openFromLink(href) {
+  let u; try { u = new URL(href, location.origin); } catch { return; }
+  const qid = u.searchParams.get('q'), tab = u.searchParams.get('tab'), v = u.searchParams.get('v');
+  if (!qid && !tab) return;
+  try { history.replaceState(null, '', location.pathname); } catch {}
+  if (qid) {
+    goTab('quotes'); await loadQuotes(true);
+    const q = (quotes || []).find(x => x.id === qid); if (q) openQuote(q); else toast('Oferta nu mai există', 'warn');
+  } else if (tab) { goTab(tab); if (tab === 'clients' && v) showClView(v); }
+}
+if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.type === 'open') openFromLink(e.data.url); });
+(function waitUnlock() {
+  if (!/[?&](q|tab)=/.test(location.search)) return;
+  let n = 0; const t = setInterval(() => { if (document.documentElement.classList.contains('unlocked') || ++n > 120) { clearInterval(t); if (n <= 120) setTimeout(() => openFromLink(location.href), 600); } }, 500);
+})();
 renderAuthUI();
 bootAuth();
 

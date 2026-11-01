@@ -641,7 +641,7 @@ async function monitorRun() {
       try {
         const ptitle = blocks.length === 1 ? `${anyCrit ? '🚨' : '✅'} ${blocks[0].nvr.name}` : `${anyCrit ? '🚨' : '✅'} ${blocks.length} NVR-uri`;
         const pbody = blocks.map(b => (blocks.length > 1 ? b.nvr.name + ': ' : '') + b.lines.map(l => l.text).join(' · ')).join('\n');
-        await pushSend(user, ptitle, pbody, { tag: 'yca-mon-' + Date.now(), urgency: anyCrit ? 'high' : 'normal' });
+        await pushSend(user, ptitle, pbody, { tag: 'yca-mon-' + Date.now(), urgency: anyCrit ? 'high' : 'normal', url: '/?tab=alerts' });
       } catch (e) { console.error('[monitor] push:', e.message); }
     }
 
@@ -1103,7 +1103,7 @@ async function opsMorning(db) {
     const txt = [azi.length ? `🛠 <b>Lucrări azi (${azi.length})</b>\n${azi.map(ln).join('\n')}` : '',
                  late.length ? `⏰ <b>Întârziate (${late.length})</b>\n${late.map(ln).join('\n')}` : '',
                  low.length ? `📦 <b>Stoc sub minim</b>\n${low.map(s => `• ${escHtml(s.name)}: ${s.qty} ${escHtml(s.unit || 'buc')} (minim ${s.minQty})`).join('\n')}` : ''].filter(Boolean).join('\n\n');
-    try { notifyOwner(db, owner, txt); } catch {}
+    try { notifyOwner(db, owner, txt, '/?tab=works'); } catch {}
   }
 }
 /* ═════════════ Statistici site (Cloudflare Web Analytics) ═════════════
@@ -1205,7 +1205,7 @@ async function cdocReminders(db) {
     }
     if (!lines.length) continue;
     await tgSend(ucfg, `📄 <b>Acte firmă — expirări</b>\n\n${lines.map(escHtml).join('\n')}`);
-    await pushSend(user, '📄 Acte firmă — expirări', lines.join('\n'), { tag: 'yca-cdoc-' + today, urgency: 'normal' });
+    await pushSend(user, '📄 Acte firmă — expirări', lines.join('\n'), { tag: 'yca-cdoc-' + today, urgency: 'normal', url: '/?tab=clients&v=docs' });
   }
   if (changed) saveCDocs(all);
 }
@@ -1468,9 +1468,9 @@ function sendHtml(res, status, html) {
   res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer' });
   res.end(html);
 }
-async function notifyOwner(db, owner, text) {
+async function notifyOwner(db, owner, text, url) {
   try { const ucfg = (db.configs[owner.username] || {}).cfg || {}; await tgSend(ucfg, text); } catch {}
-  try { const t = pushText(text).split('\n'); await pushSend(owner.username, t[0], t.slice(1).join('\n'), { tag: 'yca-q-' + Date.now(), urgency: 'normal' }); } catch {}
+  try { const t = pushText(text).split('\n'); await pushSend(owner.username, t[0], t.slice(1).join('\n'), { tag: 'yca-q-' + Date.now(), urgency: 'normal', url: url || '/' }); } catch {}
 }
 
 const PAGE_CSS = `
@@ -1867,7 +1867,7 @@ async function handleSiteContact(req, res) {
   const q = { id: newId(), no: ++all.seq, token: crypto.randomBytes(18).toString('hex'), owner: owner.username, source: 'site-contact', kind: 'contact',
               createdAt: Date.now(), validUntil: Date.now() + 365 * 864e5, customer: cust, pricing: null, status: 'new', events: [{ t: Date.now(), type: 'message' }] };
   all.list.push(q); saveQuotes(all);
-  notifyOwner(db, owner, `✉️ <b>Mesaj nou de pe site #${q.no}</b>\n${escHtml(cust.name)} · ${escHtml(cust.phone)}${cust.email ? ' · ' + escHtml(cust.email) : ''}${cust.assoc ? '\n' + escHtml(cust.assoc) : ''}${cust.message ? '\n„' + escHtml(cust.message.slice(0, 500)) + '”' : ''}${cust.page ? '\n(pagina ' + escHtml(cust.page) + ')' : ''}`);
+  notifyOwner(db, owner, `✉️ <b>Mesaj nou de pe site #${q.no}</b>\n${escHtml(cust.name)} · ${escHtml(cust.phone)}${cust.email ? ' · ' + escHtml(cust.email) : ''}${cust.assoc ? '\n' + escHtml(cust.assoc) : ''}${cust.message ? '\n„' + escHtml(cust.message.slice(0, 500)) + '”' : ''}${cust.page ? '\n(pagina ' + escHtml(cust.page) + ')' : ''}`, '/?q=' + encodeURIComponent(q.id));
   return done(true);
 }
 async function handlePublicQuote(req, res, fromSite) {
@@ -1916,7 +1916,7 @@ async function handlePublicQuote(req, res, fromSite) {
       mhtml, emailCidAttachments(mhtml));
     const a2 = loadQuotes(); const x = a2.list.find(z => z.id === q.id); if (x) { x.emailed = q.emailed; saveQuotes(a2); }
   }
-  notifyOwner(db, owner, `🧾 <b>Cerere nouă de ofertă #${q.no}</b>\n${escHtml(cust.name)} · ${escHtml(cust.phone)}${cust.assoc ? '\n' + escHtml(cust.assoc) : ''}${[cust.address !== cust.assoc ? cust.address : '', cust.city].filter(Boolean).length ? '\n' + escHtml([cust.address !== cust.assoc ? cust.address : '', cust.city].filter(Boolean).join(', ')) : ''}\n${pricing.totalCams} camere · <b>${lei(pricing.total)} / lună</b>${q.emailed ? '\n✉ trimisă și pe email' : !cust.email ? '\n(clientul nu a lăsat email)' : '\n(email neconfigurat pe server — oferta NU a fost trimisă pe mail)'}`);
+  notifyOwner(db, owner, `🧾 <b>Cerere nouă de ofertă #${q.no}</b>\n${escHtml(cust.name)} · ${escHtml(cust.phone)}${cust.assoc ? '\n' + escHtml(cust.assoc) : ''}${[cust.address !== cust.assoc ? cust.address : '', cust.city].filter(Boolean).length ? '\n' + escHtml([cust.address !== cust.assoc ? cust.address : '', cust.city].filter(Boolean).join(', ')) : ''}\n${pricing.totalCams} camere · <b>${lei(pricing.total)} / lună</b>${q.emailed ? '\n✉ trimisă și pe email' : !cust.email ? '\n(clientul nu a lăsat email)' : '\n(email neconfigurat pe server — oferta NU a fost trimisă pe mail)'}`, '/?q=' + encodeURIComponent(q.id));
   return send(200, { ok: true, no: q.no, url, emailed: q.emailed });
 }
 
@@ -1962,7 +1962,7 @@ async function handleQuotePublic(req, res, pathname, parsed) {
     }
     saveQuotes(all);
     const icon = { accepted: '✅', rejected: '❌', clarify: '❓' }[act];
-    notifyOwner(db, owner, `${icon} <b>Oferta #${q.no} — ${QSTATUS[act]}</b>\n${escHtml(q.customer.assoc || q.customer.address)}\n${escHtml(q.customer.name)} · ${escHtml(q.customer.phone)} · ${lei(q.pricing.total)} / lună${msg ? '\n„' + escHtml(msg) + '”' : ''}`);
+    notifyOwner(db, owner, `${icon} <b>Oferta #${q.no} — ${QSTATUS[act]}</b>\n${escHtml(q.customer.assoc || q.customer.address)}\n${escHtml(q.customer.name)} · ${escHtml(q.customer.phone)} · ${lei(q.pricing.total)} / lună${msg ? '\n„' + escHtml(msg) + '”' : ''}`, '/?q=' + encodeURIComponent(q.id));
     return sendJson(res, 200, { ok: true, status: act });
   }
   if (req.method !== 'GET') return sendJson(res, 405, { error: 'Metodă invalidă' });

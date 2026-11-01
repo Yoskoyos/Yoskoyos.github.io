@@ -1,7 +1,7 @@
 // CCTV Monitor — service worker
 // Pagina se ia MEREU de pe internet, ocolind memoria browserului (GitHub Pages permite păstrarea ei 10 min),
 // iar ultima versiune rămâne salvată doar pentru folosire fără internet.
-const CACHE = 'yca-cctv-v2';
+const CACHE = 'yca-cctv-v3';
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -55,7 +55,11 @@ self.addEventListener('notificationclick', e => {
   e.notification.close();
   const url = new URL((e.notification.data && e.notification.data.url) || '/', self.location.origin).href;
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-    for (const c of list) if (c.url.startsWith(self.location.origin)) { c.focus(); return; }
+    for (const c of list) if (c.url.startsWith(self.location.origin)) {
+      // aplicația e deja deschisă: o aducem în față și îi spunem ce să deschidă (oferta, alertele, lucrările)
+      c.postMessage({ type: 'open', url });
+      return c.focus().catch(() => {});
+    }
     return self.clients.openWindow(url);
   }));
 });
