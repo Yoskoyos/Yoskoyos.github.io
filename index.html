@@ -1285,11 +1285,12 @@ html:not(.unlocked) .app{display:none}
       <div class="settings-section" id="an-cfg">
         <div class="settings-section-title">Statistici site (Cloudflare)</div>
         <div class="form-hint" id="an-cfg-state" style="margin-bottom:10px">Se verifică…</div>
-        <div class="f2">
-          <div class="fg"><label for="an-acc">Account ID</label><input class="form-input" type="text" id="an-acc" placeholder="32 de caractere" autocomplete="off" spellcheck="false"></div>
-          <div class="fg"><label for="an-tag">Site tag (opțional)</label><input class="form-input" type="text" id="an-tag" placeholder="din adresa paginii Web Analytics" autocomplete="off" spellcheck="false"></div>
-        </div>
-        <div class="fg"><label for="an-token">API token (Account Analytics: Read)</label><input class="form-input" type="password" id="an-token" placeholder="se păstrează doar pe server" autocomplete="off" spellcheck="false"></div>
+        <div class="fg"><label for="an-token">① Lipește aici tokenul din Cloudflare</label><input class="form-input" type="password" id="an-token" placeholder="începe cu cfut_… — se păstrează doar pe server" autocomplete="off" spellcheck="false"></div>
+        <details style="margin:-2px 0 10px"><summary class="form-hint" style="cursor:pointer">Avansat (Account ID / Site tag, deja completate)</summary>
+        <div class="f2" style="margin-top:8px">
+          <div class="fg"><label for="an-acc">Account ID</label><input class="form-input" type="text" id="an-acc" value="2e72c3a803a6e5971800705fda1c72ac" autocomplete="off" spellcheck="false"></div>
+          <div class="fg"><label for="an-tag">Site tag (opțional)</label><input class="form-input" type="text" id="an-tag" placeholder="se găsește automat" autocomplete="off" spellcheck="false"></div>
+        </div></details>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn primary" id="an-save">Conectează</button><button type="button" class="btn" id="an-del" hidden>Deconectează</button></div>
       </div>
       <div class="settings-section">
@@ -5601,13 +5602,17 @@ document.querySelectorAll('.nav-tab[data-tab="stats"]').forEach(t => t.addEventL
 qs('#an-open').addEventListener('click', () => { document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('on')); document.querySelectorAll('.panel').forEach(x => x.classList.remove('on')); qs('#panel-stats').classList.add('on'); window.scrollTo(0, 0); loadAnalytics(); });
 async function anCfgLoad() {
   const st = qs('#an-cfg-state'); if (!getAuth()) return;
-  try { const r = await clApi('/analytics/config'); st.innerHTML = r.configured ? '✓ <b>Conectat</b> la Cloudflare. Statisticile apar în meniu, la <b>Statistici site</b>.' : 'Neconectat. Completează datele de mai jos (pașii sunt în mesajul de la Claude).';
-    qs('#an-acc').value = r.accountId || ''; qs('#an-del').hidden = !r.configured; }
+  try { const r = await clApi('/analytics/config'); st.innerHTML = r.configured ? '✓ <b>Conectat</b> la Cloudflare. Statisticile apar în meniu, la <b>Statistici site</b>.' : 'Neconectat. Lipește tokenul în câmpul de mai jos și apasă Conectează.';
+    qs('#an-acc').value = r.accountId || '2e72c3a803a6e5971800705fda1c72ac'; qs('#an-del').hidden = !r.configured; }
   catch (e) { st.textContent = /403/.test(e.message) || /administrator/.test(e.message) ? 'Doar administratorul poate conecta Cloudflare.' : /HTTP 40[45]|Operație/.test(e.message) ? 'Serverul nu are încă această funcție — actualizează serverul (v7.0).' : e.message; }
 }
 qs('#an-save').addEventListener('click', async () => {
   const b = qs('#an-save'); b.disabled = true; b.textContent = 'Se verifică…';
-  try { await clApi('/analytics/config', jsonOpt('PUT', { accountId: qs('#an-acc').value.trim(), siteTag: qs('#an-tag').value.trim(), token: qs('#an-token').value.trim() }));
+  let acc = qs('#an-acc').value.trim(), tok = qs('#an-token').value.trim(), tag = qs('#an-tag').value.trim();
+  if (!/^[a-f0-9]{32}$/i.test(acc) && acc.length > 32) { if (!tok) tok = acc; acc = '2e72c3a803a6e5971800705fda1c72ac'; qs('#an-acc').value = acc; }
+  if (tag && !/^[a-f0-9]{32}$/i.test(tag)) { if (!tok) tok = tag; tag = ''; qs('#an-tag').value = ''; }
+  if (!tok) { toast('Lipește tokenul în primul câmp', 'warn'); qs('#an-token').focus(); b.disabled = false; b.textContent = 'Conectează'; return; }
+  try { await clApi('/analytics/config', jsonOpt('PUT', { accountId: acc, siteTag: tag, token: tok }));
     qs('#an-token').value = ''; toast('Cloudflare conectat ✓', 'ok'); anCfgLoad(); }
   catch (e) { toast(e.message, 'err'); } finally { b.disabled = false; b.textContent = 'Conectează'; }
 });
