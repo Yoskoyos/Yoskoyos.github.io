@@ -1138,7 +1138,8 @@ async function cfStats(days) {
   const key = 'd' + days, c = cfCache.get(key);
   if (c && Date.now() - c.t < 10 * 60e3) return c.v;
   const siteTag = await cfSiteTag(cf);
-  const to = new Date(), from = new Date(Date.now() - days * 864e5);
+  const since = Date.parse(cf.since || '2026-11-01T19:25:00Z');            // lansarea site-ului: nu numărăm nimic de dinainte
+  const to = new Date(), from = new Date(Math.max(since, days ? Date.now() - days * 864e5 : 0));
   const filter = { AND: [{ datetime_geq: from.toISOString(), datetime_leq: to.toISOString() }, ...(siteTag ? [{ siteTag }] : []), { bot: 0 }] };
   const g = (alias, dims, limit, order) => `${alias}: rumPageloadEventsAdaptiveGroups(filter: $filter, limit: ${limit}${order ? `, orderBy: [${order}]` : ''}) { count sum { visits }${dims ? ` dimensions { ${dims} }` : ''} }`;
   const query = `query($accountTag: string, $filter: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject) { viewer { accounts(filter: { accountTag: $accountTag }) {
@@ -1150,7 +1151,7 @@ async function cfStats(days) {
   const a = (((r.json.data || {}).viewer || {}).accounts || [])[0] || {};
   const row = (x, k) => ({ name: k ? (x.dimensions || {})[k] : '', views: x.count || 0, visits: (x.sum || {}).visits || 0 });
   const tot = (a.total || [])[0] || {};
-  const v = { configured: true, days, from: from.toISOString(), to: to.toISOString(), visits: (tot.sum || {}).visits || 0, views: tot.count || 0,
+  const v = { configured: true, days, since: new Date(since).toISOString(), from: from.toISOString(), to: to.toISOString(), visits: (tot.sum || {}).visits || 0, views: tot.count || 0,
     daily: (a.daily || []).map(x => ({ date: x.dimensions.date, views: x.count || 0, visits: (x.sum || {}).visits || 0 })),
     pages: (a.pages || []).map(x => row(x, 'requestPath')), refs: (a.refs || []).map(x => row(x, 'refererHost')),
     countries: (a.countries || []).map(x => row(x, 'countryName')), devices: (a.devices || []).map(x => row(x, 'deviceType')) };
@@ -1175,7 +1176,7 @@ async function handleAnalytics(req, res, pathname, parsed) {
     }
   }
   if (pathname === '/analytics' && req.method === 'GET') {
-    const days = [1, 7, 30].includes(+parsed.query.days) ? +parsed.query.days : 7;
+    const days = [0, 1, 7, 30].includes(+parsed.query.days) ? +parsed.query.days : 7;   // 0 = de la lansare
     try { return sendJson(res, 200, await cfStats(days)); } catch (e) { return sendJson(res, 502, { error: e.message }); }
   }
   return sendJson(res, 405, { error: 'Operație necunoscută' });
