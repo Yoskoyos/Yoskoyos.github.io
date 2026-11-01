@@ -925,6 +925,33 @@ html:not(.unlocked) .app{display:none}
 :root[data-theme="light"] .section-action,:root[data-theme="light"] .cm-sec,:root[data-theme="light"] .cl-chip{font-weight:700}
 @media (prefers-color-scheme: light){:root:not([data-theme="dark"]) .section-action,:root:not([data-theme="dark"]) .cm-sec,:root:not([data-theme="dark"]) .cl-chip{font-weight:700}}
 .form-row[hidden]{display:none!important}
+
+/* ── Lucrări / Stoc / Încasări / GDPR ── */
+.seg{max-width:100%;overflow-x:auto;scrollbar-width:none}.seg::-webkit-scrollbar{display:none}
+.seg button{white-space:nowrap;flex-shrink:0}
+.op-ic{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;background:var(--bg-2)}
+.op-ic.interventie{background:var(--err-dim)}.op-ic.montaj{background:var(--ok-dim)}.op-ic.revizie{background:var(--blue-dim)}
+.op-pill{font-size:11px;font-weight:700;border-radius:999px;padding:4px 9px;white-space:nowrap;flex-shrink:0}
+.op-pill.todo{background:var(--warn-dim);color:var(--warn)}.op-pill.scheduled{background:var(--blue-dim);color:var(--blue)}
+.op-pill.done{background:var(--ok-dim);color:var(--ok)}.op-pill.cancelled{background:var(--bg-3);color:var(--fg-3)}
+.op-pill.late{background:var(--err-dim);color:var(--err)}.op-pill.urgent{background:#DC2626;color:#fff}
+.op-when{font-size:12px;font-weight:700;color:var(--fg-2);text-align:right;white-space:nowrap}
+.op-when.late{color:var(--err)}.op-when.today{color:var(--accent-tx)}
+.op-parts{display:flex;flex-direction:column;gap:6px}
+.op-part{display:grid;grid-template-columns:1fr 70px 34px;gap:6px;align-items:center}
+.op-part select,.op-part input{height:38px}
+.op-part button{height:38px;border:1px solid var(--border);background:var(--bg-1);border-radius:8px;cursor:pointer;color:var(--err);font-weight:700}
+.st-qty{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.st-qty button{width:34px;height:34px;border-radius:9px;border:1px solid var(--border);background:var(--bg-1);font-size:18px;font-weight:700;cursor:pointer;color:var(--fg)}
+.st-qty b{min-width:44px;text-align:center;font-size:15px}
+.st-qty b.low{color:var(--err)}
+.pay-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.pay-row .cl-main{flex:1 1 180px;min-width:0}
+.pay-acts{display:flex;gap:6px;flex-shrink:0}
+.pay-acts .btn{height:34px;padding:0 12px;font-size:12.5px;text-decoration:none}
+.op-banner{background:var(--warn-dim);border:1px solid var(--warn);color:var(--fg);border-radius:12px;padding:10px 12px;font-size:13px;margin-bottom:10px;line-height:1.5}
+.op-banner.err{background:var(--err-dim);border-color:var(--err)}
+.al-work{margin-left:auto;align-self:center;border:1px solid var(--border);background:var(--bg-1);color:var(--fg);border-radius:9px;padding:6px 10px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:var(--sans)}
 </style>
 </head>
 <body>
@@ -960,8 +987,8 @@ html:not(.unlocked) .app{display:none}
     <div class="nav-tab" data-tab="snapshots"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg><span class="lbl-l">Snapshots</span><span class="lbl-s">Camere</span></div>
     <div class="nav-tab" data-tab="clients"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg><span class="lbl-l">Clienți</span><span class="lbl-s">Clienți</span></div>
     <div class="nav-tab" data-tab="quotes"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg><span class="lbl-l">Cereri ofertă</span><span class="lbl-s">Oferte</span><span class="lbl-d">Cereri ofertă</span> <span class="badge" id="qt-badge" style="display:none">0</span></div>
+    <div class="nav-tab" data-tab="works"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg><span class="lbl-l">Lucrări</span><span class="lbl-s">Lucrări</span> <span class="badge" id="wk-badge" style="display:none">0</span></div>
     <div class="nav-tab" data-tab="alerts"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg><span class="lbl-l">Alerte</span><span class="lbl-s">Alerte</span> <span class="badge" id="alert-badge" style="display:none">0</span></div>
-    <div class="nav-tab" data-tab="log"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span class="lbl-l">Jurnal</span><span class="lbl-s">Jurnal</span></div>
     <div class="nav-tab" data-tab="settings"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span class="lbl-l">Setări</span><span class="lbl-s">Setări</span></div>
    </nav>
   </header>
@@ -1067,7 +1094,7 @@ html:not(.unlocked) .app{display:none}
     <!-- ── Alerte ── -->
     <!-- ── Clienți ── -->
     <div class="panel" id="panel-clients">
-      <div class="seg" role="tablist"><button type="button" class="on" data-v="clients">Clienți</button><button type="button" data-v="docs">Acte firmă <span class="cnt" id="cd-badge" hidden></span></button></div>
+      <div class="seg" role="tablist"><button type="button" class="on" data-v="clients">Clienți</button><button type="button" data-v="pay">Încasări <span class="cnt" id="pay-badge" hidden></span></button><button type="button" data-v="gdpr">Cereri imagini</button><button type="button" data-v="docs">Acte firmă <span class="cnt" id="cd-badge" hidden></span></button></div>
       <div id="cl-view-clients">
       <div class="section">
         <div class="section-hdr">
@@ -1092,6 +1119,32 @@ html:not(.unlocked) .app{display:none}
         <div class="cl-list" id="cl-list"><div class="cl-empty">Se încarcă…</div></div>
       </div>
       </div>
+      <div id="cl-view-pay" hidden>
+      <div class="section">
+        <div class="section-hdr">
+          <div class="section-title">Încasări abonamente</div>
+          <select class="cl-chip" id="pay-month" style="margin-left:auto;padding-right:10px" aria-label="Luna"></select>
+        </div>
+        <div class="qt-stats" id="pay-stats"></div>
+        <div class="cl-tools">
+          <input type="search" class="cl-search" id="pay-search" placeholder="Caută client…" autocomplete="off">
+          <select class="cl-chip" id="pay-filter" style="padding-right:10px"><option value="unpaid">Neplătite</option><option value="late">Doar restanțe</option><option value="paid">Plătite</option><option value="all">Toți</option></select>
+        </div>
+        <div class="cl-list" id="pay-list"><div class="cl-empty">Se încarcă…</div></div>
+        <div class="cm-hint" style="margin-top:12px">Lista folosește abonamentele din fișa fiecărui client (sumă, zi de plată, luna de început). „✓ Plătit” bifează luna aleasă; poți debifa din fișa clientului.</div>
+      </div>
+      </div>
+      <div id="cl-view-gdpr" hidden>
+      <div class="section">
+        <div class="section-hdr">
+          <div class="section-title">Registru cereri de imagini (GDPR)</div>
+          <div class="section-action" id="gd-add-btn" style="margin-left:auto"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Cerere nouă</div>
+        </div>
+        <div class="cl-tools"><input type="search" class="cl-search" id="gd-search" placeholder="Caută: bloc, solicitant, nr. adresă…" autocomplete="off"></div>
+        <div class="cl-list" id="gd-list"><div class="cl-empty">Se încarcă…</div></div>
+        <div class="cm-hint" style="margin-top:12px">Ține evidența fiecărei cereri de imagini (Poliție, locatari, administrator, asigurător): cine a cerut, pentru ce interval, ce s-a predat și cui. Atașează adresa primită și procesul-verbal de predare.</div>
+      </div>
+      </div>
       <div id="cl-view-docs" hidden>
       <div class="section">
         <div class="section-hdr">
@@ -1107,6 +1160,37 @@ html:not(.unlocked) .app{display:none}
         <div id="cd-alert"></div>
         <div class="cl-list" id="cd-list"><div class="cl-empty">Se încarcă…</div></div>
         <div class="cm-hint" style="margin-top:12px">Actele se păstrează doar pe serverul tău, se deschid numai după autentificare și intră în „Copie de siguranță” de la Clienți. Primești alertă pe Telegram și pe telefon cu 30, 7 și 1 zile înainte să expire un act.</div>
+      </div>
+      </div>
+    </div>
+
+    <!-- ── Lucrări + Stoc ── -->
+    <div class="panel" id="panel-works">
+      <div class="seg" role="tablist"><button type="button" class="on" data-wv="works">Lucrări</button><button type="button" data-wv="stock">Stoc <span class="cnt" id="st-badge" hidden></span></button></div>
+      <div id="wk-view-works">
+      <div class="section">
+        <div class="section-hdr">
+          <div class="section-title">Lucrări și intervenții</div>
+          <div class="section-action" id="wk-add-btn" style="margin-left:auto"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Lucrare nouă</div>
+        </div>
+        <div class="qt-stats" id="wk-stats"></div>
+        <div class="cl-tools">
+          <input type="search" class="cl-search" id="wk-search" placeholder="Caută: bloc, problemă, cameră…" autocomplete="off">
+          <select class="cl-chip" id="wk-filter" style="padding-right:10px"><option value="open">De făcut</option><option value="today">Azi</option><option value="week">Următoarele 7 zile</option><option value="done">Terminate</option><option value="all">Toate</option></select>
+        </div>
+        <div class="cl-list" id="wk-list"><div class="cl-empty">Se încarcă…</div></div>
+        <div class="cm-hint" style="margin-top:12px">Primești dimineața (la 8:00) pe Telegram și pe telefon lucrările zilei, pe cele întârziate și ce produse sunt sub stocul minim. Când marchezi o lucrare „Terminată”, piesele folosite se scad din stoc, iar la reviziile periodice se programează automat următoarea.</div>
+      </div>
+      </div>
+      <div id="wk-view-stock" hidden>
+      <div class="section">
+        <div class="section-hdr">
+          <div class="section-title">Stoc echipamente</div>
+          <div class="section-action" id="st-add-btn" style="margin-left:auto"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Produs nou</div>
+        </div>
+        <div class="qt-stats" id="st-stats"></div>
+        <div class="cl-tools"><input type="search" class="cl-search" id="st-search" placeholder="Caută: cameră, HDD, model, serie…" autocomplete="off"></div>
+        <div class="cl-list" id="st-list"><div class="cl-empty">Se încarcă…</div></div>
       </div>
       </div>
     </div>
@@ -1170,6 +1254,13 @@ html:not(.unlocked) .app{display:none}
 
     <!-- ── Setări ── -->
     <div class="panel" id="panel-settings">
+      <div class="settings-section">
+        <div class="settings-section-title">Jurnal</div>
+        <div class="form-row">
+          <div><div class="form-label">Jurnal de activitate</div><div class="form-hint">Tot ce a făcut aplicația: verificări, alerte, erori</div></div>
+          <button type="button" class="btn" id="open-log-btn">Deschide jurnalul</button>
+        </div>
+      </div>
       <div class="settings-section">
         <div class="settings-section-title">Monitorizare</div>
         <div class="form-row">
@@ -1554,6 +1645,117 @@ html:not(.unlocked) .app{display:none}
 </div>
 
 <!-- Client modal -->
+<div class="overlay hidden" id="work-modal" role="dialog" aria-modal="true" aria-labelledby="wm-title">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="wm-title">Lucrare nouă</div><div class="modal-x" id="wm-x" role="button" aria-label="Închide">✕</div></div>
+    <div class="modal-body">
+      <div class="fg"><label for="wm-name">Ce trebuie făcut</label><input type="text" id="wm-name" placeholder="ex. CH14 nu înregistrează — de verificat camera" autocomplete="off"></div>
+      <div class="f2">
+        <div class="fg"><label for="wm-type">Tip</label><select id="wm-type"><option value="interventie">🔧 Intervenție</option><option value="montaj">🏗️ Montaj nou</option><option value="revizie">🔁 Revizie periodică</option><option value="altele">📌 Altele</option></select></div>
+        <div class="fg"><label for="wm-status">Status</label><select id="wm-status"><option value="todo">De făcut</option><option value="scheduled">Programată</option><option value="done">Terminată</option><option value="cancelled">Anulată</option></select></div>
+      </div>
+      <div class="f2">
+        <div class="fg"><label for="wm-client">Client / bloc</label><select id="wm-client"></select></div>
+        <div class="fg"><label for="wm-nvr">NVR</label><select id="wm-nvr"></select></div>
+      </div>
+      <div class="f2">
+        <div class="fg"><label for="wm-date">Data</label><input type="date" id="wm-date"></div>
+        <div class="fg"><label for="wm-time">Ora</label><input type="time" id="wm-time"></div>
+      </div>
+      <div class="f2">
+        <div class="fg"><label for="wm-ch">Camere / canale</label><input type="text" id="wm-ch" placeholder="ex. CH14, CH22" autocomplete="off"></div>
+        <div class="fg"><label for="wm-prio">Prioritate</label><select id="wm-prio"><option value="normal">Normală</option><option value="urgent">🔴 Urgentă</option></select></div>
+      </div>
+      <div class="fg" id="wm-repeat-row"><label for="wm-repeat">Repetă revizia</label><select id="wm-repeat"><option value="0">Nu se repetă</option><option value="3">La 3 luni</option><option value="6">La 6 luni</option><option value="12">La 12 luni</option></select></div>
+      <div class="fg"><label for="wm-desc">Problema / detalii</label><textarea id="wm-desc" rows="3"></textarea></div>
+      <div class="cm-sec">Rezolvare</div>
+      <div class="fg"><label for="wm-sol">Ce am făcut</label><textarea id="wm-sol" rows="2" placeholder="ex. am înlocuit camera, am refăcut mufa, am formatat HDD-ul"></textarea></div>
+      <div class="fg"><label>Piese folosite (se scad din stoc când lucrarea e terminată)</label><div class="op-parts" id="wm-parts"></div>
+        <button type="button" class="btn" id="wm-part-add" style="margin-top:6px">+ Adaugă piesă din stoc</button></div>
+      <div class="cm-hint" id="wm-src"></div>
+      <div class="cm-sec">Poze și documente</div>
+      <div class="cm-files" id="wm-files"></div>
+      <div class="cm-upload"><button type="button" class="btn" id="wm-up" style="flex:1 1 100%">📷 Adaugă poze (înainte / după) sau documente</button>
+        <input type="file" id="wm-file" multiple accept="image/jpeg,image/png,.jpg,.jpeg,.png,application/pdf,.pdf,.docx,.xlsx" hidden></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn cm-del" id="wm-delete" type="button">Șterge</button>
+      <button class="btn" id="wm-done" type="button">✓ Terminată</button>
+      <button class="btn primary" id="wm-save" type="button">Salvează</button>
+    </div>
+  </div>
+</div>
+<div class="overlay hidden" id="stock-modal" role="dialog" aria-modal="true" aria-labelledby="sm-title">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="sm-title">Produs nou</div><div class="modal-x" id="sm-x" role="button" aria-label="Închide">✕</div></div>
+    <div class="modal-body">
+      <div class="fg"><label for="sm-name">Denumire</label><input type="text" id="sm-name" placeholder="ex. Cameră IP turret 5MP" autocomplete="off"></div>
+      <div class="f2">
+        <div class="fg"><label for="sm-cat">Categorie</label><select id="sm-cat"><option value="camera">Camere</option><option value="nvr">NVR-uri</option><option value="hdd">HDD-uri</option><option value="switch">Switch-uri PoE</option><option value="cablu">Cablu și consumabile</option><option value="sursa">Surse / UPS</option><option value="altele">Altele</option></select></div>
+        <div class="fg"><label for="sm-model">Model</label><input type="text" id="sm-model" placeholder="ex. DS-2CD1353G2-I" autocomplete="off"></div>
+      </div>
+      <div class="f2">
+        <div class="fg"><label for="sm-qty">Cantitate în stoc</label><input type="number" id="sm-qty" min="0" step="1" inputmode="numeric"></div>
+        <div class="fg"><label for="sm-min">Stoc minim (alertă)</label><input type="number" id="sm-min" min="0" step="1" inputmode="numeric" placeholder="ex. 2"></div>
+      </div>
+      <div class="f2">
+        <div class="fg"><label for="sm-unit">Unitate</label><input type="text" id="sm-unit" placeholder="buc / m / rolă" autocomplete="off"></div>
+        <div class="fg"><label for="sm-price">Preț achiziție (lei / unitate)</label><input type="number" id="sm-price" min="0" step="0.01" inputmode="decimal"></div>
+      </div>
+      <div class="fg"><label for="sm-sup">Furnizor</label><input type="text" id="sm-sup" list="sm-sups" autocomplete="off"><datalist id="sm-sups"><option value="A2T"><option value="Rovision"><option value="Telesystem"><option value="Vonmag"></datalist></div>
+      <div class="fg"><label for="sm-serials">Serii (una pe rând)</label><textarea id="sm-serials" rows="2"></textarea></div>
+      <div class="fg"><label for="sm-notes">Observații</label><textarea id="sm-notes" rows="2"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn cm-del" id="sm-delete" type="button">Șterge</button>
+      <button class="btn" id="sm-cancel" type="button">Anulează</button>
+      <button class="btn primary" id="sm-save" type="button">Salvează</button>
+    </div>
+  </div>
+</div>
+<div class="overlay hidden" id="gdpr-modal" role="dialog" aria-modal="true" aria-labelledby="gm-title">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="gm-title">Cerere de imagini</div><div class="modal-x" id="gm-x" role="button" aria-label="Închide">✕</div></div>
+    <div class="modal-body">
+      <div class="f2">
+        <div class="fg"><label for="gm-type">Solicitant</label><select id="gm-type"><option value="politie">👮 Poliție</option><option value="locatar">🏠 Locatar</option><option value="administrator">🗂️ Administrator / asociație</option><option value="asigurator">🛡️ Asigurător</option><option value="altele">Altele</option></select></div>
+        <div class="fg"><label for="gm-who">Nume / instituție</label><input type="text" id="gm-who" placeholder="ex. Secția 5 Poliție, ag. Popescu" autocomplete="off"></div>
+      </div>
+      <div class="f2">
+        <div class="fg"><label for="gm-client">Bloc</label><select id="gm-client"></select></div>
+        <div class="fg"><label for="gm-doc">Nr. adresă / cerere</label><input type="text" id="gm-doc" autocomplete="off"></div>
+      </div>
+      <div class="f2">
+        <div class="fg"><label for="gm-date">Data cererii</label><input type="date" id="gm-date"></div>
+        <div class="fg"><label for="gm-ch">Camere</label><input type="text" id="gm-ch" placeholder="ex. CH1, CH3 — intrare" autocomplete="off"></div>
+      </div>
+      <div class="f2">
+        <div class="fg"><label for="gm-from">Interval: de la</label><input type="datetime-local" id="gm-from"></div>
+        <div class="fg"><label for="gm-to">până la</label><input type="datetime-local" id="gm-to"></div>
+      </div>
+      <div class="fg"><label for="gm-reason">Motiv</label><textarea id="gm-reason" rows="2" placeholder="ex. furt bicicletă din scara B"></textarea></div>
+      <div class="cm-sec">Predare</div>
+      <div class="f2">
+        <div class="fg"><label for="gm-status">Status</label><select id="gm-status"><option value="primita">Primită — de rezolvat</option><option value="livrata">Imagini predate</option><option value="fara-imagini">Nu există imagini</option><option value="refuzata">Refuzată</option></select></div>
+        <div class="fg"><label for="gm-ddate">Data predării</label><input type="date" id="gm-ddate"></div>
+      </div>
+      <div class="f2">
+        <div class="fg"><label for="gm-dto">Predat către</label><input type="text" id="gm-dto" autocomplete="off"></div>
+        <div class="fg"><label for="gm-method">Cum</label><input type="text" id="gm-method" list="gm-methods" autocomplete="off"><datalist id="gm-methods"><option value="Stick USB"><option value="Link de descărcare"><option value="DVD"><option value="Vizualizare la fața locului"></datalist></div>
+      </div>
+      <div class="fg"><label for="gm-notes">Observații</label><textarea id="gm-notes" rows="2"></textarea></div>
+      <div class="cm-sec">Documente (adresa primită, proces-verbal)</div>
+      <div class="cm-files" id="gm-files"></div>
+      <div class="cm-upload"><button type="button" class="btn" id="gm-up" style="flex:1 1 100%">Încarcă documente (PDF, poză, Word)</button>
+        <input type="file" id="gm-file" multiple accept="application/pdf,.pdf,image/jpeg,image/png,.jpg,.jpeg,.png,.docx,.xlsx" hidden></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn cm-del" id="gm-delete" type="button">Șterge</button>
+      <button class="btn" id="gm-cancel" type="button">Anulează</button>
+      <button class="btn primary" id="gm-save" type="button">Salvează</button>
+    </div>
+  </div>
+</div>
 <div class="overlay hidden" id="cdoc-modal" role="dialog" aria-modal="true" aria-labelledby="cd-title">
   <div class="modal">
     <div class="modal-hdr">
@@ -2759,7 +2961,7 @@ function renderAlerts(){
     warn: `<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>`,
     info: `<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>`,
   };
-  el.innerHTML = alerts.map(a => `
+  el.innerHTML = alerts.map((a, i) => `
     <div class="alert-item ${a.type}">
       <div class="alert-icon">${icons[a.type]||icons.info}</div>
       <div class="alert-body">
@@ -2767,6 +2969,7 @@ function renderAlerts(){
         <div class="alert-desc">${a.msg}</div>
       </div>
       <div class="alert-time">${a.t}</div>
+      ${a.type === 'crit' || a.type === 'warn' ? `<button type="button" class="al-work" data-ai="${i}" title="Creează o lucrare din alertă">🛠 Lucrare</button>` : ''}
     </div>`).join('');
 }
 
@@ -3708,8 +3911,10 @@ function showClView(v) {
   document.querySelectorAll('#panel-clients .seg button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   qs('#cl-view-clients').hidden = v !== 'clients';
   qs('#cl-view-docs').hidden = v !== 'docs';
+  qs('#cl-view-pay').hidden = v !== 'pay';
+  qs('#cl-view-gdpr').hidden = v !== 'gdpr';
   try { localStorage.setItem('yca_cl_view', v); } catch {}
-  if (v === 'docs') loadCDocs(true); else loadClients(true);
+  if (v === 'docs') loadCDocs(true); else if (v === 'pay') { loadClients(true).then(renderPay); } else if (v === 'gdpr') loadOps(true); else loadClients(true);
 }
 async function loadQuotes(force) {
   if (quotes && !force) return renderQuotes();
@@ -3810,7 +4015,8 @@ function openQuote(q) {
     </div>
     <label class="cm-check"><input type="checkbox" id="qm-handled"${q.handled ? ' checked' : ''}> Am rezolvat (am sunat / am programat)</label>
     <div class="fg"><label for="qm-notes">Notițele mele</label><textarea id="qm-notes" rows="2">${escapeHtml(q.notes || '')}</textarea></div>
-    ${q.clientId ? '<div class="cm-hint">✓ Clientul a fost adăugat automat în lista de clienți la acceptare.</div>' : ''}`;
+    ${q.clientId ? '<div class="cm-hint">✓ Clientul a fost adăugat automat în lista de clienți la acceptare.</div>' : ''}
+    ${q.status === 'accepted' ? '<button type="button" class="btn primary" id="qm-work" style="width:100%;margin-top:6px">🏗️ Programează montajul (lucrare nouă)</button>' : ''}`;
   qs('#quote-modal').classList.remove('hidden');
   const rs = qs('#qm-reply-send');
   if (rs) rs.addEventListener('click', async () => {
@@ -3823,6 +4029,7 @@ function openQuote(q) {
       renderQuotes(); toast('Răspuns trimis pe email', 'ok'); openQuote(r.quote);
     } catch (e) { toast(e.message, 'err'); rs.disabled = false; rs.textContent = '✉️ Trimite răspunsul pe email'; }
   });
+  const qw = qs('#qm-work'); if (qw) qw.addEventListener('click', () => { closeQuote(); workFromQuote(q); });
   qs('#qm-copy').addEventListener('click', () => { navigator.clipboard.writeText(q.url).then(() => toast('Link copiat', 'ok'), () => toast(q.url, 'info')); });
   qs('#qm-status').addEventListener('change', e => quoteUpdate({ status: e.target.value }));
   qs('#qm-extend').addEventListener('click', () => quoteUpdate({ extendDays: 30 }, 'Valabilitate prelungită'));
@@ -3926,7 +4133,7 @@ qs('#qset-modal').addEventListener('click', e => { if (e.target.id === 'qset-mod
 qs('#qs-save').addEventListener('click', saveQuoteSettings);
 qs('#qs-copy').addEventListener('click', () => { const t = qs('#qs-embed').textContent; navigator.clipboard.writeText(t).then(() => toast('Cod copiat', 'ok'), () => toast('Selectează codul și copiază-l manual', 'warn')); });
 
-document.querySelectorAll('.nav-tab[data-tab="clients"]').forEach(t => t.addEventListener('click', () => { let v = 'clients'; try { v = localStorage.getItem('yca_cl_view') || 'clients'; } catch {} showClView(v === 'docs' ? 'docs' : 'clients'); }));
+document.querySelectorAll('.nav-tab[data-tab="clients"]').forEach(t => t.addEventListener('click', () => { let v = 'clients'; try { v = localStorage.getItem('yca_cl_view') || 'clients'; } catch {} showClView(['docs', 'pay', 'gdpr'].includes(v) ? v : 'clients'); }));
 document.querySelectorAll('.nav-tab[data-tab="quotes"]').forEach(t => t.addEventListener('click', () => loadQuotes(true)));
 
 /* ═══════════════════════════════════════
@@ -4950,6 +5157,386 @@ function startApp() {
   startMonitor();
 }
 
+
+/* ═══════════════════════════════════════
+   ORGANIZARE: Lucrări + Stoc · Încasări · Cereri de imagini (GDPR) — date pe server: /ops
+═══════════════════════════════════════ */
+let ops = null, wmDraft = null, smDraft = null, gmDraft = null;
+const WK_TYPE = { interventie: ['🔧', 'Intervenție'], montaj: ['🏗️', 'Montaj'], revizie: ['🔁', 'Revizie'], altele: ['📌', 'Altele'] };
+const WK_ST = { todo: 'De făcut', scheduled: 'Programată', done: 'Terminată', cancelled: 'Anulată' };
+const ST_CAT = { camera: 'Camere', nvr: 'NVR-uri', hdd: 'HDD-uri', switch: 'Switch-uri PoE', cablu: 'Cablu și consumabile', sursa: 'Surse / UPS', altele: 'Altele' };
+const GD_TYPE = { politie: '👮 Poliție', locatar: '🏠 Locatar', administrator: '🗂️ Administrator', asigurator: '🛡️ Asigurător', altele: 'Altele' };
+const GD_ST = { primita: ['De rezolvat', 'soon'], livrata: ['Predate', 'ok'], 'fara-imagini': ['Fără imagini', ''], refuzata: ['Refuzată', 'late'] };
+const ymdAdd = (d, n) => { const t = new Date(d + 'T12:00:00'); t.setDate(t.getDate() + n); return t.toISOString().slice(0, 10); };
+const jsonOpt = (method, body) => ({ method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+async function loadOps(force) {
+  if (ops && !force) { renderWorks(); renderStock(); renderGdpr(); return; }
+  try { ops = await clApi('/ops'); ops.works = ops.works || []; ops.stock = ops.stock || []; ops.gdpr = ops.gdpr || []; }
+  catch (e) {
+    const m = /HTTP 40[45]|Secțiune|evidența clienților/.test(e.message) ? 'Serverul nu are încă secțiunea aceasta — actualizează serverul (v6.9)' : e.message;
+    ['#wk-list', '#st-list', '#gd-list'].forEach(s => { const el = qs(s); if (el) el.innerHTML = `<div class="cl-empty">${escapeHtml(m)}</div>`; });
+    return;
+  }
+  renderWorks(); renderStock(); renderGdpr();
+}
+function opsApply(r) { if (r && r.works) { ops.works = r.works; ops.stock = r.stock; ops.gdpr = r.gdpr; } }
+async function needClients() { if (!clients) { try { clients = (await clApi('/clients')).clients || []; } catch { clients = clients || []; } } return clients; }
+function clientOptions(sel) {
+  const list = (clients || []).slice().sort((a, b) => a.name.localeCompare(b.name, 'ro'));
+  return '<option value="">— fără client —</option>' + list.map(c => `<option value="${escapeHtml(c.id)}"${c.id === sel ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
+}
+function nvrOptions(sel) { return '<option value="">—</option>' + nvrs.map(n => `<option value="${escapeHtml(String(n.id))}"${String(n.id) === String(sel) ? ' selected' : ''}>${escapeHtml(n.name)}</option>`).join(''); }
+function opFilesHtml(coll, it) {
+  const auth = getAuth(), files = (it && it.files) || [];
+  if (!files.length) return '<div class="cm-hint">Nimic încărcat.</div>';
+  return files.map(f => {
+    const href = `${getProxyBase()}/ops/${coll}/${encodeURIComponent(it.id)}/files/${encodeURIComponent(f.id)}?token=${encodeURIComponent(auth ? auth.token : '')}`;
+    const img = f.ext === 'jpg' || f.ext === 'png';
+    return `<div class="cm-file">${img ? `<img src="${escapeHtml(href)}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0">` : '<svg class="cm-file-ic" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>'}
+      <div class="cm-file-main"><div class="cm-file-name">${escapeHtml(f.name)}</div><div class="cm-file-meta">${fmtTs(f.uploadedAt)}</div></div>
+      <a href="${escapeHtml(href)}" target="_blank" rel="noopener">Deschide</a><button type="button" class="del" data-fid="${escapeHtml(f.id)}">Șterge</button></div>`;
+  }).join('');
+}
+async function opUpload(coll, draft, files, btn, saveFn, after) {
+  files = [...files]; if (!files.length || !draft) return;
+  const big = files.find(f => f.size > 20 * 1048576); if (big) return toast(`„${big.name}” e prea mare (maxim 20 MB)`, 'warn');
+  if (!draft.id && !(await saveFn(true))) return;
+  const old = btn.innerHTML; btn.disabled = true;
+  try {
+    for (let k = 0; k < files.length; k++) {
+      btn.textContent = files.length > 1 ? `Se încarcă ${k + 1} din ${files.length}…` : 'Se încarcă…';
+      const f = files[k];
+      const r = await clApi(`/ops/${coll}/${encodeURIComponent(draft.id)}/files?name=${encodeURIComponent(f.name)}`, { method: 'POST', headers: { 'Content-Type': f.type || 'application/octet-stream' }, body: f });
+      draft.files = r.item.files; const x = ops[coll].find(z => z.id === draft.id); if (x) x.files = r.item.files;
+      after();
+    }
+    toast(files.length > 1 ? `${files.length} fișiere încărcate` : 'Fișier încărcat', 'ok');
+  } catch (e) { toast(e.message, 'err'); }
+  finally { btn.disabled = false; btn.innerHTML = old; }
+}
+async function opDelFile(coll, draft, fid, after) {
+  if (!draft || !draft.id || !(await confirmDialog({ title: 'Ștergi fișierul?', okLabel: 'Șterge' }))) return;
+  try { const r = await clApi(`/ops/${coll}/${encodeURIComponent(draft.id)}/files/${encodeURIComponent(fid)}`, { method: 'DELETE' });
+    draft.files = r.item.files; const x = ops[coll].find(z => z.id === draft.id); if (x) x.files = r.item.files; after(); }
+  catch (e) { toast(e.message, 'err'); }
+}
+
+/* ── Lucrări ── */
+function wkWhen(w) {
+  const t = todayYmd();
+  if (w.status === 'done') return { txt: w.doneDate ? 'terminată ' + fmtDate(w.doneDate) : 'terminată', cls: '' };
+  if (!w.date) return { txt: 'fără dată', cls: '' };
+  const d = w.date === t ? 'azi' : w.date === ymdAdd(t, 1) ? 'mâine' : fmtDate(w.date);
+  return { txt: d + (w.time ? ' · ' + w.time : ''), cls: w.date < t ? 'late' : w.date === t ? 'today' : '' };
+}
+function wkBadge() {
+  const t = todayYmd(), open = (ops ? ops.works : []).filter(w => w.status === 'todo' || w.status === 'scheduled');
+  const n = open.filter(w => (w.date && w.date <= t) || w.priority === 'urgent').length;
+  const b = qs('#wk-badge'); if (b) { b.style.display = n ? '' : 'none'; b.textContent = n; }
+}
+function renderWorks() {
+  if (!ops) return; wkBadge();
+  const t = todayYmd(), W = ops.works;
+  const open = W.filter(w => w.status === 'todo' || w.status === 'scheduled');
+  const ym = t.slice(0, 7);
+  qs('#wk-stats').innerHTML = [[open.filter(w => w.date === t).length, 'azi'], [open.filter(w => w.date && w.date < t).length, 'întârziate'],
+    [open.length, 'de făcut'], [W.filter(w => w.status === 'done' && (w.doneDate || '').startsWith(ym)).length, 'terminate luna asta']]
+    .map(([n, l]) => `<div class="qt-stat"><b>${n}</b> ${l}</div>`).join('');
+  const f = qs('#wk-filter').value, term = qs('#wk-search').value.trim().toLowerCase();
+  let rows = W.filter(w => f === 'all' ? true : f === 'done' ? w.status === 'done' : f === 'today' ? open.includes(w) && w.date && w.date <= t
+    : f === 'week' ? open.includes(w) && w.date && w.date <= ymdAdd(t, 7) : open.includes(w));
+  if (term) rows = rows.filter(w => [w.title, w.clientName, w.channels, w.description, w.solution, WK_TYPE[w.type][1]].join(' ').toLowerCase().includes(term));
+  const key = w => w.status === 'done' ? 'z' + (9e15 - Date.parse(w.doneDate || '2000-01-01')) : (w.priority === 'urgent' ? '0' : '1') + (w.date || '9999') + (w.time || '');
+  rows.sort((a, b) => key(a).localeCompare(key(b)));
+  const list = qs('#wk-list');
+  if (!W.length) { list.innerHTML = '<div class="cl-empty">Nicio lucrare încă.<br>Apasă „Lucrare nouă”, sau „🛠 Lucrare” lângă o alertă, ca să o creezi direct din problemă.</div>'; return; }
+  if (!rows.length) { list.innerHTML = `<div class="cl-empty">${f === 'open' ? '✓ Nimic de făcut. Bravo!' : 'Nicio lucrare găsită.'}</div>`; return; }
+  list.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px">' + rows.map(w => {
+    const wh = wkWhen(w), ty = WK_TYPE[w.type] || WK_TYPE.altele, nf = (w.files || []).length;
+    const sub = [w.clientName, w.channels, ty[1], nf ? '📷 ' + nf : ''].filter(Boolean).map(escapeHtml).join(' · ');
+    return `<div class="cl-card" role="button" tabindex="0" data-wid="${escapeHtml(w.id)}"><div class="op-ic ${w.type}">${ty[0]}</div>
+      <div class="cl-main"><div class="cl-name"><span>${escapeHtml(w.title)}</span></div><div class="cl-sub">${sub}</div></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">${w.priority === 'urgent' && w.status !== 'done' ? '<span class="op-pill urgent">URGENT</span>' : `<span class="op-pill ${wh.cls === 'late' ? 'late' : w.status}">${wh.cls === 'late' ? 'Întârziată' : WK_ST[w.status]}</span>`}<span class="op-when ${wh.cls}">${escapeHtml(wh.txt)}</span></div></div>`;
+  }).join('') + '</div>';
+}
+function wmParts() {
+  const box = qs('#wm-parts'), parts = wmDraft.parts || [];
+  const opts = sel => '<option value="">— alege din stoc —</option>' + ops.stock.slice().sort((a, b) => a.name.localeCompare(b.name, 'ro')).map(s => `<option value="${escapeHtml(s.id)}"${s.id === sel ? ' selected' : ''}>${escapeHtml(s.name)} (în stoc: ${s.qty})</option>`).join('');
+  box.innerHTML = parts.length ? parts.map((p, i) => `<div class="op-part" data-i="${i}"><select class="form-input" data-k="stockId">${opts(p.stockId)}</select><input class="form-input" type="number" min="1" step="1" data-k="qty" value="${p.qty || 1}"><button type="button" data-rm="${i}" aria-label="Scoate">✕</button></div>`).join('')
+    : '<div class="cm-hint">Nicio piesă.</div>';
+}
+function wmFiles() { qs('#wm-files').innerHTML = opFilesHtml('works', wmDraft); }
+async function openWorkModal(w, pre) {
+  if (!ops) await loadOps(true); if (!ops) return;
+  await needClients();
+  wmDraft = w ? JSON.parse(JSON.stringify(w)) : { id: null, type: 'interventie', status: 'todo', priority: 'normal', parts: [], files: [], date: todayYmd(), ...(pre || {}) };
+  const d = wmDraft;
+  qs('#wm-title').textContent = w ? (WK_TYPE[d.type] || WK_TYPE.altele)[1] + ': ' + d.title : 'Lucrare nouă';
+  qs('#wm-name').value = d.title || ''; qs('#wm-type').value = d.type; qs('#wm-status').value = d.status; qs('#wm-prio').value = d.priority || 'normal';
+  qs('#wm-client').innerHTML = clientOptions(d.clientId); qs('#wm-nvr').innerHTML = nvrOptions(d.nvrId);
+  qs('#wm-date').value = d.date || ''; qs('#wm-time').value = d.time || ''; qs('#wm-ch').value = d.channels || '';
+  qs('#wm-repeat').value = String(d.repeatMonths || 0); qs('#wm-desc').value = d.description || ''; qs('#wm-sol').value = d.solution || '';
+  qs('#wm-src').textContent = d.source ? 'Creată din: ' + d.source : '';
+  qs('#wm-delete').style.display = w ? '' : 'none'; qs('#wm-done').style.display = d.status === 'done' ? 'none' : '';
+  wmTypeUi(); wmParts(); wmFiles();
+  qs('#work-modal').classList.remove('hidden');
+  if (!w && !d.title) setTimeout(() => qs('#wm-name').focus(), 50);
+}
+function wmTypeUi() { qs('#wm-repeat-row').style.display = qs('#wm-type').value === 'revizie' ? '' : 'none'; }
+function closeWorkModal() { qs('#work-modal').classList.add('hidden'); wmDraft = null; }
+function wmCollectParts() {
+  return [...qs('#wm-parts').querySelectorAll('.op-part')].map(r => {
+    const sid = r.querySelector('[data-k=stockId]').value, it = ops.stock.find(s => s.id === sid);
+    return { stockId: sid, name: it ? it.name : '', qty: parseInt(r.querySelector('[data-k=qty]').value) || 0 };
+  }).filter(p => p.stockId && p.qty > 0);
+}
+async function wmSave(stay, forceDone) {
+  const title = qs('#wm-name').value.trim();
+  if (!title) { toast('Scrie ce trebuie făcut', 'warn'); qs('#wm-name').focus(); return false; }
+  const cid = qs('#wm-client').value, cl = (clients || []).find(c => c.id === cid);
+  let status = forceDone ? 'done' : qs('#wm-status').value;
+  if (status === 'todo' && qs('#wm-date').value && qs('#wm-date').value > todayYmd()) status = 'scheduled';
+  const body = { title, type: qs('#wm-type').value, status, priority: qs('#wm-prio').value, clientId: cid, clientName: cl ? cl.name : '',
+    nvrId: qs('#wm-nvr').value, channels: qs('#wm-ch').value.trim(), date: qs('#wm-date').value, time: qs('#wm-time').value,
+    repeatMonths: qs('#wm-type').value === 'revizie' ? +qs('#wm-repeat').value : 0, description: qs('#wm-desc').value.trim(), solution: qs('#wm-sol').value.trim(),
+    parts: wmCollectParts(), doneDate: status === 'done' ? (wmDraft.doneDate || todayYmd()) : '', source: wmDraft.source || '', quoteId: wmDraft.quoteId || '' };
+  try {
+    const r = wmDraft.id ? await clApi('/ops/works/' + encodeURIComponent(wmDraft.id), jsonOpt('PUT', body)) : await clApi('/ops/works', jsonOpt('POST', body));
+    opsApply(r); wmDraft = JSON.parse(JSON.stringify(r.item)); renderWorks(); renderStock();
+    if (!stay) { closeWorkModal(); toast(status === 'done' ? 'Lucrare terminată ✓' + (body.parts.length ? ' · piesele s-au scăzut din stoc' : '') + (body.repeatMonths ? ' · următoarea revizie e programată' : '') : 'Lucrare salvată', 'ok'); }
+    else { qs('#wm-delete').style.display = ''; }
+    return true;
+  } catch (e) { toast(e.message, 'err'); return false; }
+}
+qs('#wk-add-btn').addEventListener('click', () => openWorkModal(null));
+qs('#wk-search').addEventListener('input', renderWorks); qs('#wk-filter').addEventListener('change', renderWorks);
+qs('#wk-list').addEventListener('click', e => { const c = e.target.closest('[data-wid]'); if (c) openWorkModal(ops.works.find(x => x.id === c.dataset.wid)); });
+qs('#wk-list').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset.wid) { e.preventDefault(); e.target.click(); } });
+qs('#wm-type').addEventListener('change', wmTypeUi);
+qs('#wm-client').addEventListener('change', () => { const c = (clients || []).find(x => x.id === qs('#wm-client').value); if (c && c.equip && c.equip.nvrId && !qs('#wm-nvr').value) qs('#wm-nvr').value = c.equip.nvrId; });
+qs('#wm-part-add').addEventListener('click', () => { if (!ops.stock.length) return toast('Adaugă întâi produse în Stoc', 'warn'); wmDraft.parts = wmCollectParts().concat({ stockId: '', qty: 1 }); wmParts(); });
+qs('#wm-parts').addEventListener('click', e => { const b = e.target.closest('[data-rm]'); if (!b) return; const p = wmCollectParts(); wmDraft.parts = [...qs('#wm-parts').querySelectorAll('.op-part')].map(r => ({ stockId: r.querySelector('[data-k=stockId]').value, qty: parseInt(r.querySelector('[data-k=qty]').value) || 1 })).filter((_, i) => i !== +b.dataset.rm); wmParts(); });
+qs('#wm-x').addEventListener('click', closeWorkModal);
+qs('#work-modal').addEventListener('click', e => { if (e.target.id === 'work-modal') closeWorkModal(); });
+qs('#wm-save').addEventListener('click', () => wmSave(false));
+qs('#wm-done').addEventListener('click', () => wmSave(false, true));
+qs('#wm-delete').addEventListener('click', async () => {
+  if (!wmDraft || !wmDraft.id || !(await confirmDialog({ title: 'Ștergi lucrarea?', html: `<b>${escapeHtml(wmDraft.title)}</b> va fi ștearsă, cu tot cu poze.`, okLabel: 'Șterge' }))) return;
+  try { opsApply(await clApi('/ops/works/' + encodeURIComponent(wmDraft.id), { method: 'DELETE' })); closeWorkModal(); renderWorks(); toast('Lucrare ștearsă', 'ok'); } catch (e) { toast(e.message, 'err'); }
+});
+qs('#wm-up').addEventListener('click', () => qs('#wm-file').click());
+qs('#wm-file').addEventListener('change', e => { opUpload('works', wmDraft, e.target.files, qs('#wm-up'), wmSave, () => { wmFiles(); renderWorks(); }); e.target.value = ''; });
+qs('#wm-files').addEventListener('click', e => { const b = e.target.closest('.del'); if (b) opDelFile('works', wmDraft, b.dataset.fid, () => { wmFiles(); renderWorks(); }); });
+document.querySelectorAll('#panel-works .seg button').forEach(b => b.addEventListener('click', () => showWkView(b.dataset.wv)));
+function showWkView(v) {
+  document.querySelectorAll('#panel-works .seg button').forEach(b => b.classList.toggle('on', b.dataset.wv === v));
+  qs('#wk-view-works').hidden = v !== 'works'; qs('#wk-view-stock').hidden = v !== 'stock';
+  try { localStorage.setItem('yca_wk_view', v); } catch {}
+}
+document.querySelectorAll('.nav-tab[data-tab="works"]').forEach(t => t.addEventListener('click', () => { let v = 'works'; try { v = localStorage.getItem('yca_wk_view') || 'works'; } catch {} showWkView(v === 'stock' ? 'stock' : 'works'); loadOps(true); }));
+
+/* ── Stoc ── */
+function renderStock() {
+  if (!ops) return;
+  const S = ops.stock, low = S.filter(s => s.minQty && s.qty < s.minQty);
+  const sb = qs('#st-badge'); sb.hidden = !low.length; sb.textContent = low.length;
+  const val = S.reduce((a, s) => a + (s.price || 0) * (s.qty || 0), 0);
+  qs('#st-stats').innerHTML = [[S.length, 'produse'], [S.reduce((a, s) => a + (s.qty || 0), 0), 'bucăți'], [low.length, 'sub minim'], [Math.round(val).toLocaleString('ro-RO') + ' lei', 'valoare stoc']]
+    .map(([n, l]) => `<div class="qt-stat"><b>${n}</b> ${l}</div>`).join('');
+  const term = qs('#st-search').value.trim().toLowerCase();
+  const rows = S.filter(s => !term || [s.name, s.model, s.supplier, s.serials, s.notes].join(' ').toLowerCase().includes(term));
+  const list = qs('#st-list');
+  if (!S.length) { list.innerHTML = '<div class="cl-empty">Stocul e gol.<br>Apasă „Produs nou” și adaugă ce ai în depozit (camere, HDD-uri, NVR-uri, cablu).</div>'; return; }
+  if (!rows.length) { list.innerHTML = '<div class="cl-empty">Niciun produs găsit.</div>'; return; }
+  let html = low.length && !term ? `<div class="op-banner err">📦 Sub stocul minim: ${low.map(s => `<b>${escapeHtml(s.name)}</b> (${s.qty}/${s.minQty})`).join(', ')}</div>` : '';
+  for (const cat of Object.keys(ST_CAT)) {
+    const g = rows.filter(s => s.cat === cat).sort((a, b) => a.name.localeCompare(b.name, 'ro')); if (!g.length) continue;
+    html += `<div class="cd-grp">${ST_CAT[cat]}</div>` + g.map(s => {
+      const isLow = s.minQty && s.qty < s.minQty;
+      const sub = [s.model, s.supplier, s.price ? s.price.toLocaleString('ro-RO') + ' lei/' + (s.unit || 'buc') : '', s.minQty ? 'minim ' + s.minQty : ''].filter(Boolean).map(escapeHtml).join(' · ');
+      return `<div class="cl-card" role="button" tabindex="0" data-sid="${escapeHtml(s.id)}"><div class="cl-main"><div class="cl-name"><span>${escapeHtml(s.name)}</span></div><div class="cl-sub">${sub || '&nbsp;'}</div></div>
+        <div class="st-qty"><button type="button" data-d="-1" aria-label="Scade">−</button><b class="${isLow ? 'low' : ''}">${s.qty} <small style="font-weight:600;color:var(--fg-3)">${escapeHtml(s.unit || 'buc')}</small></b><button type="button" data-d="1" aria-label="Adaugă">+</button></div></div>`;
+    }).join('');
+  }
+  list.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">${html}</div>`;
+}
+function openStockModal(s) {
+  smDraft = s ? { ...s } : { id: null };
+  qs('#sm-title').textContent = s ? s.name : 'Produs nou';
+  qs('#sm-name').value = s ? s.name : ''; qs('#sm-cat').value = s ? s.cat : 'camera'; qs('#sm-model').value = s ? s.model || '' : '';
+  qs('#sm-qty').value = s ? s.qty : ''; qs('#sm-min').value = s && s.minQty ? s.minQty : ''; qs('#sm-unit').value = s ? s.unit || 'buc' : 'buc';
+  qs('#sm-price').value = s && s.price ? s.price : ''; qs('#sm-sup').value = s ? s.supplier || '' : ''; qs('#sm-serials').value = s ? s.serials || '' : ''; qs('#sm-notes').value = s ? s.notes || '' : '';
+  qs('#sm-delete').style.display = s ? '' : 'none'; qs('#stock-modal').classList.remove('hidden');
+  if (!s) setTimeout(() => qs('#sm-name').focus(), 50);
+}
+function closeStockModal() { qs('#stock-modal').classList.add('hidden'); smDraft = null; }
+async function stSave(id, body) {
+  const r = id ? await clApi('/ops/stock/' + encodeURIComponent(id), jsonOpt('PUT', body)) : await clApi('/ops/stock', jsonOpt('POST', body));
+  opsApply(r); renderStock(); return r.item;
+}
+qs('#st-add-btn').addEventListener('click', () => openStockModal(null));
+qs('#st-search').addEventListener('input', renderStock);
+qs('#st-list').addEventListener('click', async e => {
+  const c = e.target.closest('[data-sid]'); if (!c) return; const s = ops.stock.find(x => x.id === c.dataset.sid); if (!s) return;
+  const b = e.target.closest('[data-d]');
+  if (!b) return openStockModal(s);
+  e.stopPropagation(); const q = Math.max(0, s.qty + (+b.dataset.d)); if (q === s.qty) return;
+  try { await stSave(s.id, { ...s, qty: q }); } catch (err) { toast(err.message, 'err'); }
+});
+qs('#st-list').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset.sid) { e.preventDefault(); e.target.click(); } });
+qs('#sm-x').addEventListener('click', closeStockModal); qs('#sm-cancel').addEventListener('click', closeStockModal);
+qs('#stock-modal').addEventListener('click', e => { if (e.target.id === 'stock-modal') closeStockModal(); });
+qs('#sm-save').addEventListener('click', async () => {
+  const name = qs('#sm-name').value.trim(); if (!name) { toast('Scrie denumirea', 'warn'); return qs('#sm-name').focus(); }
+  try {
+    await stSave(smDraft.id, { name, cat: qs('#sm-cat').value, model: qs('#sm-model').value.trim(), qty: qs('#sm-qty').value, minQty: qs('#sm-min').value,
+      unit: qs('#sm-unit').value.trim() || 'buc', price: qs('#sm-price').value, supplier: qs('#sm-sup').value.trim(), serials: qs('#sm-serials').value.trim(), notes: qs('#sm-notes').value.trim() });
+    closeStockModal(); toast('Produs salvat', 'ok');
+  } catch (e) { toast(e.message, 'err'); }
+});
+qs('#sm-delete').addEventListener('click', async () => {
+  if (!smDraft || !smDraft.id || !(await confirmDialog({ title: 'Ștergi produsul din stoc?', okLabel: 'Șterge' }))) return;
+  try { opsApply(await clApi('/ops/stock/' + encodeURIComponent(smDraft.id), { method: 'DELETE' })); closeStockModal(); renderStock(); toast('Produs șters', 'ok'); } catch (e) { toast(e.message, 'err'); }
+});
+
+/* ── Încasări (din abonamentele clienților) ── */
+function payMonthOptions() {
+  const sel = qs('#pay-month'), cur = sel.value || ymNow(); const out = []; let ym = ymNow();
+  for (let i = 0; i < 12; i++) { out.push(ym); ym = ymAdd(ym, -1); }
+  sel.innerHTML = out.map(m => `<option value="${m}"${m === cur ? ' selected' : ''}>${ymLabel(m)}</option>`).join('');
+}
+function payInfo(c, ym) {
+  const months = clMonths(c), paid = (c.sub && c.sub.paid) || {}, now = ymNow(), day = new Date().getDate();
+  const isLate = m => !paid[m] && (m < now || day > (c.sub.dueDay || 1));
+  const lateMonths = months.filter(isLate);
+  return { inRange: months.includes(ym), paid: paid[ym] || '', late: months.includes(ym) && isLate(ym), lateMonths, amount: +c.sub.amount || 0 };
+}
+async function renderPay() {
+  await needClients(); payMonthOptions();
+  const ym = qs('#pay-month').value, subs = (clients || []).filter(c => c.sub && c.sub.active);
+  const rows0 = subs.map(c => ({ c, p: payInfo(c, ym) })).filter(x => x.p.inRange);
+  const due = rows0.reduce((a, x) => a + x.p.amount, 0), got = rows0.filter(x => x.p.paid).reduce((a, x) => a + x.p.amount, 0);
+  const debtors = subs.map(c => ({ c, p: payInfo(c, ym) })).filter(x => x.p.lateMonths.length);
+  const debt = debtors.reduce((a, x) => a + x.p.lateMonths.length * x.p.amount, 0);
+  const pb = qs('#pay-badge'); pb.hidden = !debtors.length; pb.textContent = debtors.length;
+  const L = n => Math.round(n).toLocaleString('ro-RO') + ' lei';
+  qs('#pay-stats').innerHTML = [[L(subs.reduce((a, c) => a + (+c.sub.amount || 0), 0)), 'abonamente / lună'], [L(got), 'încasat ' + ymLabel(ym).split(' ')[0].toLowerCase()],
+    [L(due - got), 'de încasat'], [debtors.length, 'restanțieri'], [L(debt), 'restanță totală']].map(([n, l]) => `<div class="qt-stat"><b>${n}</b> ${l}</div>`).join('');
+  const f = qs('#pay-filter').value, term = qs('#pay-search').value.trim().toLowerCase();
+  let rows = rows0.filter(x => f === 'all' ? true : f === 'paid' ? x.p.paid : f === 'late' ? x.p.lateMonths.length : !x.p.paid);
+  if (term) rows = rows.filter(x => [x.c.name, x.c.contact, x.c.address, x.c.phone].join(' ').toLowerCase().includes(term));
+  rows.sort((a, b) => b.p.lateMonths.length - a.p.lateMonths.length || a.c.name.localeCompare(b.c.name, 'ro'));
+  const list = qs('#pay-list');
+  if (!subs.length) { list.innerHTML = '<div class="cl-empty">Niciun client cu abonament activ.<br>Abonamentul se setează din fișa clientului (Clienți → client → Abonament).</div>'; return; }
+  if (!rows.length) { list.innerHTML = `<div class="cl-empty">${f === 'unpaid' ? '✓ Toți au plătit pe ' + ymLabel(ym) + '.' : 'Nimic de afișat.'}</div>`; return; }
+  list.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px">' + rows.map(({ c, p }) => {
+    const lm = p.lateMonths.length, st = p.paid ? ['ok', 'plătit ' + fmtDate(p.paid).slice(0, 5)] : p.late ? ['late', 'restant'] : ['soon', 'scadent pe ' + (c.sub.dueDay || 1)];
+    const msg = `Bună ziua! Vă reamintim de plata abonamentului de supraveghere video${lm > 1 ? ` (${lm} luni restante: ${p.lateMonths.map(ymLabel).join(', ')}, total ${L(lm * p.amount)})` : ` pentru ${ymLabel(ym)} (${L(p.amount)})`}. Mulțumim! SUPRAVEGHERE24h`;
+    return `<div class="cl-card pay-row" data-pcid="${escapeHtml(c.id)}"><div class="cl-main"><div class="cl-name"><span>${escapeHtml(c.name)}</span></div>
+      <div class="cl-sub">${L(p.amount)} / lună${lm ? ` · <b style="color:var(--err)">${lm} ${lm === 1 ? 'lună restantă' : 'luni restante'} (${L(lm * p.amount)})</b>` : ''}</div></div>
+      <span class="cl-pay ${st[0]}">${st[1]}</span>
+      <div class="pay-acts">${p.paid ? '' : `<button type="button" class="btn primary" data-paid="${escapeHtml(c.id)}">✓ Plătit</button>`}${!p.paid && c.phone ? `<a class="btn" href="https://wa.me/${waNum(c.phone)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}</div></div>`;
+  }).join('') + '</div>';
+}
+qs('#pay-month').addEventListener('change', renderPay); qs('#pay-filter').addEventListener('change', renderPay); qs('#pay-search').addEventListener('input', renderPay);
+qs('#pay-list').addEventListener('click', async e => {
+  const b = e.target.closest('[data-paid]');
+  if (!b) { if (e.target.closest('a,button')) return; const r = e.target.closest('[data-pcid]'); if (r) { const c = clients.find(x => x.id === r.dataset.pcid); if (c) openClientModal(c); } return; }
+  const c = clients.find(x => x.id === b.dataset.paid); if (!c) return; const ym = qs('#pay-month').value;
+  b.disabled = true;
+  try {
+    const r = await clApi('/clients/' + encodeURIComponent(c.id), jsonOpt('PUT', { ...c, sub: { ...c.sub, paid: { ...(c.sub.paid || {}), [ym]: todayYmd() } } }));
+    const i = clients.findIndex(x => x.id === c.id); if (i >= 0) clients[i] = r.client || clients[i];
+    toast(`${c.name}: ${ymLabel(ym)} plătit`, 'ok'); renderPay();
+  } catch (err) { toast(err.message, 'err'); b.disabled = false; }
+});
+
+/* ── Cereri de imagini (GDPR) ── */
+function renderGdpr() {
+  if (!ops) return;
+  const term = qs('#gd-search').value.trim().toLowerCase();
+  const rows = ops.gdpr.filter(g => !term || [g.requester, g.clientName, g.docNo, g.reason, g.channels, g.deliveredTo].join(' ').toLowerCase().includes(term))
+    .sort((a, b) => (a.status === 'primita' ? 0 : 1) - (b.status === 'primita' ? 0 : 1) || (b.reqDate || '').localeCompare(a.reqDate || ''));
+  const list = qs('#gd-list');
+  if (!ops.gdpr.length) { list.innerHTML = '<div class="cl-empty">Nicio cerere înregistrată.<br>Când Poliția sau un locatar cere imagini, apasă „Cerere nouă” și notează cine, ce interval și cui le-ai predat.</div>'; return; }
+  if (!rows.length) { list.innerHTML = '<div class="cl-empty">Nicio cerere găsită.</div>'; return; }
+  list.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px">' + rows.map(g => {
+    const st = GD_ST[g.status] || GD_ST.primita, nf = (g.files || []).length;
+    const per = g.periodFrom ? g.periodFrom.replace('T', ' ').slice(5) + (g.periodTo ? ' → ' + g.periodTo.replace('T', ' ').slice(5) : '') : '';
+    const sub = [GD_TYPE[g.requesterType], g.clientName, g.docNo ? 'nr. ' + g.docNo : '', per, nf ? '📎 ' + nf : ''].filter(Boolean).map(escapeHtml).join(' · ');
+    return `<div class="cl-card" role="button" tabindex="0" data-gid="${escapeHtml(g.id)}"><div class="op-ic">${(GD_TYPE[g.requesterType] || '📄').split(' ')[0]}</div>
+      <div class="cl-main"><div class="cl-name"><span>${escapeHtml(g.requester)}</span></div><div class="cl-sub">${sub}</div></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="cl-pay ${st[1]}">${st[0]}</span><span class="op-when">${fmtDate(g.reqDate)}</span></div></div>`;
+  }).join('') + '</div>';
+}
+function gmFiles() { qs('#gm-files').innerHTML = opFilesHtml('gdpr', gmDraft); }
+async function openGdprModal(g) {
+  if (!ops) await loadOps(true); if (!ops) return; await needClients();
+  gmDraft = g ? JSON.parse(JSON.stringify(g)) : { id: null, files: [] };
+  const d = gmDraft;
+  qs('#gm-title').textContent = g ? 'Cerere: ' + g.requester : 'Cerere de imagini';
+  qs('#gm-type').value = d.requesterType || 'politie'; qs('#gm-who').value = d.requester || ''; qs('#gm-client').innerHTML = clientOptions(d.clientId);
+  qs('#gm-doc').value = d.docNo || ''; qs('#gm-date').value = d.reqDate || todayYmd(); qs('#gm-ch').value = d.channels || '';
+  qs('#gm-from').value = d.periodFrom || ''; qs('#gm-to').value = d.periodTo || ''; qs('#gm-reason').value = d.reason || '';
+  qs('#gm-status').value = d.status || 'primita'; qs('#gm-ddate').value = d.deliveredDate || ''; qs('#gm-dto').value = d.deliveredTo || '';
+  qs('#gm-method').value = d.method || ''; qs('#gm-notes').value = d.notes || '';
+  qs('#gm-delete').style.display = g ? '' : 'none'; gmFiles(); qs('#gdpr-modal').classList.remove('hidden');
+  if (!g) setTimeout(() => qs('#gm-who').focus(), 50);
+}
+function closeGdprModal() { qs('#gdpr-modal').classList.add('hidden'); gmDraft = null; }
+async function gmSave(stay) {
+  const who = qs('#gm-who').value.trim(); if (!who) { toast('Scrie cine a cerut imaginile', 'warn'); qs('#gm-who').focus(); return false; }
+  const cid = qs('#gm-client').value, cl = (clients || []).find(c => c.id === cid), status = qs('#gm-status').value;
+  const body = { requesterType: qs('#gm-type').value, requester: who, clientId: cid, clientName: cl ? cl.name : '', docNo: qs('#gm-doc').value.trim(),
+    reqDate: qs('#gm-date').value, channels: qs('#gm-ch').value.trim(), periodFrom: qs('#gm-from').value, periodTo: qs('#gm-to').value, reason: qs('#gm-reason').value.trim(),
+    status, deliveredDate: qs('#gm-ddate').value || (status === 'livrata' ? todayYmd() : ''), deliveredTo: qs('#gm-dto').value.trim(), method: qs('#gm-method').value.trim(), notes: qs('#gm-notes').value.trim() };
+  try {
+    const r = gmDraft.id ? await clApi('/ops/gdpr/' + encodeURIComponent(gmDraft.id), jsonOpt('PUT', body)) : await clApi('/ops/gdpr', jsonOpt('POST', body));
+    opsApply(r); gmDraft = JSON.parse(JSON.stringify(r.item)); renderGdpr();
+    if (!stay) { closeGdprModal(); toast('Cerere salvată', 'ok'); } else qs('#gm-delete').style.display = '';
+    return true;
+  } catch (e) { toast(e.message, 'err'); return false; }
+}
+qs('#gd-add-btn').addEventListener('click', () => openGdprModal(null));
+qs('#gd-search').addEventListener('input', renderGdpr);
+qs('#gd-list').addEventListener('click', e => { const c = e.target.closest('[data-gid]'); if (c) openGdprModal(ops.gdpr.find(x => x.id === c.dataset.gid)); });
+qs('#gd-list').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset.gid) { e.preventDefault(); e.target.click(); } });
+qs('#gm-x').addEventListener('click', closeGdprModal); qs('#gm-cancel').addEventListener('click', closeGdprModal);
+qs('#gdpr-modal').addEventListener('click', e => { if (e.target.id === 'gdpr-modal') closeGdprModal(); });
+qs('#gm-save').addEventListener('click', () => gmSave(false));
+qs('#gm-status').addEventListener('change', () => { if (qs('#gm-status').value === 'livrata' && !qs('#gm-ddate').value) qs('#gm-ddate').value = todayYmd(); });
+qs('#gm-delete').addEventListener('click', async () => {
+  if (!gmDraft || !gmDraft.id || !(await confirmDialog({ title: 'Ștergi cererea din registru?', okLabel: 'Șterge' }))) return;
+  try { opsApply(await clApi('/ops/gdpr/' + encodeURIComponent(gmDraft.id), { method: 'DELETE' })); closeGdprModal(); renderGdpr(); toast('Cerere ștearsă', 'ok'); } catch (e) { toast(e.message, 'err'); }
+});
+qs('#gm-up').addEventListener('click', () => qs('#gm-file').click());
+qs('#gm-file').addEventListener('change', e => { opUpload('gdpr', gmDraft, e.target.files, qs('#gm-up'), gmSave, () => { gmFiles(); renderGdpr(); }); e.target.value = ''; });
+qs('#gm-files').addEventListener('click', e => { const b = e.target.closest('.del'); if (b) opDelFile('gdpr', gmDraft, b.dataset.fid, () => { gmFiles(); renderGdpr(); }); });
+
+/* ── Lucrare din alertă / din ofertă acceptată ── */
+function workFromAlert(i) {
+  const a = alerts[i]; if (!a) return;
+  const txt = String(a.msg || '').replace(/<[^>]+>/g, '').trim();
+  const nvr = nvrs.find(n => n.name === a.nvr);
+  const cl = nvr && (clients || []).find(c => c.equip && String(c.equip.nvrId) === String(nvr.id));
+  const ch = (txt.match(/CH\s?\d+/gi) || []).map(x => x.toUpperCase().replace(/\s/g, '')).join(', ');
+  openWorkModal(null, { title: (a.nvr ? a.nvr + ': ' : '') + txt.slice(0, 120), description: txt, nvrId: nvr ? String(nvr.id) : '', clientId: cl ? cl.id : '',
+    channels: ch, priority: a.type === 'crit' ? 'urgent' : 'normal', source: 'alertă ' + (a.t || '') });
+}
+function workFromQuote(q) {
+  const c = q.customer || {};
+  openWorkModal(null, { type: 'montaj', status: 'todo', date: '', title: 'Montaj — ' + (c.assoc || c.address || c.name), clientId: q.clientId || '', quoteId: q.id,
+    description: `Oferta nr. ${q.no}: ${q.pricing.totalCams} camere${q.pricing.cams ? ` (interior ${Math.max(0, (q.pricing.totalCams || 0) - (q.pricing.cams.ex || 0) - (q.pricing.cams.lift || 0))}, exterior ${q.pricing.cams.ex || 0}, lift ${q.pricing.cams.lift || 0})` : ''}\nContact: ${c.name || ''} ${c.phone || ''}\nAdresă: ${[c.address, c.city].filter(Boolean).join(', ')}`,
+    source: 'oferta nr. ' + q.no });
+}
+setTimeout(() => { if (getAuth()) loadOps(true); }, 4500); setInterval(() => { if (getAuth() && document.documentElement.classList.contains('unlocked')) loadOps(true); }, 300000);
+
+qs('#alert-list').addEventListener('click', e => { const b = e.target.closest('.al-work'); if (b) workFromAlert(+b.dataset.ai); });
+qs('#open-log-btn').addEventListener('click', () => {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('on')); document.querySelectorAll('.panel').forEach(x => x.classList.remove('on'));
+  qs('#panel-log').classList.add('on'); try { renderLog(); } catch {} window.scrollTo(0, 0);
+});
 renderAuthUI();
 bootAuth();
 

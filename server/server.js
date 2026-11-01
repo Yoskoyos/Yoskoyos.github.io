@@ -180,7 +180,7 @@ function getAuth(req) {
   if (!tok) {   // <img src> nu poate trimite antete → tokenul poate veni și în ?token= (doar pentru /snap)
     try {
       const q = url.parse(req.url, true);
-      const tokOk = q.pathname === '/snap' || (req.method === 'GET' && (q.pathname === '/clients-backup' || /^\/clients\/[\w-]+\/contracts\/[\w-]+$/.test(q.pathname || '') || /^\/company-docs\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '')));
+      const tokOk = q.pathname === '/snap' || (req.method === 'GET' && (q.pathname === '/clients-backup' || /^\/clients\/[\w-]+\/contracts\/[\w-]+$/.test(q.pathname || '') || /^\/company-docs\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/ops\/(works|stock|gdpr)\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '')));
       if (tokOk && q.query.token) tok = String(q.query.token);
     } catch {}
   }
@@ -663,6 +663,7 @@ async function monitorRun() {
     }
 
     try { await cdocReminders(db); } catch (e) { console.error('[acte] remindere:', e.message); }
+    try { await opsMorning(db); } catch (e) { console.error('[lucrari] dimineata:', e.message); }
 
     monLastRun = new Date().toISOString();
     saveMonState();
@@ -979,6 +980,132 @@ async function handleCompanyDocs(req, res, pathname) {
   }
   return sendJson(res, 405, { error: 'Operație necunoscută' });
 }
+/* ═════════════ Organizare: lucrări, stoc, cereri de imagini (GDPR) ═════════════
+   ops.json: { user: { works: [], stock: [], gdpr: [] } } · fișiere: ops-files/<user>/<coll>/<id>/<fileId>.<ext>
+   Lucrare terminată → scade din stoc piesele folosite (o singură dată) și, la revizii periodice, creează următoarea revizie. */
+const OPS_FILE = path.join(BASE_DIR, 'ops.json');
+const OPS_DIR = path.join(BASE_DIR, 'ops-files');
+const OPS_COLLS = ['works', 'stock', 'gdpr'];
+function loadOps() { try { const c = JSON.parse(fs.readFileSync(OPS_FILE, 'utf8')); return c && typeof c === 'object' ? c : {}; } catch { return {}; } }
+function saveOps(all) { const tmp = OPS_FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(all, null, 2), { mode: 0o600 }); fs.renameSync(tmp, OPS_FILE); }
+const pick = (v, list, def) => list.includes(v) ? v : def;
+const hhmm = v => /^\d{2}:\d{2}$/.test(String(v || '')) ? String(v) : '';
+function cleanOp(coll, b, prev) {
+  const base = { id: prev ? prev.id : newId(), files: prev ? (prev.files || []) : [], createdAt: prev ? prev.createdAt : Date.now(), updatedAt: Date.now() };
+  if (coll === 'works') {
+    const parts = (Array.isArray(b.parts) ? b.parts : []).slice(0, 40).map(x => ({ stockId: str(x && x.stockId, 40), name: str(x && x.name, 200), qty: Math.max(0, Math.round(num(x && x.qty))) })).filter(x => x.name && x.qty);
+    return { ...base, title: str(b.title, 200).trim(), type: pick(b.type, ['interventie', 'montaj', 'revizie', 'altele'], 'interventie'),
+      status: pick(b.status, ['todo', 'scheduled', 'done', 'cancelled'], 'todo'), priority: pick(b.priority, ['normal', 'urgent'], 'normal'),
+      clientId: str(b.clientId, 40), clientName: str(b.clientName, 200), nvrId: str(b.nvrId, 40), channels: str(b.channels, 120),
+      date: ymd(b.date), time: hhmm(b.time), doneDate: ymd(b.doneDate), description: str(b.description, 4000), solution: str(b.solution, 4000),
+      parts, repeatMonths: Math.min(24, Math.max(0, Math.round(num(b.repeatMonths)))), source: str(b.source, 300), quoteId: str(b.quoteId, 40),
+      stockApplied: prev ? !!prev.stockApplied : false, nextCreated: prev ? !!prev.nextCreated : false };
+  }
+  if (coll === 'stock') {
+    return { ...base, name: str(b.name, 200).trim(), cat: pick(b.cat, ['camera', 'nvr', 'hdd', 'switch', 'cablu', 'sursa', 'altele'], 'altele'),
+      qty: Math.max(0, Math.round(num(b.qty))), minQty: Math.max(0, Math.round(num(b.minQty))), unit: str(b.unit, 20) || 'buc',
+      model: str(b.model, 120), supplier: str(b.supplier, 200), price: Math.max(0, num(b.price)), serials: str(b.serials, 4000), notes: str(b.notes, 4000) };
+  }
+  return { ...base, clientId: str(b.clientId, 40), clientName: str(b.clientName, 200),
+    requesterType: pick(b.requesterType, ['politie', 'locatar', 'administrator', 'asigurator', 'altele'], 'politie'), requester: str(b.requester, 200).trim(),
+    docNo: str(b.docNo, 120), reqDate: ymd(b.reqDate) || new Date().toISOString().slice(0, 10), periodFrom: str(b.periodFrom, 40), periodTo: str(b.periodTo, 40),
+    channels: str(b.channels, 200), reason: str(b.reason, 2000), status: pick(b.status, ['primita', 'livrata', 'refuzata', 'fara-imagini'], 'primita'),
+    deliveredDate: ymd(b.deliveredDate), deliveredTo: str(b.deliveredTo, 200), method: str(b.method, 200), notes: str(b.notes, 4000) };
+}
+const opsRequired = { works: ['title', 'Scrie titlul lucrării'], stock: ['name', 'Scrie denumirea produsului'], gdpr: ['requester', 'Scrie cine a cerut imaginile'] };
+function addMonthsYmd(d, m) { const [y, mo, da] = d.split('-').map(Number); const t = new Date(Date.UTC(y, mo - 1 + m, 1)); const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate(); t.setUTCDate(Math.min(da, last)); return t.toISOString().slice(0, 10); }
+// efectele unei lucrări terminate
+function worksOnDone(u, w) {
+  if (w.status !== 'done') return;
+  if (!w.doneDate) w.doneDate = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' });
+  if (!w.stockApplied && (w.parts || []).length) {
+    for (const pt of w.parts) { const it = u.stock.find(x => x.id === pt.stockId); if (it) { it.qty = Math.max(0, it.qty - pt.qty); it.updatedAt = Date.now(); } }
+    w.stockApplied = true;
+  }
+  if (w.type === 'revizie' && w.repeatMonths && !w.nextCreated) {
+    const n = cleanOp('works', { ...w, status: 'scheduled', date: addMonthsYmd(w.date || w.doneDate, w.repeatMonths), time: w.time, doneDate: '', solution: '', parts: [], source: 'Revizie periodică (după ' + w.doneDate + ')' }, null);
+    u.works.push(n); w.nextCreated = true;
+  }
+}
+async function handleOps(req, res, pathname) {
+  const ctx = requireUser(req, res); if (!ctx) return;
+  const uname = ctx.user.username;
+  const all = loadOps(); const u = all[uname] = all[uname] || {}; for (const c of OPS_COLLS) if (!Array.isArray(u[c])) u[c] = [];
+  const parts = pathname.split('/').filter(Boolean);       // ops/<coll>[/id[/files[/fid]]]
+  const coll = parts[1], id = parts[2], fid = parts[4];
+  if (parts.length === 1 && req.method === 'GET') return sendJson(res, 200, { works: u.works, stock: u.stock, gdpr: u.gdpr });
+  if (!OPS_COLLS.includes(coll)) return sendJson(res, 404, { error: 'Secțiune necunoscută' });
+  const list = u[coll];
+  if (id && !/^[\w-]+$/.test(id)) return sendJson(res, 400, { error: 'ID invalid' });
+  const it = id ? list.find(x => x.id === id) : null;
+  if (id && !it) return sendJson(res, 404, { error: 'Element inexistent' });
+  const dir = id ? path.join(OPS_DIR, uname.replace(/[^\w.-]/g, '_'), coll, id) : null;
+  const reply = (code, extra) => sendJson(res, code, { works: u.works, stock: u.stock, gdpr: u.gdpr, ...extra });
+  if (parts.length === 2 && req.method === 'GET') return sendJson(res, 200, { [coll]: list });
+  if ((parts.length === 2 && req.method === 'POST') || (parts.length === 3 && (req.method === 'PUT' || req.method === 'POST'))) {
+    const b = await readJson(req); const [f, msg] = opsRequired[coll];
+    if (!str(b[f]).trim()) return sendJson(res, 400, { error: msg });
+    const x = cleanOp(coll, b, it);
+    if (it) list[list.indexOf(it)] = x; else list.push(x);
+    if (coll === 'works') worksOnDone(u, x);
+    saveOps(all); return reply(200, { item: x });
+  }
+  if (parts.length === 3 && req.method === 'DELETE') {
+    u[coll] = list.filter(x => x !== it); saveOps(all);
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+    return reply(200, { ok: true });
+  }
+  if (parts[3] === 'files') {
+    if (parts.length === 4 && req.method === 'POST') {
+      let buf; try { buf = await readRaw(req, MAX_PDF); } catch { return sendJson(res, 413, { error: 'Fișierul e prea mare (maxim 20 MB)' }); }
+      const q = url.parse(req.url, true).query;
+      const nm = str(q.name, 150).replace(/[\\/:*?"<>|\r\n]/g, '_').trim();
+      const ext = fileKind(buf, nm);
+      if (!ext) return sendJson(res, 400, { error: 'Acceptăm poze (JPG, PNG), PDF, Word sau Excel' });
+      const f = { id: newId(), ext, name: nm || ('fisier.' + ext), size: buf.length, uploadedAt: Date.now() };
+      fs.mkdirSync(dir, { recursive: true, mode: 0o700 }); fs.writeFileSync(path.join(dir, f.id + '.' + ext), buf, { mode: 0o600 });
+      it.files = (it.files || []).concat(f); it.updatedAt = Date.now(); saveOps(all);
+      return sendJson(res, 200, { item: it });
+    }
+    if (parts.length === 5) {
+      if (!/^[\w-]+$/.test(fid || '')) return sendJson(res, 400, { error: 'ID invalid' });
+      const f = (it.files || []).find(x => x.id === fid); if (!f) return sendJson(res, 404, { error: 'Fișier inexistent' });
+      const fp = path.join(dir, f.id + '.' + f.ext);
+      if (req.method === 'GET') {
+        let data; try { data = fs.readFileSync(fp); } catch { return sendJson(res, 404, { error: 'Fișierul lipsește de pe server' }); }
+        const ascii = f.name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '');
+        res.writeHead(200, { 'Content-Type': CT[f.ext] || 'application/octet-stream', 'Content-Length': data.length, 'Cache-Control': 'private, no-store',
+          'Content-Disposition': `${['pdf', 'jpg', 'png'].includes(f.ext) ? 'inline' : 'attachment'}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(f.name)}`, ...CORS });
+        return res.end(data);
+      }
+      if (req.method === 'DELETE') {
+        try { fs.unlinkSync(fp); } catch {}
+        it.files = it.files.filter(x => x !== f); it.updatedAt = Date.now(); saveOps(all);
+        return sendJson(res, 200, { item: it });
+      }
+    }
+  }
+  return sendJson(res, 405, { error: 'Operație necunoscută' });
+}
+// dimineața, la 08:00: lucrările de azi + cele întârziate + stoc sub minim (Telegram + push), o dată pe zi
+async function opsMorning(db) {
+  const hm = new Date().toLocaleTimeString('ro-RO', { timeZone: 'Europe/Bucharest', hour: '2-digit', minute: '2-digit', hour12: false });
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' });
+  if (hm < '08:00' || monState.opsDay === today) return;
+  monState.opsDay = today;
+  for (const [user, u] of Object.entries(loadOps())) {
+    const owner = db.users.find(x => x.username === user); if (!owner) continue;
+    const open = (u.works || []).filter(w => w.status === 'todo' || w.status === 'scheduled');
+    const azi = open.filter(w => w.date === today), late = open.filter(w => w.date && w.date < today);
+    const low = (u.stock || []).filter(s => s.minQty && s.qty < s.minQty);
+    if (!azi.length && !late.length && !low.length) continue;
+    const ln = w => `• ${w.time ? w.time + ' ' : ''}${escHtml(w.title)}${w.clientName ? ' — ' + escHtml(w.clientName) : ''}`;
+    const txt = [azi.length ? `🛠 <b>Lucrări azi (${azi.length})</b>\n${azi.map(ln).join('\n')}` : '',
+                 late.length ? `⏰ <b>Întârziate (${late.length})</b>\n${late.map(ln).join('\n')}` : '',
+                 low.length ? `📦 <b>Stoc sub minim</b>\n${low.map(s => `• ${escHtml(s.name)}: ${s.qty} ${escHtml(s.unit || 'buc')} (minim ${s.minQty})`).join('\n')}` : ''].filter(Boolean).join('\n\n');
+    try { notifyOwner(db, owner, txt); } catch {}
+  }
+}
 // remindere de expirare — rulează din monitor; o dată pe zi după 09:00
 const cdocDaysLeft = exp => Math.round((Date.parse(exp + 'T00:00:00Z') - Date.parse(new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' }) + 'T00:00:00Z')) / 864e5);
 async function cdocReminders(db) {
@@ -1160,6 +1287,8 @@ function handleClientsBackup(req, res) {
       used.add(fn.toLowerCase()); z.add(root + 'acte-firma/' + fn, data);
     }
   }
+  const ops = loadOps()[uname];
+  if (ops) z.add(root + 'organizare/lucrari-stoc-gdpr.json', Buffer.from(JSON.stringify(ops, null, 2), 'utf8'));
   z.add(root + 'CITESTE-MA.txt', Buffer.from(
     `Copie de siguranță — evidența clienților YCA CCTV Monitor\r\nCreată: ${new Date().toLocaleString('ro-RO')}\r\n` +
     `Clienți: ${list.length}\r\n\r\nclienti.csv  — se deschide în Excel (date de bază, echipamente, abonament)\r\n` +
@@ -2038,9 +2167,10 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 6.8, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 6.9, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
+    if (pathname === '/ops' || pathname.startsWith('/ops/')) return await handleOps(req, res, pathname);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
     if (pathname.startsWith('/email-img/') && req.method === 'GET') {
       const m = /^\/email-img\/([a-z0-9-]+)\.(png|jpg)$/.exec(pathname);
