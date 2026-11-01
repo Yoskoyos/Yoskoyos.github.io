@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Diagnostic înregistrare: ce răspunde un NVR la programul de înregistrare și la căutarea de înregistrări.
-// Folosire:  node diag-rec.js "Uverturii C2 Scara 1"   (rulat MANUAL pe VPS; nu modifică nimic, nu afișează parole)
+// Folosire:  node diag-rec.js "Depozit" 14,22 24   (NVR, canale, câte ore în urmă; rulat MANUAL pe VPS; nu modifică nimic, nu afișează parole)
 'use strict';
 const fs = require('fs'), http = require('http'), crypto = require('crypto'), path = require('path');
 const DIR = process.env.NVR_PROXY_DIR || '/opt/nvr-proxy';
@@ -36,6 +36,8 @@ function req(nvr, cred, method, uri, body) {
 }
 const short = (b, n) => b.replace(/<\?xml[^>]*>/, '').replace(/\s+/g, ' ').replace(/ xmlns="[^"]*"/g, '').slice(0, n || 1500);
 const pad2 = n => String(n).padStart(2, '0');
+const chs = String(process.argv[3] || '1').split(',').map(x => parseInt(x, 10)).filter(Boolean);
+const hours = parseFloat(process.argv[4] || '1') || 1;
 (async () => {
   let found = 0;
   for (const conf of Object.values(db.configs || {})) for (const nvr of (conf.nvrs || [])) {
@@ -43,18 +45,27 @@ const pad2 = n => String(n).padStart(2, '0');
     found++;
     const cred = (conf.creds || {})[nvr.id] || {};
     console.log(`\n===== ${nvr.name}  (${nvr.ip}:${nvr.port}) =====`);
-    for (const uri of ['/ISAPI/ContentMgmt/record/tracks', '/ISAPI/ContentMgmt/record/tracks/101', '/ISAPI/System/time']) {
-      const r = await req(nvr, cred, 'GET', uri);
-      console.log(`\n--- GET ${uri} → HTTP ${r.s}\n${short(r.b, uri.endsWith('tracks') ? 1800 : 700)}`);
-    }
     const t = await req(nvr, cred, 'GET', '/ISAPI/System/time');
     const m = /<localTime>(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})/.exec(t.b);
-    if (!m) { console.log('\n(nu am putut citi ora NVR-ului)'); continue; }
+    if (!m) { console.log('(nu am putut citi ora NVR-ului) HTTP ' + t.s); continue; }
     const wall = new Date(m[1] + 'T' + m[2] + ':' + m[3] + ':' + m[4] + 'Z');
+    console.log('Ora NVR: ' + m[1] + ' ' + m[2] + ':' + m[3]);
+    const st = await req(nvr, cred, 'GET', '/ISAPI/ContentMgmt/InputProxy/channels/status');
     const f = d => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}T${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}Z`;
-    const body = `<?xml version="1.0" encoding="UTF-8"?><CMSearchDescription><searchID>${crypto.randomUUID()}</searchID><trackList><trackID>101</trackID></trackList><timeSpanList><timeSpan><startTime>${f(new Date(wall - 3600e3))}</startTime><endTime>${f(wall)}</endTime></timeSpan></timeSpanList><maxResults>5</maxResults><searchResultPostion>0</searchResultPostion><metadataList><metadataDescriptor>//recordType.meta.std-cgi.com</metadataDescriptor></metadataList></CMSearchDescription>`;
-    const r = await req(nvr, cred, 'POST', '/ISAPI/ContentMgmt/search', body);
-    console.log(`\n--- POST /ISAPI/ContentMgmt/search (CH1, ultima oră) → HTTP ${r.s}\n${short(r.b, 900)}`);
+    for (const ch of chs) {
+      const id = ch * 100 + 1;
+      const tr = await req(nvr, cred, 'GET', '/ISAPI/ContentMgmt/record/tracks/' + id);
+      const acts = [...tr.b.matchAll(/<ScheduleAction\b[^>]*>([\s\S]*?)<\/ScheduleAction>/g)].map(x => x[1]);
+      const modes = {}; for (const a of acts) { const r = /<Record>\s*true/i.test(a) ? ((/<ActionRecordingMode>\s*([^<\s]+)/i.exec(a) || [])[1] || '?') : 'oprit'; modes[r] = (modes[r] || 0) + 1; }
+      const cs = new RegExp(`<InputProxyChannelStatus\\b[^>]*>(?:(?!</InputProxyChannelStatus>)[\\s\\S])*?<id>${ch}</id>[\\s\\S]*?</InputProxyChannelStatus>`).exec(st.b);
+      const on = cs ? ((/<online>([^<]*)/.exec(cs[0]) || [])[1] + ' / ' + ((/<chanDetectResult>([^<]*)/.exec(cs[0]) || [])[1] || '')) : 'canal negăsit';
+      console.log(`\nCH${ch} (track ${id}) — HTTP ${tr.s} · online: ${on} · program: ${JSON.stringify(modes)} · implicit: ${(/<DefaultRecordingMode>([^<]*)/.exec(tr.b) || [])[1] || '-'}`);
+      const body = `<?xml version="1.0" encoding="UTF-8"?><CMSearchDescription><searchID>${crypto.randomUUID()}</searchID><trackList><trackID>${id}</trackID></trackList><timeSpanList><timeSpan><startTime>${f(new Date(wall - hours * 3600e3))}</startTime><endTime>${f(wall)}</endTime></timeSpan></timeSpanList><maxResults>40</maxResults><searchResultPostion>0</searchResultPostion><metadataList><metadataDescriptor>//recordType.meta.std-cgi.com</metadataDescriptor></metadataList></CMSearchDescription>`;
+      const r = await req(nvr, cred, 'POST', '/ISAPI/ContentMgmt/search', body);
+      const items = [...r.b.matchAll(/<startTime>([^<]*)<\/startTime>\s*<endTime>([^<]*)<\/endTime>/g)].map(x => x[1].slice(5, 16).replace('T', ' ') + '→' + x[2].slice(11, 16));
+      console.log(`  căutare ultimele ${hours} h → HTTP ${r.s} · ${(/<responseStatusStrg>([^<]*)/.exec(r.b) || [])[1] || ''} · ${(/<numOfMatches>(\d+)/.exec(r.b) || [])[1] || 0} rezultate${items.length ? ' · ultimele: ' + items.slice(-4).join(', ') : ''}`);
+      if (r.s !== 200) console.log('  ' + short(r.b, 300));
+    }
   }
   if (!found) console.log('Niciun NVR nu se potrivește cu: ' + q);
 })();
