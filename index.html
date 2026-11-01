@@ -952,6 +952,19 @@ html:not(.unlocked) .app{display:none}
 .op-banner{background:var(--warn-dim);border:1px solid var(--warn);color:var(--fg);border-radius:12px;padding:10px 12px;font-size:13px;margin-bottom:10px;line-height:1.5}
 .op-banner.err{background:var(--err-dim);border-color:var(--err)}
 .al-work{margin-left:auto;align-self:center;border:1px solid var(--border);background:var(--bg-1);color:var(--fg);border-radius:9px;padding:6px 10px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:var(--sans)}
+
+/* ── Vizitatori site (Cloudflare) ── */
+.an-chart{display:flex;align-items:flex-end;gap:3px;height:86px;padding:8px 2px 0;border-bottom:1px solid var(--border);margin:4px 0 4px}
+.an-bar{flex:1 1 0;min-width:3px;background:var(--accent);border-radius:4px 4px 0 0;position:relative;opacity:.85}
+.an-bar:hover{opacity:1}
+.an-axis{display:flex;justify-content:space-between;font-size:10.5px;color:var(--fg-3);margin-bottom:12px;font-variant-numeric:tabular-nums}
+.an-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.an-box{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;min-width:0}
+.an-box h4{margin:0 0 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--fg-3)}
+.an-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;font-size:13px;padding:5px 0;position:relative}
+.an-row span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.an-row b{font-variant-numeric:tabular-nums}
+.an-row i{position:absolute;left:0;bottom:1px;height:2px;background:var(--accent);border-radius:2px;opacity:.45}
 </style>
 </head>
 <body>
@@ -1197,6 +1210,13 @@ html:not(.unlocked) .app{display:none}
 
     <!-- ── Cereri ofertă ── -->
     <div class="panel" id="panel-quotes">
+      <div class="section" id="an-sec">
+        <div class="section-hdr">
+          <div class="section-title">Vizitatori site</div>
+          <select class="cl-chip" id="an-days" style="margin-left:auto;padding-right:10px" aria-label="Perioada"><option value="1">Ultimele 24 de ore</option><option value="7" selected>Ultimele 7 zile</option><option value="30">Ultimele 30 de zile</option></select>
+        </div>
+        <div id="an-body"><div class="cl-empty">Se încarcă…</div></div>
+      </div>
       <div id="cl-view-quotes">
       <div class="section">
         <div class="section-hdr">
@@ -1254,6 +1274,16 @@ html:not(.unlocked) .app{display:none}
 
     <!-- ── Setări ── -->
     <div class="panel" id="panel-settings">
+      <div class="settings-section" id="an-cfg">
+        <div class="settings-section-title">Statistici site (Cloudflare)</div>
+        <div class="form-hint" id="an-cfg-state" style="margin-bottom:10px">Se verifică…</div>
+        <div class="f2">
+          <div class="fg"><label for="an-acc">Account ID</label><input class="form-input" type="text" id="an-acc" placeholder="32 de caractere" autocomplete="off" spellcheck="false"></div>
+          <div class="fg"><label for="an-tag">Site tag (opțional)</label><input class="form-input" type="text" id="an-tag" placeholder="din adresa paginii Web Analytics" autocomplete="off" spellcheck="false"></div>
+        </div>
+        <div class="fg"><label for="an-token">API token (Account Analytics: Read)</label><input class="form-input" type="password" id="an-token" placeholder="se păstrează doar pe server" autocomplete="off" spellcheck="false"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn primary" id="an-save">Conectează</button><button type="button" class="btn" id="an-del" hidden>Deconectează</button></div>
+      </div>
       <div class="settings-section">
         <div class="settings-section-title">Jurnal</div>
         <div class="form-row">
@@ -5532,6 +5562,49 @@ function workFromQuote(q) {
 }
 setTimeout(() => { if (getAuth()) loadOps(true); }, 4500); setInterval(() => { if (getAuth() && document.documentElement.classList.contains('unlocked')) loadOps(true); }, 300000);
 
+
+/* ═══ Vizitatori site — din Cloudflare Web Analytics, prin server (/analytics) ═══ */
+const AN_PAGES = { '/': 'Prima pagină', '/index.html': 'Prima pagină', '/calculator-pret.html': 'Calculator preț', '/contact.html': 'Contact', '/oferta-asociatii.html': 'Oferta pentru asociații', '/despre-noi.html': 'Despre noi', '/echipamente.html': 'Echipamente', '/camere-ip.html': 'Camere IP', '/nvr.html': 'NVR', '/accesorii.html': 'Accesorii', '/kit-uri-camere.html': 'Kit-uri camere', '/sistem-vechi.html': 'Sistem vechi' };
+const anPage = p => AN_PAGES[p] || (/supraveghere-video-bloc-(.+)\.html$/.test(p) ? 'Zona ' + p.match(/bloc-(.+)\.html$/)[1].replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : p);
+const AN_DEV = { mobile: '📱 Telefon', desktop: '💻 Calculator', tablet: '📟 Tabletă' };
+let anBusy = false;
+async function loadAnalytics() {
+  const body = qs('#an-body'); if (!body || anBusy || !getAuth()) return; anBusy = true;
+  const days = +qs('#an-days').value;
+  try {
+    const a = await clApi('/analytics?days=' + days);
+    if (!a.configured) { body.innerHTML = '<div class="cm-hint">Conectează Cloudflare din <b>Setări → Statistici site</b> ca să vezi aici câți oameni intră pe site, ce pagini citesc și de unde vin.</div>'; return; }
+    const since = Date.now() - days * 864e5;
+    const qn = (quotes || []).filter(q => q.createdAt >= since), offers = qn.filter(q => q.kind !== 'contact').length, msgs = qn.length - offers;
+    const conv = a.visits ? ((offers + msgs) / a.visits * 100) : 0;
+    const max = Math.max(1, ...a.daily.map(d => d.visits));
+    const chart = days > 1 && a.daily.length ? `<div class="an-chart" role="img" aria-label="Vizite pe zile">${a.daily.map(d => `<div class="an-bar" style="height:${Math.max(3, d.visits / max * 100)}%" title="${fmtDate(d.date)}: ${d.visits} vizite, ${d.views} afișări"></div>`).join('')}</div>
+      <div class="an-axis"><span>${fmtDate(a.daily[0].date).slice(0, 5)}</span><span>maxim ${max} vizite / zi</span><span>${fmtDate(a.daily[a.daily.length - 1].date).slice(0, 5)}</span></div>` : '';
+    const list = (title, rows, name) => { const m = Math.max(1, ...rows.map(r => r.visits || r.views)); return `<div class="an-box"><h4>${title}</h4>${rows.length ? rows.slice(0, 6).map(r => `<div class="an-row"><span title="${escapeHtml(r.name)}">${escapeHtml(name(r.name))}</span><b>${r.visits || r.views}</b><i style="width:${(r.visits || r.views) / m * 100}%"></i></div>`).join('') : '<div class="cm-hint">Încă nimic.</div>'}</div>`; };
+    body.innerHTML = `<div class="qt-stats">${[[a.visits, 'vizite'], [a.views, 'pagini văzute'], [offers, 'cereri de ofertă'], [msgs, 'mesaje'], [conv.toFixed(1).replace('.', ',') + '%', 'din vizite au cerut ceva']].map(([n, l]) => `<div class="qt-stat"><b>${n}</b> ${l}</div>`).join('')}</div>
+      ${chart}<div class="an-grid">${list('Pagini citite', a.pages.map(p => ({ ...p, visits: p.views })), anPage)}${list('De unde vin', a.refs, n => n ? n.replace(/^www\./, '').replace(/^(.*\.)?google\..*$/, 'Google').replace(/^(l\.|m\.|lm\.)?facebook\.com$/, 'Facebook').replace(/^supraveghere24h\.ro$/, 'din site (navigare)') : 'Direct / WhatsApp / aplicații')}
+      ${list('Țări', a.countries, n => n || 'Necunoscut')}${list('Dispozitive', a.devices, n => AN_DEV[n] || n || 'Altul')}</div>
+      <div class="cm-hint" style="margin-top:8px">Datele vin din Cloudflare și se actualizează la 10 minute. O „vizită” = o persoană care intră pe site (poate vedea mai multe pagini). Fără roboți.</div>`;
+  } catch (e) { body.innerHTML = `<div class="cm-hint">${escapeHtml(/HTTP 40[45]|Operație/.test(e.message) ? 'Serverul nu are încă statisticile — actualizează serverul (v7.0)' : e.message)}</div>`; }
+  finally { anBusy = false; }
+}
+qs('#an-days').addEventListener('change', loadAnalytics);
+document.querySelectorAll('.nav-tab[data-tab="quotes"]').forEach(t => t.addEventListener('click', () => setTimeout(loadAnalytics, 400)));
+async function anCfgLoad() {
+  const st = qs('#an-cfg-state'); if (!getAuth()) return;
+  try { const r = await clApi('/analytics/config'); st.innerHTML = r.configured ? '✓ <b>Conectat</b> la Cloudflare. Statisticile apar la <b>Oferte</b>, sus.' : 'Neconectat. Completează datele de mai jos (pașii sunt în mesajul de la Claude).';
+    qs('#an-acc').value = r.accountId || ''; qs('#an-del').hidden = !r.configured; }
+  catch (e) { st.textContent = /403/.test(e.message) || /administrator/.test(e.message) ? 'Doar administratorul poate conecta Cloudflare.' : /HTTP 40[45]|Operație/.test(e.message) ? 'Serverul nu are încă această funcție — actualizează serverul (v7.0).' : e.message; }
+}
+qs('#an-save').addEventListener('click', async () => {
+  const b = qs('#an-save'); b.disabled = true; b.textContent = 'Se verifică…';
+  try { await clApi('/analytics/config', jsonOpt('PUT', { accountId: qs('#an-acc').value.trim(), siteTag: qs('#an-tag').value.trim(), token: qs('#an-token').value.trim() }));
+    qs('#an-token').value = ''; toast('Cloudflare conectat ✓', 'ok'); anCfgLoad(); }
+  catch (e) { toast(e.message, 'err'); } finally { b.disabled = false; b.textContent = 'Conectează'; }
+});
+qs('#an-del').addEventListener('click', async () => { if (!(await confirmDialog({ title: 'Deconectezi Cloudflare?', html: 'Tokenul se șterge de pe server.', okLabel: 'Deconectează' }))) return;
+  try { await clApi('/analytics/config', { method: 'DELETE' }); toast('Deconectat', 'ok'); anCfgLoad(); } catch (e) { toast(e.message, 'err'); } });
+document.querySelectorAll('.nav-tab[data-tab="settings"]').forEach(t => t.addEventListener('click', anCfgLoad));
 qs('#alert-list').addEventListener('click', e => { const b = e.target.closest('.al-work'); if (b) workFromAlert(+b.dataset.ai); });
 qs('#open-log-btn').addEventListener('click', () => {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('on')); document.querySelectorAll('.panel').forEach(x => x.classList.remove('on'));

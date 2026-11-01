@@ -1106,6 +1106,80 @@ async function opsMorning(db) {
     try { notifyOwner(db, owner, txt); } catch {}
   }
 }
+/* ═════════════ Statistici site (Cloudflare Web Analytics) ═════════════
+   cloudflare.json (doar pe server, 0600): { token, accountId, siteTag? }  — token cu permisiunea „Account Analytics: Read”.
+   GET /analytics?days=7|30 → vizite, afișări, pe zile, pagini, surse, țări, dispozitive (cache 10 min). */
+const CF_FILE = path.join(BASE_DIR, 'cloudflare.json');
+function loadCf() { try { const c = JSON.parse(fs.readFileSync(CF_FILE, 'utf8')); return c && c.token && c.accountId ? c : null; } catch { return null; } }
+function cfApi(method, apiPath, token, body) {
+  return new Promise((resolve, reject) => {
+    const data = body ? JSON.stringify(body) : null;
+    const rq = https.request({ host: 'api.cloudflare.com', path: '/client/v4' + apiPath, method, timeout: 20000,
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', ...(data ? { 'Content-Length': Buffer.byteLength(data) } : {}) } }, r => {
+      let b = ''; r.on('data', d => b += d); r.on('end', () => { try { resolve({ status: r.statusCode, json: JSON.parse(b) }); } catch { reject(new Error('Răspuns invalid de la Cloudflare (HTTP ' + r.statusCode + ')')); } });
+    });
+    rq.on('timeout', () => rq.destroy(new Error('Cloudflare nu răspunde')));
+    rq.on('error', reject); if (data) rq.write(data); rq.end();
+  });
+}
+const cfCache = new Map();
+async function cfSiteTag(cf) {
+  if (cf.siteTag) return cf.siteTag;
+  const r = await cfApi('GET', `/accounts/${encodeURIComponent(cf.accountId)}/rum/site_info/list?per_page=50`, cf.token);
+  const list = (r.json && r.json.result) || [];
+  if (!r.json || !r.json.success) throw new Error('Cloudflare: ' + (((r.json || {}).errors || [])[0] || {}).message || 'acces refuzat');
+  const hit = list.find(x => /supraveghere24h\.ro$/i.test((x.ruleset && x.ruleset.zone_name) || x.host || '')) || list[0];
+  if (!hit) throw new Error('Nu găsesc niciun site în Cloudflare Web Analytics');
+  cf.siteTag = hit.site_tag; try { fs.writeFileSync(CF_FILE, JSON.stringify(cf, null, 2), { mode: 0o600 }); } catch {}
+  return cf.siteTag;
+}
+async function cfStats(days) {
+  const cf = loadCf(); if (!cf) return { configured: false };
+  const key = 'd' + days, c = cfCache.get(key);
+  if (c && Date.now() - c.t < 10 * 60e3) return c.v;
+  const siteTag = await cfSiteTag(cf);
+  const to = new Date(), from = new Date(Date.now() - days * 864e5);
+  const filter = { AND: [{ datetime_geq: from.toISOString(), datetime_leq: to.toISOString() }, { siteTag }, { bot: 0 }] };
+  const g = (alias, dims, limit, order) => `${alias}: rumPageloadEventsAdaptiveGroups(filter: $filter, limit: ${limit}${order ? `, orderBy: [${order}]` : ''}) { count sum { visits }${dims ? ` dimensions { ${dims} }` : ''} }`;
+  const query = `query($accountTag: string, $filter: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject) { viewer { accounts(filter: { accountTag: $accountTag }) {
+    ${g('total', '', 1)} ${g('daily', 'date', 100, 'date_ASC')} ${g('pages', 'requestPath', 10, 'count_DESC')}
+    ${g('refs', 'refererHost', 10, 'sum_visits_DESC')} ${g('countries', 'countryName', 8, 'sum_visits_DESC')} ${g('devices', 'deviceType', 5, 'sum_visits_DESC')} } } }`;
+  const r = await cfApi('POST', '/graphql', cf.token, { query, variables: { accountTag: cf.accountId, filter } });
+  const errs = (r.json && r.json.errors) || [];
+  if (errs.length) throw new Error('Cloudflare: ' + errs[0].message);
+  const a = (((r.json.data || {}).viewer || {}).accounts || [])[0] || {};
+  const row = (x, k) => ({ name: k ? (x.dimensions || {})[k] : '', views: x.count || 0, visits: (x.sum || {}).visits || 0 });
+  const tot = (a.total || [])[0] || {};
+  const v = { configured: true, days, from: from.toISOString(), to: to.toISOString(), visits: (tot.sum || {}).visits || 0, views: tot.count || 0,
+    daily: (a.daily || []).map(x => ({ date: x.dimensions.date, views: x.count || 0, visits: (x.sum || {}).visits || 0 })),
+    pages: (a.pages || []).map(x => row(x, 'requestPath')), refs: (a.refs || []).map(x => row(x, 'refererHost')),
+    countries: (a.countries || []).map(x => row(x, 'countryName')), devices: (a.devices || []).map(x => row(x, 'deviceType')) };
+  cfCache.set(key, { t: Date.now(), v }); return v;
+}
+async function handleAnalytics(req, res, pathname, parsed) {
+  const ctx = requireUser(req, res); if (!ctx) return;
+  if (pathname === '/analytics/config') {
+    if (ctx.user.role !== 'admin') return sendJson(res, 403, { error: 'Doar administratorul poate seta legătura cu Cloudflare' });
+    if (req.method === 'GET') { const cf = loadCf(); return sendJson(res, 200, { configured: !!cf, accountId: cf ? cf.accountId : '' }); }
+    if (req.method === 'DELETE') { try { fs.unlinkSync(CF_FILE); } catch {} cfCache.clear(); return sendJson(res, 200, { configured: false }); }
+    if (req.method === 'PUT' || req.method === 'POST') {
+      const b = await readJson(req); const token = str(b.token, 200).trim(), accountId = str(b.accountId, 64).trim(), siteTag = str(b.siteTag, 64).trim();
+      if (!/^[A-Za-z0-9_-]{20,}$/.test(token) || !/^[a-f0-9]{32}$/i.test(accountId)) return sendJson(res, 400, { error: 'Verifică tokenul și Account ID (32 de caractere)' });
+      if (siteTag && !/^[a-f0-9]{32}$/i.test(siteTag)) return sendJson(res, 400, { error: 'Site tag trebuie să aibă 32 de caractere' });
+      const cf = { token, accountId, ...(siteTag ? { siteTag } : {}) };
+      const prev = fs.existsSync(CF_FILE) ? fs.readFileSync(CF_FILE) : null;
+      fs.writeFileSync(CF_FILE, JSON.stringify(cf, null, 2), { mode: 0o600 }); cfCache.clear();
+      try { await cfStats(1); } catch (e) { if (prev) fs.writeFileSync(CF_FILE, prev, { mode: 0o600 }); else try { fs.unlinkSync(CF_FILE); } catch {} cfCache.clear();
+        return sendJson(res, 400, { error: e.message + (siteTag ? '' : ' — dacă tokenul nu poate citi lista de site-uri, completează și „Site tag”') }); }
+      return sendJson(res, 200, { configured: true, accountId });
+    }
+  }
+  if (pathname === '/analytics' && req.method === 'GET') {
+    const days = [1, 7, 30].includes(+parsed.query.days) ? +parsed.query.days : 7;
+    try { return sendJson(res, 200, await cfStats(days)); } catch (e) { return sendJson(res, 502, { error: e.message }); }
+  }
+  return sendJson(res, 405, { error: 'Operație necunoscută' });
+}
 // remindere de expirare — rulează din monitor; o dată pe zi după 09:00
 const cdocDaysLeft = exp => Math.round((Date.parse(exp + 'T00:00:00Z') - Date.parse(new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' }) + 'T00:00:00Z')) / 864e5);
 async function cdocReminders(db) {
@@ -2167,10 +2241,11 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 6.9, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.0, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops' || pathname.startsWith('/ops/')) return await handleOps(req, res, pathname);
+    if (pathname === '/analytics' || pathname === '/analytics/config') return await handleAnalytics(req, res, pathname, parsed);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
     if (pathname.startsWith('/email-img/') && req.method === 'GET') {
       const m = /^\/email-img\/([a-z0-9-]+)\.(png|jpg)$/.exec(pathname);
