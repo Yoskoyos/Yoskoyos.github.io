@@ -1245,7 +1245,7 @@ function buildQuote(c, inp) {
 const lei = v => (Math.round(v * 100) / 100).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' lei';
 const roDate = t => new Date(t).toLocaleDateString('ro-RO', { timeZone: 'Europe/Bucharest', day: '2-digit', month: '2-digit', year: 'numeric' });
 const publicBase = req => process.env.PUBLIC_URL ? process.env.PUBLIC_URL.replace(/\/$/, '') : 'https://' + String(req.headers.host || 'proxy.supraveghere24h.ro').replace(/[^\w.:-]/g, '');
-const QSTATUS = { new: 'Mesaj nou', sent: 'Trimisă', viewed: 'Văzută', accepted: 'Acceptată', rejected: 'Refuzată', clarify: 'Cere clarificări', expired: 'Expirată' };
+const QSTATUS = { new: 'Mesaj nou', sent: 'Trimisă', viewed: 'Văzută', accepted: 'Acceptată', rejected: 'Refuzată', clarify: 'Cere clarificări', answered: 'Am răspuns', expired: 'Expirată' };
 function quoteStatus(q) { return (q.status === 'sent' || q.status === 'viewed') && Date.now() > q.validUntil ? 'expired' : q.status; }
 
 // limitare cereri publice: 6 oferte / oră / IP
@@ -1777,14 +1777,15 @@ async function handleQuotePublic(req, res, pathname, parsed) {
 function quotePageV2(q, cfg, base, pre) {
   const url = `${base}/q/${q.token}`;
   const st = quoteStatus(q);
-  const open = ['sent', 'viewed', 'clarify'].includes(st);
+  const open = ['sent', 'viewed', 'clarify', 'answered'].includes(st);
   let html = quoteEmailHtml(q, cfg, url);
   const F = "font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
   const B = { accepted: ['#DCFCE7', '#14532D', '✓', 'Ați acceptat această ofertă.', 'Vă mulțumim! Vă contactăm în cel mai scurt timp pentru programarea montajului.'],
               rejected: ['#FEE4E2', '#7A271A', '✕', 'Ați refuzat această ofertă.', 'Vă mulțumim pentru timpul acordat. Ne puteți contacta oricând pentru o ofertă nouă.'],
               expired:  ['#EEF2F7', '#475467', '⏱', 'Această ofertă a expirat.', 'Ne puteți contacta pentru o ofertă actualizată.'],
-              clarify:  ['#FEF3C7', '#78350F', '?', 'Am primit întrebarea dumneavoastră.', q.replies && q.replies.length ? 'V-am răspuns mai jos (și pe e-mail). Puteți accepta oferta sau ne puteți scrie din nou.' : 'Vă răspundem în maxim 24 de ore. Între timp puteți accepta sau refuza oferta.'] }[st];
-  const banner = B ? `<div style="${F}background:${B[0]};color:${B[1]};border-radius:12px;padding:16px 18px;margin:0 0 ${open ? 18 : 6}px"><div style="font-size:17px;font-weight:800">${B[2]}&nbsp; ${B[3]}</div><div style="font-size:14px;line-height:1.5;margin-top:4px">${B[4]}</div>${q.response && q.response.message ? `<div style="font-size:13px;margin-top:8px;opacity:.85">Mesajul dumneavoastră: „${escHtml(q.response.message)}”</div>` : ''}${st === 'clarify' && q.replies && q.replies.length ? `<div style="font-size:14px;line-height:1.55;margin-top:10px;background:#FFFFFF;border-radius:10px;padding:10px 12px;color:#14202E"><b>Răspunsul nostru:</b><br>${escHtml(q.replies[q.replies.length - 1].message).replace(/\r?\n/g, '<br>')}</div>` : ''}</div>` : '';
+              clarify:  ['#FEF3C7', '#78350F', '?', 'Am primit întrebarea dumneavoastră.', q.replies && q.replies.length ? 'V-am răspuns mai jos (și pe e-mail). Puteți accepta oferta sau ne puteți scrie din nou.' : 'Vă răspundem în maxim 24 de ore. Între timp puteți accepta sau refuza oferta.'],
+              answered: ['#E0F2FE', '#0C4A6E', '✉', 'V-am răspuns la întrebare.', 'Răspunsul nostru este mai jos (și pe e-mail). Puteți accepta oferta sau ne puteți scrie din nou.'] }[st];
+  const banner = B ? `<div style="${F}background:${B[0]};color:${B[1]};border-radius:12px;padding:16px 18px;margin:0 0 ${open ? 18 : 6}px"><div style="font-size:17px;font-weight:800">${B[2]}&nbsp; ${B[3]}</div><div style="font-size:14px;line-height:1.5;margin-top:4px">${B[4]}</div>${q.response && q.response.message ? `<div style="font-size:13px;margin-top:8px;opacity:.85">Mesajul dumneavoastră: „${escHtml(q.response.message)}”</div>` : ''}${(st === 'clarify' || st === 'answered') && q.replies && q.replies.length ? `<div style="font-size:14px;line-height:1.55;margin-top:10px;background:#FFFFFF;border-radius:10px;padding:10px 12px;color:#14202E"><b>Răspunsul nostru:</b><br>${escHtml(q.replies[q.replies.length - 1].message).replace(/\r?\n/g, '<br>')}</div>` : ''}</div>` : '';
   const btn = 'cursor:pointer;display:block;width:100%;box-sizing:border-box;text-align:center;border-radius:10px;';
   const cta = `<tr class="noprint"><td class="px" style="padding:24px 32px 28px">${banner}${open ? `<div style="${F}font-size:19px;font-weight:800;color:#14202E;margin:0 0 4px">Ce decideți?</div>
     <div style="${F}font-size:13px;color:#5B6B7C;margin:0 0 16px">Alegeți o variantă și confirmați — durează câteva secunde.</div>
@@ -1890,6 +1891,7 @@ async function handleQuotesApi(req, res, pathname, parsed) {
     if (!ok) return sendJson(res, 502, { error: 'Emailul nu a putut fi trimis' });
     const r = { message: msg, at: Date.now() };
     q.replies = (q.replies || []).concat(r); q.events.push({ t: r.at, type: 'reply', message: msg }); q.handled = true;
+    if (!['accepted', 'rejected'].includes(q.status)) q.status = 'answered';
     saveQuotes(all);
     return sendJson(res, 200, { quote: view(q) });
   }
@@ -2036,7 +2038,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 6.7, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 6.8, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──

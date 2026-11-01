@@ -462,6 +462,9 @@ html[data-font] .nvr-name,html[data-font] .cl-name,html[data-font] .modal-title{
 .qpill.accepted{background:var(--ok-dim);color:var(--ok)}
 .qpill.rejected{background:var(--err-dim);color:var(--err)}
 .qpill.clarify{background:var(--warn-dim);color:var(--warn)}
+.qpill.answered{background:var(--blue-dim);color:var(--blue)}
+select.qpill{appearance:none;-webkit-appearance:none;border:0;cursor:pointer;font-family:inherit;padding-right:20px;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:calc(100% - 10px) 52%,calc(100% - 6px) 52%;background-size:4px 4px;background-repeat:no-repeat}
+select.qpill option{background:var(--bg-1,#fff);color:var(--fg-1,#111)}
 .qpill.new{background:var(--warn-dim);color:var(--warn)}
 .qpill.msgdone{background:var(--bg-3);color:var(--fg-2)}
 .qpill.expired{background:var(--bg-3);color:var(--fg-3)}
@@ -1094,7 +1097,7 @@ html:not(.unlocked) .app{display:none}
           <input type="search" class="cl-search" id="qt-search" placeholder="Caută după nume, telefon, email, localitate, nr. ofertă…" autocomplete="off">
           <select class="cl-chip" id="qt-status" style="padding-right:10px">
             <option value="">Toate</option><option value="open">Deschise</option><option value="viewed">Văzute</option>
-            <option value="clarify">Cer clarificări</option><option value="accepted">Acceptate</option><option value="rejected">Refuzate</option><option value="expired">Expirate</option><option value="contact">Mesaje de pe site</option>
+            <option value="clarify">Cer clarificări</option><option value="answered">Am răspuns</option><option value="accepted">Acceptate</option><option value="rejected">Refuzate</option><option value="expired">Expirate</option><option value="contact">Mesaje de pe site</option>
           </select>
         </div>
         <div class="qt-head"><div>Nr.</div><div>Client</div><div>Contact</div><div class="r">Total</div><div>Status</div><div class="r">Valabilă / creată</div></div>
@@ -3675,7 +3678,8 @@ qs('#cd-delete').addEventListener('click', async () => {
    OFERTE (calculator site → server → pagina ofertei cu Accept / Refuz / Clarificări)
 ═══════════════════════════════════════ */
 let quotes = null, quotesMail = true, qmCur = null;
-const QST = { new: 'Mesaj nou', sent: 'Trimisă', viewed: 'Văzută', accepted: 'Acceptată', rejected: 'Refuzată', clarify: 'Cere clarificări', expired: 'Expirată' };
+const QST_EDIT = ['sent', 'viewed', 'clarify', 'answered', 'accepted', 'rejected'];
+const QST = { new: 'Mesaj nou', sent: 'Trimisă', viewed: 'Văzută', accepted: 'Acceptată', rejected: 'Refuzată', clarify: 'Cere clarificări', answered: 'Am răspuns', expired: 'Expirată' };
 const fmtTs = t => t ? new Date(t).toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
 const fmtTsH = t => t ? new Date(t).toLocaleString('ro-RO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
 const waNum = ph => { let d = String(ph || '').replace(/\D/g, ''); if (d.startsWith('00')) d = d.slice(2); else if (d.startsWith('0')) d = '40' + d.slice(1); return d; };
@@ -3699,7 +3703,7 @@ function renderQuotes() {
   if (!quotes) return;
   const ym = ymNow();
   const inMonth = q => new Date(q.createdAt).toISOString().slice(0, 7) === ym;
-  const open = quotes.filter(q => ['sent', 'viewed', 'clarify'].includes(q.status));
+  const open = quotes.filter(q => ['sent', 'viewed', 'clarify', 'answered'].includes(q.status));
   const need = quotes.filter(q => q.status === 'clarify' || ((q.status === 'accepted' || q.kind === 'contact') && !q.handled));
   const badge = qs('#qt-badge'); badge.hidden = !need.length; badge.textContent = need.length;
   qs('#qt-stats').innerHTML = [
@@ -3711,7 +3715,7 @@ function renderQuotes() {
   qs('#qt-warn').innerHTML = quotesMail ? '' : '<div class="qt-warn">Emailul nu e configurat pe server, așa că ofertele <b>nu pleacă pe email</b>. Clientul își vede oferta pe ecran imediat după calcul și poate răspunde de acolo; tu primești totul pe Telegram și aici.</div>';
   const term = (qs('#qt-search').value || '').trim().toLowerCase(), f = qs('#qt-status').value;
   let rows = quotes;
-  if (f === 'open') rows = rows.filter(q => ['sent', 'viewed', 'clarify'].includes(q.status));
+  if (f === 'open') rows = rows.filter(q => ['sent', 'viewed', 'clarify', 'answered'].includes(q.status));
   else if (f === 'contact') rows = rows.filter(q => q.kind === 'contact');
   else if (f) rows = rows.filter(q => q.status === f);
   if (term) rows = rows.filter(q => [q.no, q.customer.name, q.customer.assoc, q.customer.address, q.customer.phone, q.customer.email, q.customer.city, q.customer.message].join(' ').toLowerCase().includes(term));
@@ -3731,7 +3735,7 @@ function renderQuotes() {
       <div style="min-width:0"><div class="qt-name">${escapeHtml(c.assoc || c.name)}</div><div class="qt-sub">${escapeHtml(c.assoc ? c.name + ' · ' : '')}${escapeHtml(c.address || c.city)} · ${q.pricing.totalCams} cam.</div></div>
       <div class="qt-c-contact" style="min-width:0"><div class="qt-sub"><a href="tel:${escapeHtml(c.phone.replace(/[^\d+]/g, ''))}" onclick="event.stopPropagation()">${escapeHtml(c.phone)}</a></div><div class="qt-sub">${escapeHtml(c.email)}</div></div>
       <div class="qt-tot">${fmtLei(q.pricing.total)}${q.pricing.period === 'month' ? '<span class="qt-sub" style="font-weight:600"> /lună</span>' : ''}</div>
-      <div class="qt-st"><span class="qpill ${q.status}">${QST[q.status] || q.status}</span>${q.viewedAt ? `<span class="qt-sub">👁 văzută ${fmtTs(q.viewedAt)}</span>` : ''}</div>
+      <div class="qt-st"><select class="qpill ${q.status} qt-stsel" data-qid="${escapeHtml(q.id)}" aria-label="Schimbă statusul" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()">${QST_EDIT.map(s => `<option value="${s}"${s === q.status ? ' selected' : ''}>${QST[s]}</option>`).join('')}${q.status === 'expired' ? '<option value="expired" selected>Expirată</option>' : ''}</select>${q.viewedAt ? `<span class="qt-sub">👁 văzută ${fmtTs(q.viewedAt)}</span>` : ''}</div>
       <div class="qt-dates">până ${fmtTs(q.validUntil)}<br>${fmtTs(q.createdAt)}</div></div>`;
   }).join('');
 }
@@ -3757,7 +3761,7 @@ function openQuote(q) {
   if (q.kind === 'contact') return openContactMsg(q);
   const c = q.customer, p = q.pricing;
   qs('#qm-title').textContent = `Oferta nr. ${q.no}`;
-  const evName = { created: 'Ofertă creată (calculator site)', viewed: 'Clientul a deschis oferta', accepted: 'Acceptată', rejected: 'Refuzată', clarify: 'Cere clarificări', reply: 'Ai răspuns pe email', extended: 'Valabilitate prelungită', sent: 'Marcată „Trimisă”', expired: 'Expirată' };
+  const evName = { created: 'Ofertă creată (calculator site)', viewed: 'Clientul a deschis oferta', accepted: 'Acceptată', rejected: 'Refuzată', clarify: 'Cere clarificări', reply: 'Ai răspuns pe email', answered: 'Am răspuns', extended: 'Valabilitate prelungită', sent: 'Marcată „Trimisă”', expired: 'Expirată' };
   const wa = `https://wa.me/${waNum(c.phone)}?text=${encodeURIComponent(`Bună ziua, ${c.name.split(' ')[0]}! Oferta pentru sistemul de supraveghere al blocului (nr. ${q.no}) este aici: ${q.url}`)}`;
   qs('#qm-body').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span class="qpill ${q.status}" style="font-size:12.5px;padding:5px 12px">${QST[q.status]}</span><span class="cm-hint">creată ${fmtTsH(q.createdAt)} · valabilă până ${fmtTs(q.validUntil)}${q.views ? ` · deschisă de ${q.views} ori` : ''}</span></div>
@@ -3779,7 +3783,7 @@ function openQuote(q) {
     <div class="qm-ev">${q.events.slice().reverse().map(e => `<div><span>${fmtTsH(e.t)}</span><div>${evName[e.type] || e.type}${e.manual ? ' (manual)' : ''}${e.message ? ` — „${escapeHtml(e.message)}”` : ''}</div></div>`).join('')}</div>
     <div class="cm-sec">Acțiuni</div>
     <div class="f2">
-      <div class="fg"><label for="qm-status">Schimbă statusul</label><select id="qm-status">${['sent', 'viewed', 'clarify', 'accepted', 'rejected'].map(s => `<option value="${s}"${s === q.status ? ' selected' : ''}>${QST[s]}</option>`).join('')}${q.status === 'expired' ? '<option value="expired" selected>Expirată</option>' : ''}</select></div>
+      <div class="fg"><label for="qm-status">Schimbă statusul</label><select id="qm-status">${QST_EDIT.map(s => `<option value="${s}"${s === q.status ? ' selected' : ''}>${QST[s]}</option>`).join('')}${q.status === 'expired' ? '<option value="expired" selected>Expirată</option>' : ''}</select></div>
       <div class="fg"><label>&nbsp;</label><button type="button" class="btn" id="qm-extend">Prelungește 30 de zile</button></div>
     </div>
     <label class="cm-check"><input type="checkbox" id="qm-handled"${q.handled ? ' checked' : ''}> Am rezolvat (am sunat / am programat)</label>
@@ -3844,6 +3848,17 @@ qs('#qt-status').addEventListener('change', renderQuotes);
 qs('#qt-refresh-btn').addEventListener('click', () => loadQuotes(true));
 qs('#qt-settings-btn').addEventListener('click', openQuoteSettings);
 qs('#qt-list').addEventListener('click', e => { const r = e.target.closest('.qt-row'); if (!r) return; const q = (quotes || []).find(x => x.id === r.dataset.qid); if (q) openQuote(q); });
+qs('#qt-list').addEventListener('change', async e => {
+  const sel = e.target.closest('.qt-stsel'); if (!sel) return;
+  const q = (quotes || []).find(x => x.id === sel.dataset.qid); if (!q) return;
+  sel.disabled = true;
+  try {
+    const r = await clApi('/quotes/' + encodeURIComponent(q.id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: sel.value }) });
+    const i = quotes.findIndex(x => x.id === r.quote.id); if (i >= 0) quotes[i] = r.quote;
+    toast('Status: ' + (QST[r.quote.status] || r.quote.status), 'ok');
+  } catch (err) { toast(err.message, 'err'); }
+  renderQuotes();
+});
 qs('#qt-list').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('qt-row')) { e.preventDefault(); e.target.click(); } });
 qs('#qm-x').addEventListener('click', closeQuote); qs('#qm-close').addEventListener('click', closeQuote);
 qs('#quote-modal').addEventListener('click', e => { if (e.target.id === 'quote-modal') closeQuote(); });
