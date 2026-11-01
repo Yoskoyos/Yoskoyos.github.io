@@ -1591,12 +1591,10 @@ function quoteReplyEmailHtml(q, cfg, url, msg) {
   return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Răspuns la oferta nr. ${q.no}</title></head>
 <body style="margin:0;padding:0;background:${SOFT}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${SOFT}"><tr><td align="center" style="padding:18px 10px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#FFFFFF;border-radius:14px;overflow:hidden;border:1px solid ${LINE}">
-<tr><td style="background:${NAVY};padding:18px 22px"><img src="cid:q-logo.png@s24" alt="${escHtml(cfg.company)}" width="150" style="display:block;width:150px;height:auto;border:0;background:#FFFFFF;border-radius:8px;padding:6px"></td></tr>
 <tr><td style="padding:24px 22px 8px;${F}color:${INK}">
-  <div style="font-size:13px;font-weight:700;color:${ORG};letter-spacing:.06em;text-transform:uppercase">Oferta nr. ${q.no} · răspuns la întrebarea dvs.</div>
-  <div style="font-size:20px;font-weight:800;margin:6px 0 14px">Bună ziua${c.name ? ', ' + escHtml(c.name) : ''}!</div>
-  ${ask ? `<div style="font-size:13px;color:${MUT};background:${SOFT};border-radius:10px;padding:10px 12px;margin:0 0 14px">Ați întrebat: „${escHtml(ask)}”</div>` : ''}
+  <div style="font-size:16px;line-height:1.6;margin:0 0 6px">Bună ziua${c.name ? ', ' + escHtml(c.name) : ''},</div>
   <div style="font-size:16px;line-height:1.6">${body}</div>
+  ${ask ? `<div style="font-size:13px;color:${MUT};background:${SOFT};border-left:3px solid ${ORG};border-radius:6px;padding:10px 12px;margin:18px 0 0">Întrebarea dvs. la oferta nr. ${q.no}: „${escHtml(ask)}”</div>` : ''}
 </td></tr>
 <tr><td style="padding:18px 22px 6px">${b(url + '?a=accept', 'Accept oferta', ORG, NAVY, ORG)}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px"><tr>
@@ -1604,7 +1602,7 @@ function quoteReplyEmailHtml(q, cfg, url, msg) {
   <td width="50%" style="padding-left:5px">${b(url + '?a=clarify', 'Altă întrebare', '#FFFFFF', NAVY, NAVY)}</td></tr></table>
   <div style="${F}font-size:13px;color:${MUT};margin:12px 0 0">Puteți și să răspundeți direct la acest e-mail sau să ne sunați la <a href="tel:${escHtml(String(cfg.phone || '').replace(/[^\d+]/g, ''))}" style="color:${NAVY};font-weight:700">${escHtml(cfg.phone || '')}</a>.</div>
 </td></tr>
-<tr><td style="padding:18px 22px 22px;${F}font-size:12px;color:${MUT};border-top:1px solid ${LINE}">${escHtml(cfg.company)} · ${escHtml(cfg.legal || '')}</td></tr>
+<tr><td style="padding:18px 22px 22px;${F}font-size:12px;color:${MUT};border-top:1px solid ${LINE}"><img src="cid:q-logo.png@s24" alt="${escHtml(cfg.company)}" width="140" style="display:block;width:140px;height:auto;border:0;margin:0 0 10px">${escHtml(cfg.company)} · ${escHtml(cfg.legal || '')}</td></tr>
 </table></td></tr></table></body></html>`;
 }
 function emailCidAttachments(html) {
