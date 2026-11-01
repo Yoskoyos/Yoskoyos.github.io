@@ -449,7 +449,7 @@ html[data-font] .nvr-name,html[data-font] .cl-name,html[data-font] .modal-title{
 .qt-stat b{color:var(--fg);font-size:14px;margin-right:4px}
 .qt-warn{font-size:12px;line-height:1.5;border-radius:10px;padding:9px 12px;background:var(--warn-dim);color:var(--warn);margin-bottom:12px}
 .qt-list{display:flex;flex-direction:column;gap:8px}
-.qt-row{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;display:grid;grid-template-columns:62px 1.4fr 1.3fr .8fr 1fr .8fr;gap:12px;align-items:center;cursor:pointer;font-size:13px}
+.qt-row{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;display:grid;grid-template-columns:86px 1.4fr 1.3fr .8fr 1fr .8fr;gap:12px;align-items:center;cursor:pointer;font-size:13px}
 .qt-row:hover{border-color:var(--border-2)}
 .qt-no{font-weight:800;font-family:var(--mono);font-size:13.5px}
 .qt-name{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -470,8 +470,18 @@ select.qpill option{background:var(--bg-1,#fff);color:var(--fg-1,#111)}
 .qpill.msgdone{background:var(--bg-3);color:var(--fg-2)}
 .qpill.expired{background:var(--bg-3);color:var(--fg-3)}
 .qt-dates{font-size:12px;color:var(--fg-3);text-align:right}
-.qt-head{display:grid;grid-template-columns:62px 1.4fr 1.3fr .8fr 1fr .8fr;gap:12px;padding:0 15px 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-3)}
+.qt-head{display:grid;grid-template-columns:86px 1.4fr 1.3fr .8fr 1fr .8fr;gap:12px;padding:0 15px 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-3)}
 .qt-head .r{text-align:right}
+.qt-chk{width:20px;height:20px;margin:0;accent-color:#F5A100;cursor:pointer;flex-shrink:0}
+.qt-c-no{display:flex;align-items:center;gap:10px}
+.qt-row.sel{border-color:#F5A100;box-shadow:0 0 0 1px #F5A100 inset;background:var(--warn-dim)}
+.qt-bulk{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:#0D1F33;color:#fff;border-radius:14px;padding:10px 12px;margin:0 0 10px;position:sticky;top:8px;z-index:5}
+.qt-bulk[hidden]{display:none}
+.qt-bulk label{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13.5px;margin-right:auto;cursor:pointer}
+.qt-bulk select,.qt-bulk button{height:36px;border-radius:10px;font:inherit;font-size:13px;font-weight:700;padding:0 12px;cursor:pointer}
+.qt-bulk select{background:#fff;color:#0D1F33;border:0}
+.qt-bulk .del{background:#DC2626;color:#fff;border:0}
+.qt-bulk .x{background:transparent;color:#C9D4E0;border:1px solid rgba(255,255,255,.25)}
 #quote-modal .modal,#qset-modal .modal{max-width:640px}
 #quote-modal .modal-body,#qset-modal .modal-body{max-height:74vh}
 #qm-body a:not(.btn){color:var(--accent-tx);text-decoration:none}
@@ -1125,6 +1135,7 @@ html:not(.unlocked) .app{display:none}
             <option value="clarify">Cer clarificări</option><option value="answered">Am răspuns</option><option value="accepted">Acceptate</option><option value="rejected">Refuzate</option><option value="expired">Expirate</option><option value="contact">Mesaje de pe site</option>
           </select>
         </div>
+        <div class="qt-bulk" id="qt-bulk" hidden><label><input type="checkbox" class="qt-chk" id="qt-all"> <span id="qt-bulk-n">0 selectate</span></label><select id="qt-bulk-st" aria-label="Mută la status"><option value="">Mută la status…</option></select><button type="button" class="del" id="qt-bulk-del">Șterge</button><button type="button" class="x" id="qt-bulk-x">Anulează</button></div>
         <div class="qt-head"><div>Nr.</div><div>Client</div><div>Contact</div><div class="r">Total</div><div>Status</div><div class="r">Valabilă / creată</div></div>
         <div class="qt-list" id="qt-list"><div class="cl-empty">Se încarcă…</div></div>
       </div>
@@ -3686,6 +3697,7 @@ qs('#cd-delete').addEventListener('click', async () => {
    OFERTE (calculator site → server → pagina ofertei cu Accept / Refuz / Clarificări)
 ═══════════════════════════════════════ */
 let quotes = null, quotesMail = true, qmCur = null;
+const qtSel = new Set(); let qtShown = [];
 const QST_EDIT = ['sent', 'viewed', 'clarify', 'answered', 'accepted', 'rejected'];
 const QST = { new: 'Mesaj nou', sent: 'Trimisă', viewed: 'Văzută', accepted: 'Acceptată', rejected: 'Refuzată', clarify: 'Cere clarificări', answered: 'Am răspuns', expired: 'Expirată' };
 const fmtTs = t => t ? new Date(t).toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
@@ -3727,18 +3739,21 @@ function renderQuotes() {
   else if (f) rows = rows.filter(q => q.status === f);
   if (term) rows = rows.filter(q => [q.no, q.customer.name, q.customer.assoc, q.customer.address, q.customer.phone, q.customer.email, q.customer.city, q.customer.message].join(' ').toLowerCase().includes(term));
   const list = qs('#qt-list');
+  qtShown = rows.map(q => q.id);
+  for (const id of [...qtSel]) if (!quotes.some(q => q.id === id)) qtSel.delete(id);
+  qtBulkUI();
   if (!rows.length) { list.innerHTML = `<div class="cl-empty">${quotes.length ? 'Nicio ofertă găsită.' : 'Încă nu ai cereri de ofertă de pe site.<br>Apasă <b>Setări calculator</b> ca să pui prețurile și să iei codul pentru WordPress.'}</div>`; return; }
   list.innerHTML = rows.map(q => {
     const c = q.customer;
-    if (q.kind === 'contact') return `<div class="qt-row" role="button" tabindex="0" data-qid="${escapeHtml(q.id)}">
-      <div class="qt-c-no"><span class="qt-no">#${q.no}</span></div>
+    if (q.kind === 'contact') return `<div class="qt-row${qtSel.has(q.id) ? ' sel' : ''}" role="button" tabindex="0" data-qid="${escapeHtml(q.id)}">
+      <div class="qt-c-no"><input type="checkbox" class="qt-chk" data-sel="${escapeHtml(q.id)}"${qtSel.has(q.id) ? ' checked' : ''} aria-label="Selectează #${q.no}" onclick="event.stopPropagation()"><span class="qt-no">#${q.no}</span></div>
       <div style="min-width:0"><div class="qt-name">${escapeHtml(c.name)}</div><div class="qt-sub">✉ ${escapeHtml(c.message || '(fără mesaj)')}</div></div>
       <div class="qt-c-contact" style="min-width:0"><div class="qt-sub"><a href="tel:${escapeHtml(c.phone.replace(/[^\d+]/g, ''))}" onclick="event.stopPropagation()">${escapeHtml(c.phone)}</a></div><div class="qt-sub">${escapeHtml(c.email || '')}</div></div>
       <div class="qt-tot qt-sub">mesaj</div>
       <div class="qt-st"><span class="qpill ${q.handled ? 'msgdone' : 'new'}">${q.handled ? 'Rezolvat' : 'Mesaj nou'}</span>${c.page ? `<span class="qt-sub">pagina ${escapeHtml(c.page)}</span>` : ''}</div>
       <div class="qt-dates">${fmtTsH(q.createdAt)}</div></div>`;
-    return `<div class="qt-row" role="button" tabindex="0" data-qid="${escapeHtml(q.id)}">
-      <div class="qt-c-no"><span class="qt-no">#${q.no}</span><span class="qpill ${q.status}" style="display:none"></span></div>
+    return `<div class="qt-row${qtSel.has(q.id) ? ' sel' : ''}" role="button" tabindex="0" data-qid="${escapeHtml(q.id)}">
+      <div class="qt-c-no"><input type="checkbox" class="qt-chk" data-sel="${escapeHtml(q.id)}"${qtSel.has(q.id) ? ' checked' : ''} aria-label="Selectează #${q.no}" onclick="event.stopPropagation()"><span class="qt-no">#${q.no}</span><span class="qpill ${q.status}" style="display:none"></span></div>
       <div style="min-width:0"><div class="qt-name">${escapeHtml(c.assoc || c.name)}</div><div class="qt-sub">${escapeHtml(c.assoc ? c.name + ' · ' : '')}${escapeHtml(c.address || c.city)} · ${q.pricing.totalCams} cam.</div></div>
       <div class="qt-c-contact" style="min-width:0"><div class="qt-sub"><a href="tel:${escapeHtml(c.phone.replace(/[^\d+]/g, ''))}" onclick="event.stopPropagation()">${escapeHtml(c.phone)}</a></div><div class="qt-sub">${escapeHtml(c.email)}</div></div>
       <div class="qt-tot">${fmtLei(q.pricing.total)}${q.pricing.period === 'month' ? '<span class="qt-sub" style="font-weight:600"> /lună</span>' : ''}</div>
@@ -3855,7 +3870,37 @@ qs('#qt-status').addEventListener('change', renderQuotes);
 qs('#qt-refresh-btn').addEventListener('click', () => loadQuotes(true));
 qs('#qt-settings-btn').addEventListener('click', openQuoteSettings);
 qs('#qt-list').addEventListener('click', e => { const r = e.target.closest('.qt-row'); if (!r) return; const q = (quotes || []).find(x => x.id === r.dataset.qid); if (q) openQuote(q); });
+function qtBulkUI() {
+  const n = qtSel.size, bar = qs('#qt-bulk'); bar.hidden = !n;
+  qs('#qt-bulk-n').textContent = n === 1 ? '1 selectată' : n + ' selectate';
+  const all = qs('#qt-all'); all.checked = n > 0 && qtShown.every(id => qtSel.has(id)); all.indeterminate = n > 0 && !all.checked;
+  const st = qs('#qt-bulk-st'); if (st.options.length < 2) st.innerHTML = '<option value="">Mută la status…</option>' + QST_EDIT.map(s => `<option value="${s}">${QST[s]}</option>`).join('') + '<option value="__done">Mesaje: rezolvat</option>';
+}
+qs('#qt-all').addEventListener('change', e => { if (e.target.checked) qtShown.forEach(id => qtSel.add(id)); else qtSel.clear(); renderQuotes(); });
+qs('#qt-bulk-x').addEventListener('click', () => { qtSel.clear(); renderQuotes(); });
+async function qtBulkRun(fn, okMsg) {
+  const ids = [...qtSel]; let ok = 0, fail = 0;
+  for (const id of ids) { try { await fn(id); ok++; } catch { fail++; } }
+  qtSel.clear(); await loadQuotes(true);
+  toast(okMsg(ok) + (fail ? ` · ${fail} nereușite` : ''), fail ? 'err' : 'ok');
+}
+qs('#qt-bulk-del').addEventListener('click', () => {
+  const n = qtSel.size; if (!n) return;
+  if (!confirm(`Ștergi ${n === 1 ? 'oferta selectată' : n + ' oferte / mesaje'}? Nu se poate anula.`)) return;
+  qtBulkRun(id => clApi('/quotes/' + encodeURIComponent(id), { method: 'DELETE' }), k => `${k} șterse`);
+});
+qs('#qt-bulk-st').addEventListener('change', e => {
+  const v = e.target.value; e.target.value = ''; if (!v || !qtSel.size) return;
+  const items = (quotes || []).filter(q => qtSel.has(q.id));
+  const body = q => v === '__done' ? (q.kind === 'contact' ? { handled: true } : null) : (q.kind === 'contact' ? null : { status: v });
+  const skip = items.filter(q => !body(q)).length;
+  qtBulkRun(async id => { const q = items.find(x => x.id === id), b = q && body(q); if (!b) return;
+    await clApi('/quotes/' + encodeURIComponent(id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }); },
+    k => `Mutate: ${k - skip}` + (skip ? ` · ${skip} sărite (alt tip)` : ''));
+});
 qs('#qt-list').addEventListener('change', async e => {
+  const ck = e.target.closest('[data-sel]');
+  if (ck) { if (ck.checked) qtSel.add(ck.dataset.sel); else qtSel.delete(ck.dataset.sel); ck.closest('.qt-row').classList.toggle('sel', ck.checked); qtBulkUI(); return; }
   const sel = e.target.closest('.qt-stsel'); if (!sel) return;
   const q = (quotes || []).find(x => x.id === sel.dataset.qid); if (!q) return;
   sel.disabled = true;
