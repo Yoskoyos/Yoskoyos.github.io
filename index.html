@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 
 <style>
+.nav-tab .lbl-d{display:none}
 /* ── Token system — dark surveillance aesthetic ── */
 :root {
   --bg:        #0a0b0d;
@@ -792,6 +793,7 @@ select.qpill option{background:var(--bg-1,#fff);color:var(--fg-1,#111)}
   .nav-tab .lbl-l{display:none}.nav-tab .lbl-s{display:inline}
   .nav-tab .badge{margin-left:auto;min-width:20px;height:20px;font-size:11px;border-radius:10px;position:static}
   .nav-tab[data-tab="settings"]{margin-top:auto}
+  .nav-tab[data-tab="quotes"] .lbl-s{display:none}.nav-tab[data-tab="quotes"] .lbl-d{display:inline}
   .main{margin-left:var(--side-w)}
   #toast-wrap{left:calc(50% + var(--side-w) / 2)}
 }
@@ -813,7 +815,8 @@ select.qpill option{background:var(--bg-1,#fff);color:var(--fg-1,#111)}
   .nav-tab .badge{top:1px;left:calc(50% + 7px);border:2px solid #0D1F33}
   .main{padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
 }
-@media(max-width:380px){ .nav{left:6px;right:6px}.nav-tab .nav-ic{padding:5px 9px}.nav-tab{font-size:9.5px} }
+@media(max-width:600px){ .nav-tab .nav-ic{padding:5px 11px} }
+@media(max-width:380px){ .nav{left:6px;right:6px}.nav-tab .nav-ic{padding:5px 7px}.nav-tab{font-size:9.5px} }
 
 
 /* ── Ecran de login ── */
@@ -946,6 +949,7 @@ html:not(.unlocked) .app{display:none}
     <div class="nav-tab" data-tab="nvrs"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01"/><circle cx="18" cy="12" r="2"/></svg><span class="lbl-l">NVR-uri</span><span class="lbl-s">NVR-uri</span></div>
     <div class="nav-tab" data-tab="snapshots"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg><span class="lbl-l">Snapshots</span><span class="lbl-s">Camere</span></div>
     <div class="nav-tab" data-tab="clients"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg><span class="lbl-l">Clienți</span><span class="lbl-s">Clienți</span></div>
+    <div class="nav-tab" data-tab="quotes"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg><span class="lbl-l">Cereri ofertă</span><span class="lbl-s">Oferte</span><span class="lbl-d">Cereri ofertă</span> <span class="badge" id="qt-badge" style="display:none">0</span></div>
     <div class="nav-tab" data-tab="alerts"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg><span class="lbl-l">Alerte</span><span class="lbl-s">Alerte</span> <span class="badge" id="alert-badge" style="display:none">0</span></div>
     <div class="nav-tab" data-tab="log"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span class="lbl-l">Jurnal</span><span class="lbl-s">Jurnal</span></div>
     <div class="nav-tab" data-tab="settings"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span class="lbl-l">Setări</span><span class="lbl-s">Setări</span></div>
@@ -1053,7 +1057,7 @@ html:not(.unlocked) .app{display:none}
     <!-- ── Alerte ── -->
     <!-- ── Clienți ── -->
     <div class="panel" id="panel-clients">
-      <div class="seg" role="tablist"><button type="button" class="on" data-v="clients">Clienți</button><button type="button" data-v="quotes">Oferte <span class="cnt" id="qt-badge" hidden></span></button><button type="button" data-v="docs">Acte firmă <span class="cnt" id="cd-badge" hidden></span></button></div>
+      <div class="seg" role="tablist"><button type="button" class="on" data-v="clients">Clienți</button><button type="button" data-v="docs">Acte firmă <span class="cnt" id="cd-badge" hidden></span></button></div>
       <div id="cl-view-clients">
       <div class="section">
         <div class="section-hdr">
@@ -1078,10 +1082,31 @@ html:not(.unlocked) .app{display:none}
         <div class="cl-list" id="cl-list"><div class="cl-empty">Se încarcă…</div></div>
       </div>
       </div>
-      <div id="cl-view-quotes" hidden>
+      <div id="cl-view-docs" hidden>
       <div class="section">
         <div class="section-hdr">
-          <div class="section-title">Oferte și mesaje de pe site</div>
+          <div class="section-title">Actele firmei</div>
+          <div class="section-action" id="cd-add-btn" style="margin-left:auto">
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            Adaugă act
+          </div>
+        </div>
+        <div class="cl-tools">
+          <input type="search" class="cl-search" id="cd-search" placeholder="Caută: CUI, licență, asigurare, număr…" autocomplete="off">
+        </div>
+        <div id="cd-alert"></div>
+        <div class="cl-list" id="cd-list"><div class="cl-empty">Se încarcă…</div></div>
+        <div class="cm-hint" style="margin-top:12px">Actele se păstrează doar pe serverul tău, se deschid numai după autentificare și intră în „Copie de siguranță” de la Clienți. Primești alertă pe Telegram și pe telefon cu 30, 7 și 1 zile înainte să expire un act.</div>
+      </div>
+      </div>
+    </div>
+
+    <!-- ── Cereri ofertă ── -->
+    <div class="panel" id="panel-quotes">
+      <div id="cl-view-quotes">
+      <div class="section">
+        <div class="section-hdr">
+          <div class="section-title">Cereri de ofertă și mesaje de pe site</div>
           <div class="section-action" id="qt-settings-btn" style="margin-left:auto;margin-right:16px">
             <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.2 4.2l2.8 2.8M17 17l2.8 2.8M1 12h4M19 12h4M4.2 19.8L7 17M17 7l2.8-2.8"/></svg>
             Setări calculator
@@ -1105,23 +1130,6 @@ html:not(.unlocked) .app{display:none}
       </div>
       </div>
 
-      <div id="cl-view-docs" hidden>
-      <div class="section">
-        <div class="section-hdr">
-          <div class="section-title">Actele firmei</div>
-          <div class="section-action" id="cd-add-btn" style="margin-left:auto">
-            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-            Adaugă act
-          </div>
-        </div>
-        <div class="cl-tools">
-          <input type="search" class="cl-search" id="cd-search" placeholder="Caută: CUI, licență, asigurare, număr…" autocomplete="off">
-        </div>
-        <div id="cd-alert"></div>
-        <div class="cl-list" id="cd-list"><div class="cl-empty">Se încarcă…</div></div>
-        <div class="cm-hint" style="margin-top:12px">Actele se păstrează doar pe serverul tău, se deschid numai după autentificare și intră în „Copie de siguranță” de la Clienți. Primești alertă pe Telegram și pe telefon cu 30, 7 și 1 zile înainte să expire un act.</div>
-      </div>
-      </div>
     </div>
 
     <div class="panel" id="panel-alerts">
@@ -3687,10 +3695,9 @@ const waNum = ph => { let d = String(ph || '').replace(/\D/g, ''); if (d.startsW
 function showClView(v) {
   document.querySelectorAll('#panel-clients .seg button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   qs('#cl-view-clients').hidden = v !== 'clients';
-  qs('#cl-view-quotes').hidden = v !== 'quotes';
   qs('#cl-view-docs').hidden = v !== 'docs';
   try { localStorage.setItem('yca_cl_view', v); } catch {}
-  if (v === 'quotes') loadQuotes(true); else if (v === 'docs') loadCDocs(true); else loadClients(true);
+  if (v === 'docs') loadCDocs(true); else loadClients(true);
 }
 async function loadQuotes(force) {
   if (quotes && !force) return renderQuotes();
@@ -3705,7 +3712,7 @@ function renderQuotes() {
   const inMonth = q => new Date(q.createdAt).toISOString().slice(0, 7) === ym;
   const open = quotes.filter(q => ['sent', 'viewed', 'clarify', 'answered'].includes(q.status));
   const need = quotes.filter(q => q.status === 'clarify' || ((q.status === 'accepted' || q.kind === 'contact') && !q.handled));
-  const badge = qs('#qt-badge'); badge.hidden = !need.length; badge.textContent = need.length;
+  const badge = qs('#qt-badge'); badge.style.display = need.length ? '' : 'none'; badge.textContent = need.length;
   qs('#qt-stats').innerHTML = [
     [open.length, 'deschise'], [quotes.filter(q => q.kind !== 'contact' && inMonth(q)).length, 'oferte luna asta'],
     [quotes.filter(q => q.status === 'accepted' && inMonth(q)).length, 'acceptate luna asta'],
@@ -3874,7 +3881,8 @@ qs('#qset-modal').addEventListener('click', e => { if (e.target.id === 'qset-mod
 qs('#qs-save').addEventListener('click', saveQuoteSettings);
 qs('#qs-copy').addEventListener('click', () => { const t = qs('#qs-embed').textContent; navigator.clipboard.writeText(t).then(() => toast('Cod copiat', 'ok'), () => toast('Selectează codul și copiază-l manual', 'warn')); });
 
-document.querySelectorAll('.nav-tab[data-tab="clients"]').forEach(t => t.addEventListener('click', () => { let v = 'clients'; try { v = localStorage.getItem('yca_cl_view') || 'clients'; } catch {} showClView(['quotes', 'docs'].includes(v) ? v : 'clients'); }));
+document.querySelectorAll('.nav-tab[data-tab="clients"]').forEach(t => t.addEventListener('click', () => { let v = 'clients'; try { v = localStorage.getItem('yca_cl_view') || 'clients'; } catch {} showClView(v === 'docs' ? 'docs' : 'clients'); }));
+document.querySelectorAll('.nav-tab[data-tab="quotes"]').forEach(t => t.addEventListener('click', () => loadQuotes(true)));
 
 /* ═══════════════════════════════════════
    SETTINGS
@@ -4529,6 +4537,8 @@ async function refreshRecStatus(){
   } catch {}
 }
 setTimeout(refreshRecStatus, 2500); setInterval(refreshRecStatus, 120000);
+function refreshQuotesBadge() { if (getAuth() && document.documentElement.classList.contains('unlocked')) loadQuotes(true).catch(() => {}); }
+setTimeout(refreshQuotesBadge, 3500); setInterval(refreshQuotesBadge, 300000);
 async function refreshMonitorHint(){
   const auth = getAuth(); if (!auth) return;
   try {
