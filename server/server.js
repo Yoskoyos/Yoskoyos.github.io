@@ -367,12 +367,12 @@ async function probeNvr(nvr, cred) {
 }
 
 /* Verificare înregistrare — caută în NVR înregistrări reale, cameră cu cameră (ca la Redare):
-   • camere pe înregistrare CONTINUĂ: la 15 min, fereastra = ultima oră; alertă după 2 căutări la rând fără nimic (~30 min)
+   • camere pe înregistrare CONTINUĂ: la 15 min, fereastra = ultimele 2 ore (segmentele în curs pot apărea abia după ce se închid); alertă după 2 căutări la rând fără nimic
    • camere pe înregistrare la MIȘCARE / evenimente: la 6 ore, fereastra = ultimele 12 ore; alertă dacă în 12 ore n-a înregistrat nimic
    Doar pentru camere online și HDD bun (acelea au alertele lor). */
 const REC_EVERY_MS = parseInt(process.env.REC_EVERY_MS || '900000', 10);          // 15 min
 const REC_MOT_EVERY_MS = parseInt(process.env.REC_MOT_EVERY_MS || '21600000', 10); // 6 ore
-const REC_TRACKS_EVERY_MS = 6 * 3600e3, REC_WINDOW_MIN = 60, REC_MOT_WINDOW_MIN = 12 * 60;
+const REC_TRACKS_EVERY_MS = 6 * 3600e3, REC_WINDOW_MIN = 120, REC_MOT_WINDOW_MIN = 12 * 60;
 const pad2 = n => String(n).padStart(2, '0');
 function nvrWall(xml) {   // <localTime>2026-11-01T11:00:00+02:00</localTime> → ora de pe ceasul NVR-ului
   const m = /<localTime>(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/.exec(xml || '');
@@ -407,8 +407,14 @@ async function recCheck(key, nvr, cred) {
     for (const m of t.body.matchAll(/<Track\b[^>]*>([\s\S]*?)<\/Track>/g)) {
       const id = parseInt((/<id>(\d+)<\/id>/.exec(m[1]) || [])[1], 10);
       if (!id || id % 100 !== 1) continue;                                   // doar fluxul principal (101, 201…)
-      if (/<Enable>\s*false\s*<\/Enable>/i.test(m[1])) continue;             // cameră fără înregistrare programată
-      list.push({ id, cont: /<(?:DefaultRecordingMode|ActionRecordingMode)>\s*(CMR|continuous)\s*</i.test(m[1]) });
+      // <Enable> de pe track NU spune dacă înregistrează (pe multe NVR-uri e „false” deși înregistrează) → ne uităm la programare
+      const acts = [...m[1].matchAll(/<ScheduleAction\b[^>]*>([\s\S]*?)<\/ScheduleAction>/g)].map(x => x[1]);
+      const rec = acts.filter(a => /<Record>\s*true\s*<\/Record>/i.test(a));
+      if (acts.length && !rec.length) continue;                              // are program, dar fără înregistrare
+      const def = (/<DefaultRecordingMode>\s*([^<\s]+)/i.exec(m[1]) || [])[1] || '';
+      const modes = rec.map(a => (/<ActionRecordingMode>\s*([^<\s]+)/i.exec(a) || [])[1] || def).filter(Boolean);
+      const all = modes.length ? modes : [def];
+      list.push({ id, cont: all.length > 0 && all.every(x => /^(CMR|continuous)$/i.test(x)) });   // program mixt → tratat ca „la mișcare”
     }
     st.recTracks = list; st.recTracksAt = now;
   }
@@ -431,7 +437,7 @@ async function recCheck(key, nvr, cred) {
       if (st.recMiss[ch] >= need && !st.recBad[ch]) {
         st.recBad[ch] = true;
         lines.push({ kind: 'crit', text: t.cont
-          ? `🔴 CH${ch} — NU ÎNREGISTREAZĂ (nicio înregistrare în ultima oră, deși camera e online)`
+          ? `🔴 CH${ch} — NU ÎNREGISTREAZĂ (nicio înregistrare în ultimele 2 ore, deși camera e online)`
           : `🔴 CH${ch} — NU ÎNREGISTREAZĂ (înregistrare la mișcare: nimic în ultimele 12 ore, deși camera e online)` });
       }
     }
@@ -1987,7 +1993,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 6.3, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 6.4, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
@@ -2087,4 +2093,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('NVR Proxy v6.3 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
+server.listen(PORT, () => console.log('NVR Proxy v6.4 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));
