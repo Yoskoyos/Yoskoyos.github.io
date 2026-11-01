@@ -1127,7 +1127,7 @@ async function cfSiteTag(cf) {
   if (cf.siteTag) return cf.siteTag;
   const r = await cfApi('GET', `/accounts/${encodeURIComponent(cf.accountId)}/rum/site_info/list?per_page=50`, cf.token);
   const list = (r.json && r.json.result) || [];
-  if (!r.json || !r.json.success) throw new Error('Cloudflare: ' + (((r.json || {}).errors || [])[0] || {}).message || 'acces refuzat');
+  if (!r.json || !r.json.success) return '';   // tokenul nu poate citi lista de site-uri → statistici pe tot contul (un singur site)
   const hit = list.find(x => /supraveghere24h\.ro$/i.test((x.ruleset && x.ruleset.zone_name) || x.host || '')) || list[0];
   if (!hit) throw new Error('Nu găsesc niciun site în Cloudflare Web Analytics');
   cf.siteTag = hit.site_tag; try { fs.writeFileSync(CF_FILE, JSON.stringify(cf, null, 2), { mode: 0o600 }); } catch {}
@@ -1139,7 +1139,7 @@ async function cfStats(days) {
   if (c && Date.now() - c.t < 10 * 60e3) return c.v;
   const siteTag = await cfSiteTag(cf);
   const to = new Date(), from = new Date(Date.now() - days * 864e5);
-  const filter = { AND: [{ datetime_geq: from.toISOString(), datetime_leq: to.toISOString() }, { siteTag }, { bot: 0 }] };
+  const filter = { AND: [{ datetime_geq: from.toISOString(), datetime_leq: to.toISOString() }, ...(siteTag ? [{ siteTag }] : []), { bot: 0 }] };
   const g = (alias, dims, limit, order) => `${alias}: rumPageloadEventsAdaptiveGroups(filter: $filter, limit: ${limit}${order ? `, orderBy: [${order}]` : ''}) { count sum { visits }${dims ? ` dimensions { ${dims} }` : ''} }`;
   const query = `query($accountTag: string, $filter: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject) { viewer { accounts(filter: { accountTag: $accountTag }) {
     ${g('total', '', 1)} ${g('daily', 'date', 100, 'date_ASC')} ${g('pages', 'requestPath', 10, 'count_DESC')}
@@ -1170,7 +1170,7 @@ async function handleAnalytics(req, res, pathname, parsed) {
       const prev = fs.existsSync(CF_FILE) ? fs.readFileSync(CF_FILE) : null;
       fs.writeFileSync(CF_FILE, JSON.stringify(cf, null, 2), { mode: 0o600 }); cfCache.clear();
       try { await cfStats(1); } catch (e) { if (prev) fs.writeFileSync(CF_FILE, prev, { mode: 0o600 }); else try { fs.unlinkSync(CF_FILE); } catch {} cfCache.clear();
-        return sendJson(res, 400, { error: e.message + (siteTag ? '' : ' — dacă tokenul nu poate citi lista de site-uri, completează și „Site tag”') }); }
+        return sendJson(res, 400, { error: e.message  }); }
       return sendJson(res, 200, { configured: true, accountId });
     }
   }
