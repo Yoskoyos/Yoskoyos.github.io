@@ -1410,7 +1410,7 @@ const QUOTE_DEFAULTS = {
   validDays: 30,
   intro: 'Vă mulțumim pentru interes! Mai jos găsiți oferta pentru sistemul de supraveghere video al blocului, cu plată lunară fixă.',
   note: 'Oferta poate fi îmbunătățită după inspectarea locației. Abonamentul lunar este singurul cost suportat de asociație pe toată durata contractului.',
-  includes: 'Supraveghere video 24/7, rezoluție 5 MP, echipamente Hikvision, Dahua și HiLook\nInstalare, punere în funcțiune și instruire gratuite\nGaranție extinsă pe toată durata contractului, inclusiv la furt și vandalism\nMentenanță și service pe toată durata contractului\nLa finalul contractului, echipamentele devin proprietatea asociației',
+  includes: 'Supraveghere video 24/7, rezoluție de minimum 4 MP, echipamente Hikvision, Dahua și HiLook\nInstalare, punere în funcțiune și instruire gratuite\nGaranție extinsă pe toată durata contractului, inclusiv la furt și vandalism\nMentenanță și service pe toată durata contractului\nLa finalul contractului, echipamentele devin proprietatea asociației',
 };
 function quoteCfg(db, owner) {
   const c = (owner && db.configs[owner.username] && db.configs[owner.username].quoteCfg) || {};
@@ -1699,8 +1699,8 @@ function quoteEmailHtml(q, cfg, url, opt = {}) {
   const nLift = cams.lift || 0, nIE = Math.max(0, (p.totalCams || 0) - nLift);
   let nEx = Math.min(cams.ex || 0, nIE), nIn = nIE - nEx;
   const pk = [['p-nvr.png', 'NVR (Hikvision, Dahua sau HiLook)', 'Unitatea de înregistrare și gestionare video, de înaltă performanță.', '1x']];
-  if (nIn) pk.push(['p-turret.png', 'Camere IP interior', `Camere Hikvision, Dahua sau HiLook de minimum 5 MP pentru scări, holuri și intrări.`, nIn + 'x']);
-  if (nEx) pk.push(['p-bullet.png', 'Camere IP exterior', `Camere Hikvision, Dahua sau HiLook de minimum 5 MP, pentru exterior, cu vedere pe timp de noapte.`, nEx + 'x']);
+  if (nIn) pk.push(['p-turret.png', 'Camere IP interior', `Camere Hikvision, Dahua sau HiLook de minimum 4 MP pentru scări, holuri și intrări.`, nIn + 'x']);
+  if (nEx) pk.push(['p-bullet.png', 'Camere IP exterior', `Camere Hikvision, Dahua sau HiLook de minimum 4 MP, pentru exterior, cu vedere pe timp de noapte.`, nEx + 'x']);
   if (nLift) pk.push(['p-turret.png', 'Camere pentru lift', 'Camere compacte, montate în cabina liftului.', nLift + 'x']);
   pk.push(['p-hdd.png', 'Stocare pe hard disk', 'Hard disk dedicat pentru păstrarea înregistrărilor video.', '1x'],
           ['p-mon.png', 'Monitor', 'Monitor pentru vizualizarea live și a înregistrărilor, la fața locului.', '1x'],
@@ -1718,7 +1718,7 @@ function quoteEmailHtml(q, cfg, url, opt = {}) {
   const nApt = parseInt(c.apartments, 10);
   const facts = [`${p.totalCams} ${p.totalCams === 1 ? 'cameră' : 'camere'}`, p.months ? `contract ${p.months} luni` : '', p.setup ? `instalare ${lei(p.setup)}` : 'instalare gratuită'].filter(Boolean).join('&nbsp;&nbsp;·&nbsp;&nbsp;');
   // beneficii (2 coloane) și garanții (2 x 2)
-  const ben = [['i-img.png', 'Imagine clară 5 MP', 'Detalii clare pentru identificarea persoanelor, zi și noapte.'],
+  const ben = [['i-img.png', 'Imagine clară 4 MP', 'Detalii clare pentru identificarea persoanelor, zi și noapte.'],
                ['i-shield.png', 'Acreditați de Poliția Română', 'Sisteme recunoscute oficial pentru supraveghere video.'],
                ['i-rec.png', 'Înregistrare 24/7', 'Înregistrările sunt păstrate în siguranță pe hard disk.'],
                ['i-lock.png', 'Garanție la furt și vandalism', 'Echipamentele sunt acoperite pe toată durata contractului.'],
