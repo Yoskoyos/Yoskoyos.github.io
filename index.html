@@ -3757,11 +3757,15 @@ function openQuote(q) {
   if (q.kind === 'contact') return openContactMsg(q);
   const c = q.customer, p = q.pricing;
   qs('#qm-title').textContent = `Oferta nr. ${q.no}`;
-  const evName = { created: 'Ofertă creată (calculator site)', viewed: 'Clientul a deschis oferta', accepted: 'Acceptată', rejected: 'Refuzată', clarify: 'Cere clarificări', extended: 'Valabilitate prelungită', sent: 'Marcată „Trimisă”', expired: 'Expirată' };
+  const evName = { created: 'Ofertă creată (calculator site)', viewed: 'Clientul a deschis oferta', accepted: 'Acceptată', rejected: 'Refuzată', clarify: 'Cere clarificări', reply: 'Ai răspuns pe email', extended: 'Valabilitate prelungită', sent: 'Marcată „Trimisă”', expired: 'Expirată' };
   const wa = `https://wa.me/${waNum(c.phone)}?text=${encodeURIComponent(`Bună ziua, ${c.name.split(' ')[0]}! Oferta pentru sistemul de supraveghere al blocului (nr. ${q.no}) este aici: ${q.url}`)}`;
   qs('#qm-body').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span class="qpill ${q.status}" style="font-size:12.5px;padding:5px 12px">${QST[q.status]}</span><span class="cm-hint">creată ${fmtTsH(q.createdAt)} · valabilă până ${fmtTs(q.validUntil)}${q.views ? ` · deschisă de ${q.views} ori` : ''}</span></div>
     ${q.response && q.response.message ? `<div class="qm-msg"><b>Mesajul clientului:</b> ${escapeHtml(q.response.message)}</div>` : ''}
+    ${(q.replies || []).map(r => `<div class="qm-msg" style="background:var(--bg-2)"><b>Răspunsul tău</b> <span class="cm-hint">· ${fmtTsH(r.at)} · trimis pe email</span><div style="white-space:pre-wrap;margin-top:4px">${escapeHtml(r.message)}</div></div>`).join('')}
+    ${c.email && (q.status === 'clarify' || (q.replies || []).length) ? `<div class="fg" style="margin-top:10px"><label for="qm-reply">${(q.replies || []).length ? 'Mai trimite un răspuns pe email' : 'Răspunde clientului pe email'}</label>
+      <textarea id="qm-reply" rows="4" placeholder="Scrie răspunsul… (clientul îl primește pe ${escapeHtml(c.email)}, cu butoanele ofertei)"></textarea>
+      <button type="button" class="btn primary" id="qm-reply-send" style="margin-top:8px;width:100%">✉️ Trimite răspunsul pe email</button></div>` : ''}
     <div class="cm-sec">Client</div>
     <div style="font-size:14px;line-height:1.7">${c.assoc ? `<b>${escapeHtml(c.assoc)}</b><br>` : ''}${c.assoc ? '' : '<b>'}${escapeHtml(c.name)}${c.assoc ? '' : '</b>'}${c.role ? ` — ${escapeHtml(c.role)}` : ''}${c.apartments ? ` · ${escapeHtml(c.apartments)} apartamente` : ''}<br>
       <a href="tel:${escapeHtml(c.phone.replace(/[^\d+]/g, ''))}">${escapeHtml(c.phone)}</a> · <a href="mailto:${escapeHtml(c.email)}">${escapeHtml(c.email)}</a><br>${escapeHtml([c.address, c.city].filter(Boolean).join(', '))}
@@ -3782,6 +3786,17 @@ function openQuote(q) {
     <div class="fg"><label for="qm-notes">Notițele mele</label><textarea id="qm-notes" rows="2">${escapeHtml(q.notes || '')}</textarea></div>
     ${q.clientId ? '<div class="cm-hint">✓ Clientul a fost adăugat automat în lista de clienți la acceptare.</div>' : ''}`;
   qs('#quote-modal').classList.remove('hidden');
+  const rs = qs('#qm-reply-send');
+  if (rs) rs.addEventListener('click', async () => {
+    const ta = qs('#qm-reply'), msg = ta.value.trim();
+    if (!msg) { ta.focus(); return toast('Scrie răspunsul', 'err'); }
+    rs.disabled = true; rs.textContent = 'Se trimite…';
+    try {
+      const r = await clApi('/quotes/' + encodeURIComponent(q.id) + '/reply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: msg }) });
+      const i = quotes.findIndex(x => x.id === r.quote.id); if (i >= 0) quotes[i] = r.quote;
+      renderQuotes(); toast('Răspuns trimis pe email', 'ok'); openQuote(r.quote);
+    } catch (e) { toast(e.message, 'err'); rs.disabled = false; rs.textContent = '✉️ Trimite răspunsul pe email'; }
+  });
   qs('#qm-copy').addEventListener('click', () => { navigator.clipboard.writeText(q.url).then(() => toast('Link copiat', 'ok'), () => toast(q.url, 'info')); });
   qs('#qm-status').addEventListener('change', e => quoteUpdate({ status: e.target.value }));
   qs('#qm-extend').addEventListener('click', () => quoteUpdate({ extendDays: 30 }, 'Valabilitate prelungită'));

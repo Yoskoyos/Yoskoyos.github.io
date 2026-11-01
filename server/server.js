@@ -1581,6 +1581,32 @@ ${cfg.note || c.message ? `<tr><td class="px" style="padding:16px 22px 4px">${cf
 }
 
 // imaginile referite ca cid:<nume>@s24 în e-mail → atașamente inline (din email-img/ și logo-ul ofertei)
+// Răspunsul meu la „Cer clarificări” — e-mail scurt, cu mesajul și butoanele ofertei
+function quoteReplyEmailHtml(q, cfg, url, msg) {
+  const NAVY = '#0D1F33', ORG = '#F5A100', INK = '#14202E', MUT = '#5B6B7C', LINE = '#E3E8EF', SOFT = '#F4F7FB';
+  const F = "font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
+  const c = q.customer || {}, ask = q.response && q.response.action === 'clarify' ? q.response.message : '';
+  const body = escHtml(msg).replace(/\r?\n/g, '<br>');
+  const b = (href, t, bg, fg, bd) => `<a href="${href}" style="${F}display:block;background:${bg};color:${fg};border:1.5px solid ${bd};text-decoration:none;font-weight:700;font-size:15px;text-align:center;padding:13px 8px;border-radius:10px">${t}</a>`;
+  return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Răspuns la oferta nr. ${q.no}</title></head>
+<body style="margin:0;padding:0;background:${SOFT}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${SOFT}"><tr><td align="center" style="padding:18px 10px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#FFFFFF;border-radius:14px;overflow:hidden;border:1px solid ${LINE}">
+<tr><td style="background:${NAVY};padding:18px 22px"><img src="cid:q-logo.png@s24" alt="${escHtml(cfg.company)}" width="150" style="display:block;width:150px;height:auto;border:0;background:#FFFFFF;border-radius:8px;padding:6px"></td></tr>
+<tr><td style="padding:24px 22px 8px;${F}color:${INK}">
+  <div style="font-size:13px;font-weight:700;color:${ORG};letter-spacing:.06em;text-transform:uppercase">Oferta nr. ${q.no} · răspuns la întrebarea dvs.</div>
+  <div style="font-size:20px;font-weight:800;margin:6px 0 14px">Bună ziua${c.name ? ', ' + escHtml(c.name) : ''}!</div>
+  ${ask ? `<div style="font-size:13px;color:${MUT};background:${SOFT};border-radius:10px;padding:10px 12px;margin:0 0 14px">Ați întrebat: „${escHtml(ask)}”</div>` : ''}
+  <div style="font-size:16px;line-height:1.6">${body}</div>
+</td></tr>
+<tr><td style="padding:18px 22px 6px">${b(url + '?a=accept', 'Accept oferta', ORG, NAVY, ORG)}
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px"><tr>
+  <td width="50%" style="padding-right:5px">${b(url, 'Vezi oferta', '#FFFFFF', NAVY, NAVY)}</td>
+  <td width="50%" style="padding-left:5px">${b(url + '?a=clarify', 'Altă întrebare', '#FFFFFF', NAVY, NAVY)}</td></tr></table>
+  <div style="${F}font-size:13px;color:${MUT};margin:12px 0 0">Puteți și să răspundeți direct la acest e-mail sau să ne sunați la <a href="tel:${escHtml(String(cfg.phone || '').replace(/[^\d+]/g, ''))}" style="color:${NAVY};font-weight:700">${escHtml(cfg.phone || '')}</a>.</div>
+</td></tr>
+<tr><td style="padding:18px 22px 22px;${F}font-size:12px;color:${MUT};border-top:1px solid ${LINE}">${escHtml(cfg.company)} · ${escHtml(cfg.legal || '')}</td></tr>
+</table></td></tr></table></body></html>`;
+}
 function emailCidAttachments(html) {
   const out = [], seen = new Set();
   for (const m of html.matchAll(/cid:([a-z0-9-]+\.(?:png|jpg))@s24/g)) {
@@ -1759,8 +1785,8 @@ function quotePageV2(q, cfg, base, pre) {
   const B = { accepted: ['#DCFCE7', '#14532D', '✓', 'Ați acceptat această ofertă.', 'Vă mulțumim! Vă contactăm în cel mai scurt timp pentru programarea montajului.'],
               rejected: ['#FEE4E2', '#7A271A', '✕', 'Ați refuzat această ofertă.', 'Vă mulțumim pentru timpul acordat. Ne puteți contacta oricând pentru o ofertă nouă.'],
               expired:  ['#EEF2F7', '#475467', '⏱', 'Această ofertă a expirat.', 'Ne puteți contacta pentru o ofertă actualizată.'],
-              clarify:  ['#FEF3C7', '#78350F', '?', 'Am primit întrebarea dumneavoastră.', 'Vă răspundem în maxim 24 de ore. Între timp puteți accepta sau refuza oferta.'] }[st];
-  const banner = B ? `<div style="${F}background:${B[0]};color:${B[1]};border-radius:12px;padding:16px 18px;margin:0 0 ${open ? 18 : 6}px"><div style="font-size:17px;font-weight:800">${B[2]}&nbsp; ${B[3]}</div><div style="font-size:14px;line-height:1.5;margin-top:4px">${B[4]}</div>${q.response && q.response.message ? `<div style="font-size:13px;margin-top:8px;opacity:.85">Mesajul dumneavoastră: „${escHtml(q.response.message)}”</div>` : ''}</div>` : '';
+              clarify:  ['#FEF3C7', '#78350F', '?', 'Am primit întrebarea dumneavoastră.', q.replies && q.replies.length ? 'V-am răspuns mai jos (și pe e-mail). Puteți accepta oferta sau ne puteți scrie din nou.' : 'Vă răspundem în maxim 24 de ore. Între timp puteți accepta sau refuza oferta.'] }[st];
+  const banner = B ? `<div style="${F}background:${B[0]};color:${B[1]};border-radius:12px;padding:16px 18px;margin:0 0 ${open ? 18 : 6}px"><div style="font-size:17px;font-weight:800">${B[2]}&nbsp; ${B[3]}</div><div style="font-size:14px;line-height:1.5;margin-top:4px">${B[4]}</div>${q.response && q.response.message ? `<div style="font-size:13px;margin-top:8px;opacity:.85">Mesajul dumneavoastră: „${escHtml(q.response.message)}”</div>` : ''}${st === 'clarify' && q.replies && q.replies.length ? `<div style="font-size:14px;line-height:1.55;margin-top:10px;background:#FFFFFF;border-radius:10px;padding:10px 12px;color:#14202E"><b>Răspunsul nostru:</b><br>${escHtml(q.replies[q.replies.length - 1].message).replace(/\r?\n/g, '<br>')}</div>` : ''}</div>` : '';
   const btn = 'cursor:pointer;display:block;width:100%;box-sizing:border-box;text-align:center;border-radius:10px;';
   const cta = `<tr class="noprint"><td class="px" style="padding:24px 32px 28px">${banner}${open ? `<div style="${F}font-size:19px;font-weight:800;color:#14202E;margin:0 0 4px">Ce decideți?</div>
     <div style="${F}font-size:13px;color:#5B6B7C;margin:0 0 16px">Alegeți o variantă și confirmați — durează câteva secunde.</div>
@@ -1854,6 +1880,21 @@ async function handleQuotesApi(req, res, pathname, parsed) {
   const id = pathname.split('/')[2];
   const q = mine.find(x => x.id === id);
   if (!q) return sendJson(res, 404, { error: 'Ofertă inexistentă' });
+  if (pathname.split('/')[3] === 'reply' && req.method === 'POST') {
+    const b = await readJson(req); const msg = str(b.message, 4000).trim();
+    if (!msg) return sendJson(res, 400, { error: 'Scrie răspunsul' });
+    if (!q.customer || !q.customer.email) return sendJson(res, 400, { error: 'Clientul nu are adresă de email' });
+    if (!mailReady()) return sendJson(res, 503, { error: 'Emailul nu e configurat pe server' });
+    const cfg = quoteCfg(ctx.db, ctx.user), url = `${publicBase(req)}/q/${q.token}`;
+    const html = quoteReplyEmailHtml(q, cfg, url, msg);
+    const ok = await sendMail(q.customer.email, `Re: Oferta nr. ${q.no} — ${cfg.company}`,
+      `Bună ziua${q.customer.name ? ', ' + q.customer.name : ''}!\n\n${msg}\n\nOferta: ${url}\n\n${cfg.company} · ${cfg.phone}`, html, emailCidAttachments(html));
+    if (!ok) return sendJson(res, 502, { error: 'Emailul nu a putut fi trimis' });
+    const r = { message: msg, at: Date.now() };
+    q.replies = (q.replies || []).concat(r); q.events.push({ t: r.at, type: 'reply', message: msg }); q.handled = true;
+    saveQuotes(all);
+    return sendJson(res, 200, { quote: view(q) });
+  }
   if (req.method === 'PUT') {
     const b = await readJson(req);
     if (b.status && QSTATUS[b.status] && b.status !== 'expired' && b.status !== q.status && (q.kind === 'contact') === (b.status === 'new')) { q.status = b.status; q.events.push({ t: Date.now(), type: b.status, manual: true }); }
@@ -1997,7 +2038,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 6.6, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 6.7, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
