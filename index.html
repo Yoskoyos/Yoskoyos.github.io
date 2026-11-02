@@ -4106,7 +4106,7 @@ function openQuote(q) {
   if (q.kind === 'contact') return openContactMsg(q);
   const c = q.customer, p = q.pricing;
   qs('#qm-title').textContent = `Oferta nr. ${q.no}`;
-  const evName = { created: 'Ofertă creată (calculator site)', viewed: 'Clientul a deschis oferta', accepted: 'Acceptată', rejected: 'Refuzată', clarify: 'Cere clarificări', reply: 'Ai răspuns pe email', answered: 'Am răspuns', extended: 'Valabilitate prelungită', sent: 'Marcată „Trimisă”', expired: 'Expirată' };
+  const evName = { client: 'Adăugat în Clienți', contract: 'Contract generat', created: 'Ofertă creată (calculator site)', viewed: 'Clientul a deschis oferta', accepted: 'Acceptată', rejected: 'Refuzată', clarify: 'Cere clarificări', reply: 'Ai răspuns pe email', answered: 'Am răspuns', extended: 'Valabilitate prelungită', sent: 'Marcată „Trimisă”', expired: 'Expirată' };
   const wa = `https://wa.me/${waNum(c.phone)}?text=${encodeURIComponent(`Bună ziua, ${c.name.split(' ')[0]}! Oferta pentru sistemul de supraveghere al blocului (nr. ${q.no}) este aici: ${q.url}`)}`;
   qs('#qm-body').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span class="qpill ${q.status}" style="font-size:12.5px;padding:5px 12px">${QST[q.status]}</span><span class="cm-hint">creată ${fmtTsH(q.createdAt)} · valabilă până ${fmtTs(q.validUntil)}${q.views ? ` · deschisă de ${q.views} ori` : ''}</span></div>
@@ -4133,8 +4133,18 @@ function openQuote(q) {
     </div>
     <label class="cm-check"><input type="checkbox" id="qm-handled"${q.handled ? ' checked' : ''}> Am rezolvat (am sunat / am programat)</label>
     <div class="fg"><label for="qm-notes">Notițele mele</label><textarea id="qm-notes" rows="2">${escapeHtml(q.notes || '')}</textarea></div>
-    ${q.clientId ? '<div class="cm-hint">✓ Clientul a fost adăugat automat în lista de clienți la acceptare.</div>' : ''}
-    ${q.status === 'accepted' ? '<button type="button" class="btn primary" id="qm-work" style="width:100%;margin-top:6px">🏗️ Programează montajul (lucrare nouă)</button>' : ''}`;
+    ${q.status === 'accepted' || q.clientId ? `<div class="cm-sec">După acceptare</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--border);border-radius:10px">
+        <span><b>1.</b> ${q.clientId ? '✓ Este în <b>Clienți</b>' : 'Nu e încă în Clienți'}</span>
+        <button type="button" class="btn" id="qm-client">${q.clientId ? 'Deschide fișa clientului' : '➕ Adaugă în Clienți'}</button></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--border);border-radius:10px">
+        <span><b>2.</b> ${q.contractNo ? `✓ Contract nr. <b>${escapeHtml(q.contractNo)}</b> generat ${fmtTs(q.contractAt)}` : 'Contractul, completat din ofertă'}</span>
+        <button type="button" class="btn primary" id="qm-contract">📄 ${q.contractNo ? 'Generează din nou' : 'Generează contractul'}</button></div>
+      ${q.status === 'accepted' ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--border);border-radius:10px">
+        <span><b>3.</b> Montajul</span>
+        <button type="button" class="btn" id="qm-work">🏗️ Programează montajul</button></div>` : ''}
+    </div>` : ''}`;
   qs('#quote-modal').classList.remove('hidden');
   const rs = qs('#qm-reply-send');
   if (rs) rs.addEventListener('click', async () => {
@@ -4148,6 +4158,16 @@ function openQuote(q) {
     } catch (e) { toast(e.message, 'err'); rs.disabled = false; rs.textContent = '✉️ Trimite răspunsul pe email'; }
   });
   const qw = qs('#qm-work'); if (qw) qw.addEventListener('click', () => { closeQuote(); workFromQuote(q); });
+  const qcl = qs('#qm-client'); if (qcl) qcl.addEventListener('click', async () => {
+    qcl.disabled = true;
+    const c = await clientForQuote(q); qcl.disabled = false; if (!c) return;
+    closeQuote(); goTab('clients'); openClientModal(c);
+  });
+  const qct = qs('#qm-contract'); if (qct) qct.addEventListener('click', async () => {
+    qct.disabled = true; const old = qct.textContent; qct.textContent = 'Se pregătește…';
+    const c = await clientForQuote(qmCur || q); qct.disabled = false; qct.textContent = old; if (!c) return;
+    openCtrModal(c, qmCur || q);
+  });
   qs('#qm-copy').addEventListener('click', () => { navigator.clipboard.writeText(q.url).then(() => toast('Link copiat', 'ok'), () => toast(q.url, 'info')); });
   qs('#qm-status').addEventListener('change', e => quoteUpdate({ status: e.target.value }));
   qs('#qm-extend').addEventListener('click', () => quoteUpdate({ extendDays: 30 }, 'Valabilitate prelungită'));
@@ -4162,6 +4182,29 @@ async function quoteUpdate(body, msg) {
     renderQuotes(); if (msg) toast(msg, 'ok');
     if (body.status || body.extendDays) openQuote(r.quote); else qmCur = r.quote;
   } catch (e) { toast(e.message, 'err'); }
+}
+// Clientul ofertei: îl găsim sau îl creăm (serverul îl leagă de ofertă)
+async function clientForQuote(q) {
+  try {
+    if (!clients) clients = (await clApi('/clients')).clients || [];
+    if (q.clientId) { const c = clients.find(x => x.id === q.clientId); if (c) return c; clients = (await clApi('/clients')).clients || []; const c2 = clients.find(x => x.id === q.clientId); if (c2) return c2; }
+    const r = await clApi('/quotes/' + encodeURIComponent(q.id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ makeClient: true }) });
+    const i = (quotes || []).findIndex(x => x.id === r.quote.id); if (i >= 0) quotes[i] = r.quote;
+    if (qmCur && qmCur.id === r.quote.id) qmCur = r.quote;
+    clients = (await clApi('/clients')).clients || [];
+    let c = r.quote.clientId ? clients.find(x => x.id === r.quote.clientId) : null;
+    if (!c) {   // server vechi: creăm clientul din aplicație (fără legătura automată)
+      const k = q.customer, nx = new Date(); nx.setMonth(nx.getMonth() + 1);
+      const body = { kind: 'pj', name: k.assoc || ('Asociația de proprietari ' + k.address), contact: [k.name, k.role].filter(Boolean).join(' — '), phone: k.phone, email: k.email,
+        address: [k.address, k.city].filter(Boolean).join(', '), notes: `Din oferta nr. ${q.no} · ${q.pricing.totalCams} camere · ${q.pricing.total} lei / lună`,
+        equip: { cams: q.pricing.totalCams }, sub: { active: true, amount: q.pricing.total, dueDay: 1, start: nx.toISOString().slice(0, 7), paid: {} } };
+      c = (await clApi('/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).client;
+      clients.push(c); toast('Client adăugat. Actualizează serverul ca oferta să rămână legată de client.', 'info');
+    } else toast('Clientul a fost adăugat în Clienți', 'ok');
+    renderQuotes(); try { renderClients(); } catch {}
+    if (qmCur && qmCur.id === q.id && !qs('#quote-modal').classList.contains('hidden')) openQuote(qmCur);
+    return c;
+  } catch (e) { toast(e.message, 'err'); return null; }
 }
 function closeQuote() { qs('#quote-modal').classList.add('hidden'); qmCur = null; }
 
@@ -5805,17 +5848,19 @@ const lsGet = (k, d) => { try { return localStorage.getItem(k) || d; } catch { r
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 function loadScriptOnce(src) { return new Promise((ok, no) => { if ([...document.scripts].some(s => s.src === src)) return ok(); const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => no(new Error('Nu s-a putut încărca ' + src)); document.head.appendChild(s); }); }
 let ctrClient = null;
-async function openCtrModal() {
-  const c = cmDraft; if (!c || !c.id) return;
+let ctrQuote = null;
+async function openCtrModal(cArg, qArg) {
+  const c = (cArg && cArg.id) ? cArg : cmDraft; if (!c || !c.id) return;
   ctrClient = c;
-  if (!quotes) { try { await loadQuotes(true); } catch {} }
-  const q = (quotes || []).filter(x => x.clientId === c.id).sort((a, b) => b.createdAt - a.createdAt)[0];
+  if (!quotes && !qArg) { try { await loadQuotes(true); } catch {} }
+  const q = qArg || (quotes || []).filter(x => x.clientId === c.id).sort((a, b) => b.createdAt - a.createdAt)[0];
+  ctrQuote = q || null;
   const cams = (q && q.pricing && q.pricing.cams) || {}, tot = (q && q.pricing && q.pricing.totalCams) || (c.equip && c.equip.cams) || 0;
   const qLift = cams.lift || 0, qExt = cams.ex || 0, qInt = Math.max(0, tot - qLift - qExt);
   const d = new Date(), dd = String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
   const pres = String(c.contact || '').split(/\s+[—-]\s+/)[0];
   const V = { NR: lsGet('yca_ctr_next', '105'), DATA: dd, LICENTA: lsGet('yca_ctr_lic', ''), ASOC: String(c.name || '').replace(/^asocia[tț]ia\s+de\s+proprietari\s*/i, ''),
-    SEDIU: c.address || '', CIF: c.code || '', IBAN: '', BANCA: '', PRES: pres, HAG_NR: '', HAG_DATA: '', IMOBIL: c.address || '',
+    SEDIU: c.address || '', CIF: c.code || '', IBAN: '', BANCA: '', PRES: pres, HAG_NR: '', HAG_DATA: '', IMOBIL: (q && [q.customer.address, q.customer.city].filter(Boolean).join(', ')) || c.address || '',
     PRET: c.sub && c.sub.amount ? String(c.sub.amount) : (q ? String(q.pricing.total) : ''), EMAIL: c.email || '', VALOARE: '', AMPLASARE: '',
     M_NVR: (c.equip && c.equip.nvr) || 'HiLook NVR-108MH-C(E)', M_HDD: '', Q_HDD: '1', M_EXT: 'HiLook IPC-B140HA-LUC', Q_EXT: qExt ? String(qExt) : '',
     M_INT: 'HiLook IPC-T240HA-LUC', Q_INT: qInt ? String(qInt) : '', M_LIFT: 'Dahua HAC-HDBW2241F-A', Q_LIFT: qLift ? String(qLift) : '', M_RACK: 'Safer SAF-WMA-6604', Q_MON: '1' };
@@ -5842,10 +5887,15 @@ async function genContract() {
     if (val.LICENTA) lsSet('yca_ctr_lic', val.LICENTA);
     if (/^\d+$/.test(val.NR)) lsSet('yca_ctr_next', String(+val.NR + 1));
     closeCtrModal(); toast('Contract generat: ' + name, 'ok');
+    if (ctrQuote && val.NR) {   // notăm pe ofertă numărul contractului
+      try { const r = await clApi('/quotes/' + encodeURIComponent(ctrQuote.id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contractNo: val.NR }) });
+        const i = (quotes || []).findIndex(x => x.id === r.quote.id); if (i >= 0) quotes[i] = r.quote; renderQuotes();
+        if (qmCur && qmCur.id === r.quote.id && !qs('#quote-modal').classList.contains('hidden')) openQuote(r.quote); } catch {}
+    }
   } catch (e) { toast(e.message, 'err'); }
   finally { btn.disabled = false; btn.textContent = old; }
 }
-qs('#cm-gen').addEventListener('click', openCtrModal);
+qs('#cm-gen').addEventListener('click', () => openCtrModal());
 qs('#ctr-x').addEventListener('click', closeCtrModal); qs('#ctr-cancel').addEventListener('click', closeCtrModal);
 qs('#ctr-modal').addEventListener('click', e => { if (e.target.id === 'ctr-modal') closeCtrModal(); });
 qs('#ctr-go').addEventListener('click', genContract);

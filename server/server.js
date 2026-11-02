@@ -806,6 +806,23 @@ function cleanClient(b, prev) {
 }
 function userClients(all, username) { return Array.isArray(all[username]) ? all[username] : (all[username] = []); }
 
+// Oferta acceptată → client nou în evidență (o singură dată per ofertă)
+function clientFromQuote(q, msg) {
+  if (q.clientId) return q.clientId;
+  try {
+    const cl = loadClients(); const list = userClients(cl, q.owner);
+    const nx = new Date(); nx.setMonth(nx.getMonth() + 1);
+    const c = cleanClient({ kind: 'pj', name: q.customer.assoc || ('Asociația de proprietari ' + q.customer.address), contact: [q.customer.name, q.customer.role].filter(Boolean).join(' — '),
+      phone: q.customer.phone, email: q.customer.email, address: [q.customer.address, q.customer.city].filter(Boolean).join(', '),
+      notes: `Din oferta nr. ${q.no} acceptată pe ${roDate(Date.now())} · ${q.pricing.totalCams} camere · ${lei(q.pricing.total)} / lună${q.pricing.months ? ' · contract ' + q.pricing.months + ' luni' : ''}${msg ? '\nMesaj client: ' + msg : ''}`,
+      equip: { cams: q.pricing.totalCams },
+      sub: { active: true, amount: q.pricing.total, dueDay: 1, start: nx.toISOString().slice(0, 7), paid: {} } }, null);
+    list.push(c); saveClients(cl); q.clientId = c.id;
+    q.events.push({ t: Date.now(), type: 'client' });
+  } catch (e) { console.error('Oferte: nu am putut crea clientul:', e.message); }
+  return q.clientId || '';
+}
+
 async function handleClients(req, res, pathname) {
   const ctx = requireUser(req, res); if (!ctx) return;
   const uname = ctx.user.username;
@@ -1948,18 +1965,7 @@ async function handleQuotePublic(req, res, pathname, parsed) {
     q.status = act; q.response = { action: act, message: msg, at: Date.now() };
     q.events.push({ t: Date.now(), type: act, message: msg });
     // la acceptare: clientul apare automat în evidența de clienți
-    if (act === 'accepted' && !q.clientId) {
-      try {
-        const cl = loadClients(); const list = userClients(cl, q.owner);
-        const nx = new Date(); nx.setMonth(nx.getMonth() + 1);
-        const c = cleanClient({ kind: 'pj', name: q.customer.assoc || ('Asociația de proprietari ' + q.customer.address), contact: [q.customer.name, q.customer.role].filter(Boolean).join(' — '),
-          phone: q.customer.phone, email: q.customer.email, address: [q.customer.address, q.customer.city].filter(Boolean).join(', '),
-          notes: `Din oferta nr. ${q.no} acceptată pe ${roDate(Date.now())} · ${q.pricing.totalCams} camere · ${lei(q.pricing.total)} / lună${q.pricing.months ? ' · contract ' + q.pricing.months + ' luni' : ''}${msg ? '\nMesaj client: ' + msg : ''}`,
-          equip: { cams: q.pricing.totalCams },
-          sub: { active: true, amount: q.pricing.total, dueDay: 1, start: nx.toISOString().slice(0, 7), paid: {} } }, null);
-        list.push(c); saveClients(cl); q.clientId = c.id;
-      } catch (e) { console.error('Oferte: nu am putut crea clientul:', e.message); }
-    }
+    if (act === 'accepted' && !q.clientId) clientFromQuote(q, msg);
     saveQuotes(all);
     const icon = { accepted: '✅', rejected: '❌', clarify: '❓' }[act];
     notifyOwner(db, owner, `${icon} <b>Oferta #${q.no} — ${QSTATUS[act]}</b>\n${escHtml(q.customer.assoc || q.customer.address)}\n${escHtml(q.customer.name)} · ${escHtml(q.customer.phone)} · ${lei(q.pricing.total)} / lună${msg ? '\n„' + escHtml(msg) + '”' : ''}`, '/?q=' + encodeURIComponent(q.id));
@@ -2105,6 +2111,9 @@ async function handleQuotesApi(req, res, pathname, parsed) {
     if ('notes' in b) q.notes = str(b.notes, 4000);
     if ('handled' in b) q.handled = !!b.handled;
     if (b.extendDays) { q.validUntil = Math.max(Date.now(), q.validUntil) + Math.min(365, qNum(b.extendDays)) * 864e5; q.events.push({ t: Date.now(), type: 'extended' }); }
+    // acceptată manual din aplicație / „Adaugă în Clienți” → clientul intră în evidență
+    if (q.kind !== 'contact' && !q.clientId && (b.makeClient || (b.status === 'accepted' && q.status === 'accepted'))) clientFromQuote(q, '');
+    if (b.contractNo) { q.contractNo = str(b.contractNo, 40); q.contractAt = Date.now(); q.events.push({ t: q.contractAt, type: 'contract', message: 'nr. ' + q.contractNo }); }
     saveQuotes(all);
     return sendJson(res, 200, { quote: view(q) });
   }
@@ -2242,7 +2251,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.0, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.1, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops' || pathname.startsWith('/ops/')) return await handleOps(req, res, pathname);
