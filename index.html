@@ -956,7 +956,7 @@ html:not(.unlocked) .app{display:none}
 
 /* ── Statistici site (Cloudflare) ── */
 .an-mob{display:none;border:0;background:none;font-family:inherit;cursor:pointer}
-@media(max-width:600px){.nav-tab.nav-desk{display:none!important}.an-mob{display:flex}}
+@media(max-width:600px){.nav-tab.nav-desk,.nav-tab.mob-hide{display:none!important}.mob-tabs-sec{display:block!important}.an-mob{display:flex}}
 .an-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
 .an-kpi{background:var(--bg-1);border:1px solid var(--border);border-radius:14px;padding:14px 16px;min-width:0}
 .an-kpi-l{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;color:var(--fg-3);text-transform:uppercase;letter-spacing:.06em}
@@ -1309,6 +1309,11 @@ html:not(.unlocked) .app{display:none}
 
     <!-- ── Setări ── -->
     <div class="panel" id="panel-settings">
+      <div class="settings-section mob-tabs-sec" style="display:none">
+        <div class="settings-section-title">Meniul de jos (doar pe telefon)</div>
+        <div class="form-hint" style="margin-bottom:10px">Debifează ce nu folosești pe telefon. Pe calculator meniul rămâne complet. Acasă și Setări apar mereu.</div>
+        <div id="mob-tabs" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px"></div>
+      </div>
       <div class="settings-section">
         <div class="settings-section-title">Jurnal</div>
         <div class="form-row">
@@ -5761,6 +5766,22 @@ qs('#open-log-btn').addEventListener('click', () => {
 });
 
 /* ═══ Deschidere din notificare: /?q=<id ofertă> · /?tab=alerts|works|clients&v=docs ═══ */
+/* Taburi ascunse pe telefon (preferință pe acest dispozitiv) */
+const MOB_TABS = [['nvrs','NVR-uri'],['snapshots','Camere'],['clients','Clienți'],['quotes','Oferte'],['works','Lucrări'],['alerts','Alerte']];
+function mobHidden(){ try { const a = JSON.parse(localStorage.getItem('yca_mob_hide') || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } }
+function applyMobTabs(){
+  const h = mobHidden();
+  document.querySelectorAll('.nav-tab[data-tab]').forEach(t => t.classList.toggle('mob-hide', h.includes(t.dataset.tab)));
+  const box = qs('#mob-tabs'); if (!box) return;
+  box.innerHTML = MOB_TABS.map(([k, l]) => `<label class="s24-chkl" style="display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer"><input type="checkbox" data-mt="${k}" ${h.includes(k) ? '' : 'checked'} style="width:20px;height:20px;accent-color:#F5A100">${l}</label>`).join('');
+}
+document.addEventListener('change', e => {
+  const k = e.target && e.target.dataset && e.target.dataset.mt; if (!k) return;
+  let h = mobHidden().filter(x => x !== k); if (!e.target.checked) h.push(k);
+  try { localStorage.setItem('yca_mob_hide', JSON.stringify(h)); } catch {}
+  applyMobTabs();
+});
+applyMobTabs();
 function goTab(tab) { const t = document.querySelector('.nav-tab[data-tab="' + tab + '"]'); if (t) t.click(); window.scrollTo(0, 0); }
 async function openFromLink(href) {
   let u; try { u = new URL(href, location.origin); } catch { return; }
