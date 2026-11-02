@@ -1818,7 +1818,6 @@ html:not(.unlocked) .app{display:none}
         <div class="fg"><label for="ctm-model">Model</label><input type="text" id="ctm-model" placeholder="ex. IPC-B140HA-LUC" autocomplete="off"></div>
       </div>
       <div class="fg"><label for="ctm-cat">Unde se folosește</label><select id="ctm-cat"><option value="exterior">Cameră exterior</option><option value="interior">Cameră interior</option><option value="lift">Cameră lift</option><option value="nvr">Recorder (NVR)</option><option value="hdd">Hard disk</option><option value="rack">Rack / protecție</option><option value="retea">Rețea / alimentare</option><option value="altele">Altele</option></select></div>
-      <div class="fg"><label for="ctm-tag">Descriere scurtă (o frază)</label><input type="text" id="ctm-tag" placeholder="ex. Pentru parcare, intrări și loc de joacă." autocomplete="off"></div>
       <div class="fg"><label for="ctm-specs">Caracteristici (câte una pe rând)</label><textarea id="ctm-specs" rows="5" placeholder="Rezoluție 4 MP (2560 × 1440)&#10;Lentilă 2,8 mm&#10;Infraroșu și lumină albă până la 30 m&#10;Protecție IP67"></textarea></div>
       <div class="cm-sec">Poză și fișă tehnică</div>
       <div class="cm-files" id="ctm-files"></div>
@@ -5639,7 +5638,7 @@ function openCatalogModal(x) {
   ctDraft = x ? JSON.parse(JSON.stringify(x)) : { id: null, files: [] };
   qs('#ctm-title').textContent = x ? x.name : 'Echipament nou';
   qs('#ctm-vis').checked = x ? !!x.visible : true; qs('#ctm-name').value = x ? x.name : ''; qs('#ctm-brand').value = x ? x.brand || '' : '';
-  qs('#ctm-model').value = x ? x.model || '' : ''; qs('#ctm-cat').value = x ? x.cat : 'exterior'; qs('#ctm-tag').value = x ? x.tagline || '' : ''; qs('#ctm-specs').value = x ? x.specs || '' : '';
+  qs('#ctm-model').value = x ? x.model || '' : ''; qs('#ctm-cat').value = x ? x.cat : 'exterior'; qs('#ctm-specs').value = x ? x.specs || '' : '';
   qs('#ctm-delete').style.display = x ? '' : 'none'; ctFiles(); qs('#catalog-modal').classList.remove('hidden');
   if (!x) setTimeout(() => qs('#ctm-name').focus(), 50);
 }
@@ -5647,7 +5646,7 @@ function closeCatalogModal() { qs('#catalog-modal').classList.add('hidden'); ctD
 async function ctmSave(stay) {
   const name = qs('#ctm-name').value.trim(); if (!name) { toast('Scrie denumirea', 'warn'); qs('#ctm-name').focus(); return false; }
   const L = ctSorted();
-  const body = { name, brand: qs('#ctm-brand').value.trim(), model: qs('#ctm-model').value.trim(), cat: qs('#ctm-cat').value, tagline: qs('#ctm-tag').value.trim(),
+  const body = { name, brand: qs('#ctm-brand').value.trim(), model: qs('#ctm-model').value.trim(), cat: qs('#ctm-cat').value, tagline: '',
     specs: qs('#ctm-specs').value.trim(), visible: qs('#ctm-vis').checked, order: ctDraft.id ? (ctDraft.order || 0) : (L.length ? (L[L.length - 1].order || 0) + 1 : 1) };
   try {
     const r = ctDraft.id ? await clApi('/ops/catalog/' + encodeURIComponent(ctDraft.id), jsonOpt('PUT', body)) : await clApi('/ops/catalog', jsonOpt('POST', body));
