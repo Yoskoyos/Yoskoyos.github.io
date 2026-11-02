@@ -2022,6 +2022,8 @@ html:not(.unlocked) .app{display:none}
         <div class="fg"><label>Adresă IP / Domeniu</label><input type="text" id="e-ip" placeholder="192.168.1.200" inputmode="url"></div>
         <div class="fg"><label>Port HTTP</label><input type="text" id="e-port" placeholder="80" inputmode="numeric"></div>
       </div>
+      <div class="fg"><label>Port RTSP (pentru imaginile camerelor)</label><input type="text" id="e-rtsp" placeholder="554" inputmode="numeric">
+        <div class="cm-hint" style="margin-top:4px">Necesar doar la NVR-urile care nu dau poze direct (de ex. seria K1). Portul trebuie redirecționat în routerul clientului către portul 554 al NVR-ului.</div></div>
       <div class="f2">
         <div class="fg"><label>Nr. canale</label><select id="e-ch"><option>4</option><option>8</option><option>16</option><option>21</option><option>32</option><option>64</option></select></div>
         <div class="fg"><label>Locație</label><input type="text" id="e-loc" placeholder="ex: Depozit, parter"></div>
@@ -2694,7 +2696,7 @@ function nvrCardHTML(n, showDetail){
       if (n.status === 'auth') return `<div class="nvr-warnbar"><span>⚠ NVR-ul răspunde, dar <b>refuză utilizatorul sau parola</b>.<small>Dacă parola e sigur corectă: după mai multe încercări greșite, NVR-urile Hikvision blochează accesul temporar (de obicei 30 de minute). Așteaptă sau repornește NVR-ul.</small></span><button type="button" class="nvr-fix-cred" data-nid="${n.id}">Corectează credențialele</button></div>`;
       const probs = camsArr.map((c, i) => c === 'err' ? [i + 1, camReasonLabel((n.camReasons || {})[i + 1])] : null).filter(x => x && x[1]);
       const noSnapNote = nvrHasNoSnap(n) && n.status !== 'offline'
-        ? `<span class="nosnap">ℹ Acest NVR nu oferă capturi de imagine prin rețea — vezi starea camerelor aici, iar imaginea în Hik-Connect / iVMS.</span>` : '';
+        ? `<span class="nosnap">ℹ Acest NVR nu dă poze direct, iar portul RTSP (${n.rtspPort || 554}) nu răspunde din internet. Ca să vezi imaginile aici, redirecționează în router un port spre portul 554 al NVR-ului și trece-l la ⋯ → Editează → Port RTSP. Starea camerelor e monitorizată normal.</span>` : '';
       const rb = n.status === 'offline' ? [] : (recBadMap[n.id] || []);
       const recRows = rb.map(x => `<span>⏺ <b>CH${x.ch}${x.ip ? ' · ' + escapeHtml(x.ip) : ''}</b> — nu înregistrează<small>${x.mode === 'continuu' ? 'Setată pe înregistrare continuă, dar nu are înregistrări în ultimele 2 ore.' : 'Setată pe înregistrare la mișcare, dar n-a înregistrat nimic în ultimele 12 ore.'} Verifică în NVR: Configurare → Eveniment → Detecție mișcare (Activare + „Declanșare înregistrare” pe canal) sau pune programul pe Continuu.</small></span>`).join('');
       if ((!probs.length || n.status === 'offline') && !recRows) return noSnapNote ? `<div class="nvr-infobar">${noSnapNote}</div>` : '';
@@ -3144,6 +3146,7 @@ function openEditModal(nid){
   qs('#e-name').value = n.name;
   qs('#e-ip').value = n.ip;
   qs('#e-port').value = n.port;
+  qs('#e-rtsp').value = n.rtspPort || '';
   qs('#e-loc').value = n.location||'';
   qs('#e-ch').value = String(n.channels);
   // add option if not present
@@ -3169,6 +3172,7 @@ qs('#edit-save').addEventListener('click', ()=>{
   nvrs[idx].name     = name;
   nvrs[idx].ip       = ip;
   nvrs[idx].port     = parseInt(qs('#e-port').value)||80;
+  { const rp = parseInt(qs('#e-rtsp').value) || 0; if ((nvrs[idx].rtspPort || 0) !== rp) { nvrs[idx].rtspPort = rp || undefined; delete nvrs[idx].snapMode; delete nvrs[idx].snapV; delete nvrs[idx].snapCheckedAt; } }
   nvrs[idx].channels = parseInt(qs('#e-ch').value)||16;
   nvrs[idx].location = qs('#e-loc').value.trim();
   nvrs[idx].status   = 'unknown';
@@ -4901,7 +4905,7 @@ async function refreshMonitorHint(){
 // Setările care contează pentru server (fără starea live a NVR-urilor)
 function settingsPayload(){
   return {
-    nvrs: nvrs.map(n => ({ id: n.id, name: n.name, ip: n.ip, port: n.port, channels: n.channels, location: n.location || '', seenCh: n.seenCh || {}, seenV: 2 })),
+    nvrs: nvrs.map(n => ({ id: n.id, name: n.name, ip: n.ip, port: n.port, ...(n.rtspPort ? { rtspPort: n.rtspPort } : {}), channels: n.channels, location: n.location || '', seenCh: n.seenCh || {}, seenV: 2 })),
     creds, cfg,
   };
 }
