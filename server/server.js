@@ -1085,7 +1085,7 @@ async function handleOps(req, res, pathname) {
       const nm = str(q.name, 150).replace(/[\\/:*?"<>|\r\n]/g, '_').trim();
       const ext = fileKind(buf, nm);
       if (!ext) return sendJson(res, 400, { error: 'Acceptăm poze (JPG, PNG), PDF, Word sau Excel' });
-      if (coll === 'catalog' && !['jpg', 'png', 'webp'].includes(ext)) return sendJson(res, 400, { error: 'Pentru echipamente încarcă o poză (JPG, PNG sau WebP)' });
+      if (coll === 'catalog' && !['jpg', 'png', 'webp', 'pdf'].includes(ext)) return sendJson(res, 400, { error: 'Pentru echipamente încarcă o poză (JPG, PNG, WebP) sau fișa tehnică (PDF)' });
       const f = { id: newId(), ext, name: nm || ('fisier.' + ext), size: buf.length, uploadedAt: Date.now() };
       fs.mkdirSync(dir, { recursive: true, mode: 0o700 }); fs.writeFileSync(path.join(dir, f.id + '.' + ext), buf, { mode: 0o600 });
       it.files = (it.files || []).concat(f); it.updatedAt = Date.now(); saveOps(all);
@@ -1862,18 +1862,21 @@ async function readBodyAny(req) {
 function catalogPublic(req, res, pathname) {
   const db = loadDb(); const owner = quoteOwner(db); const uname = owner ? owner.username : '';
   const items = ((loadOps()[uname] || {}).catalog || []).filter(x => x.visible).sort((a, b) => (a.order || 0) - (b.order || 0) || a.createdAt - b.createdAt);
-  const m = /^\/public\/catalog\/([\w-]+)\/photo$/.exec(pathname);
+  const m = /^\/public\/catalog\/([\w-]+)\/(photo|fisa)$/.exec(pathname);
   if (m) {
-    const it = items.find(x => x.id === m[1]); const f = it && (it.files || []).find(x => ['jpg', 'png', 'webp'].includes(x.ext));
+    const it = items.find(x => x.id === m[1]);
+    const f = it && (it.files || []).find(x => m[2] === 'fisa' ? x.ext === 'pdf' : ['jpg', 'png', 'webp'].includes(x.ext));
     if (!f) { res.writeHead(404, PUB_CORS); return res.end(); }
     let data; try { data = fs.readFileSync(path.join(OPS_DIR, uname.replace(/[^\w.-]/g, '_'), 'catalog', it.id, f.id + '.' + f.ext)); } catch { res.writeHead(404, PUB_CORS); return res.end(); }
-    res.writeHead(200, { 'Content-Type': CT[f.ext], 'Content-Length': data.length, 'Cache-Control': 'public, max-age=86400', ...PUB_CORS });
+    const nm = ('Fisa tehnica ' + (it.model || it.name)).replace(/[^\w .-]+/g, '_').trim() + '.pdf';
+    res.writeHead(200, { 'Content-Type': CT[f.ext], 'Content-Length': data.length, 'Cache-Control': 'public, max-age=86400', ...PUB_CORS,
+      ...(f.ext === 'pdf' ? { 'Content-Disposition': `inline; filename="${nm}"` } : {}) });
     return res.end(data);
   }
   const base = publicBase(req);
-  const out = items.map(x => { const f = (x.files || []).find(y => ['jpg', 'png', 'webp'].includes(y.ext));
+  const out = items.map(x => { const f = (x.files || []).find(y => ['jpg', 'png', 'webp'].includes(y.ext)), pdf = (x.files || []).find(y => y.ext === 'pdf');
     return { id: x.id, name: x.name, brand: x.brand, model: x.model, cat: x.cat, tagline: x.tagline,
-      specs: String(x.specs || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 20), photo: f ? `${base}/public/catalog/${x.id}/photo?v=${f.id}` : '' }; });
+      specs: String(x.specs || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 20), photo: f ? `${base}/public/catalog/${x.id}/photo?v=${f.id}` : '', datasheet: pdf ? `${base}/public/catalog/${x.id}/fisa?v=${pdf.id}` : '' }; });
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=300', ...PUB_CORS });
   res.end(JSON.stringify({ items: out }));
 }
@@ -2302,7 +2305,7 @@ const server = http.createServer(async (req, res) => {
     if ((pathname === '/contact' || pathname === '/public/contact') && req.method === 'POST') return await handleSiteContact(req, res);
     if ((pathname === '/cerere' || pathname === '/public/cerere') && req.method === 'POST') return await handlePublicQuote(req, res, true);
     if (pathname === '/public/prices' && req.method === 'GET') return handlePublicPrices(req, res);
-    if ((pathname === '/public/catalog' || /^\/public\/catalog\/[\w-]+\/photo$/.test(pathname)) && req.method === 'GET') return catalogPublic(req, res, pathname);
+    if ((pathname === '/public/catalog' || /^\/public\/catalog\/[\w-]+\/(photo|fisa)$/.test(pathname)) && req.method === 'GET') return catalogPublic(req, res, pathname);
     if (pathname.startsWith('/q/')) return await handleQuotePublic(req, res, pathname, parsed);
     if (pathname === '/quotes' || pathname.startsWith('/quotes/') || pathname === '/quote-settings') return await handleQuotesApi(req, res, pathname, parsed);
     if (pathname === '/company' && req.method === 'GET') return await handleCompany(req, res, parsed);
