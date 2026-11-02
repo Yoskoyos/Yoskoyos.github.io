@@ -923,10 +923,11 @@ function fileKind(buf, name) {
   if (h.slice(0, 5).toString('latin1') === '%PDF-') return 'pdf';
   if (h[0] === 0xFF && h[1] === 0xD8 && h[2] === 0xFF) return 'jpg';
   if (h.slice(0, 4).toString('hex') === '89504e47') return 'png';
+  if (h.slice(0, 4).toString('latin1') === 'RIFF' && buf.slice(8, 12).toString('latin1') === 'WEBP') return 'webp';
   if (h.slice(0, 4).toString('hex') === '504b0304') { const m = /\.(docx|xlsx)$/i.exec(name || ''); return m ? m[1].toLowerCase() : null; }
   return null;
 }
-const CT = { pdf: 'application/pdf', jpg: 'image/jpeg', png: 'image/png',
+const CT = { pdf: 'application/pdf', jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
 async function handleCompanyDocs(req, res, pathname) {
   const ctx = requireUser(req, res); if (!ctx) return;
@@ -1002,7 +1003,7 @@ async function handleCompanyDocs(req, res, pathname) {
    Lucrare terminată → scade din stoc piesele folosite (o singură dată) și, la revizii periodice, creează următoarea revizie. */
 const OPS_FILE = path.join(BASE_DIR, 'ops.json');
 const OPS_DIR = path.join(BASE_DIR, 'ops-files');
-const OPS_COLLS = ['works', 'stock', 'gdpr'];
+const OPS_COLLS = ['works', 'stock', 'gdpr', 'catalog'];
 function loadOps() { try { const c = JSON.parse(fs.readFileSync(OPS_FILE, 'utf8')); return c && typeof c === 'object' ? c : {}; } catch { return {}; } }
 function saveOps(all) { const tmp = OPS_FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(all, null, 2), { mode: 0o600 }); fs.renameSync(tmp, OPS_FILE); }
 const pick = (v, list, def) => list.includes(v) ? v : def;
@@ -1018,6 +1019,11 @@ function cleanOp(coll, b, prev) {
       parts, repeatMonths: Math.min(24, Math.max(0, Math.round(num(b.repeatMonths)))), source: str(b.source, 300), quoteId: str(b.quoteId, 40),
       stockApplied: prev ? !!prev.stockApplied : false, nextCreated: prev ? !!prev.nextCreated : false };
   }
+  if (coll === 'catalog') {   // echipamentele prezentate pe site (pagina Echipamente)
+    return { ...base, name: str(b.name, 160).trim(), brand: str(b.brand, 60), model: str(b.model, 120),
+      cat: pick(b.cat, ['exterior', 'interior', 'lift', 'nvr', 'hdd', 'rack', 'retea', 'altele'], 'altele'),
+      tagline: str(b.tagline, 400), specs: str(b.specs, 3000), visible: !!b.visible, order: Math.round(num(b.order)) };
+  }
   if (coll === 'stock') {
     return { ...base, name: str(b.name, 200).trim(), cat: pick(b.cat, ['camera', 'nvr', 'hdd', 'switch', 'cablu', 'sursa', 'altele'], 'altele'),
       qty: Math.max(0, Math.round(num(b.qty))), minQty: Math.max(0, Math.round(num(b.minQty))), unit: str(b.unit, 20) || 'buc',
@@ -1029,7 +1035,7 @@ function cleanOp(coll, b, prev) {
     channels: str(b.channels, 200), reason: str(b.reason, 2000), status: pick(b.status, ['primita', 'livrata', 'refuzata', 'fara-imagini'], 'primita'),
     deliveredDate: ymd(b.deliveredDate), deliveredTo: str(b.deliveredTo, 200), method: str(b.method, 200), notes: str(b.notes, 4000) };
 }
-const opsRequired = { works: ['title', 'Scrie titlul lucrării'], stock: ['name', 'Scrie denumirea produsului'], gdpr: ['requester', 'Scrie cine a cerut imaginile'] };
+const opsRequired = { catalog: ['name', 'Scrie denumirea echipamentului'], works: ['title', 'Scrie titlul lucrării'], stock: ['name', 'Scrie denumirea produsului'], gdpr: ['requester', 'Scrie cine a cerut imaginile'] };
 function addMonthsYmd(d, m) { const [y, mo, da] = d.split('-').map(Number); const t = new Date(Date.UTC(y, mo - 1 + m, 1)); const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate(); t.setUTCDate(Math.min(da, last)); return t.toISOString().slice(0, 10); }
 // efectele unei lucrări terminate
 function worksOnDone(u, w) {
@@ -1050,14 +1056,14 @@ async function handleOps(req, res, pathname) {
   const all = loadOps(); const u = all[uname] = all[uname] || {}; for (const c of OPS_COLLS) if (!Array.isArray(u[c])) u[c] = [];
   const parts = pathname.split('/').filter(Boolean);       // ops/<coll>[/id[/files[/fid]]]
   const coll = parts[1], id = parts[2], fid = parts[4];
-  if (parts.length === 1 && req.method === 'GET') return sendJson(res, 200, { works: u.works, stock: u.stock, gdpr: u.gdpr });
+  if (parts.length === 1 && req.method === 'GET') return sendJson(res, 200, { works: u.works, stock: u.stock, gdpr: u.gdpr, catalog: u.catalog });
   if (!OPS_COLLS.includes(coll)) return sendJson(res, 404, { error: 'Secțiune necunoscută' });
   const list = u[coll];
   if (id && !/^[\w-]+$/.test(id)) return sendJson(res, 400, { error: 'ID invalid' });
   const it = id ? list.find(x => x.id === id) : null;
   if (id && !it) return sendJson(res, 404, { error: 'Element inexistent' });
   const dir = id ? path.join(OPS_DIR, uname.replace(/[^\w.-]/g, '_'), coll, id) : null;
-  const reply = (code, extra) => sendJson(res, code, { works: u.works, stock: u.stock, gdpr: u.gdpr, ...extra });
+  const reply = (code, extra) => sendJson(res, code, { works: u.works, stock: u.stock, gdpr: u.gdpr, catalog: u.catalog, ...extra });
   if (parts.length === 2 && req.method === 'GET') return sendJson(res, 200, { [coll]: list });
   if ((parts.length === 2 && req.method === 'POST') || (parts.length === 3 && (req.method === 'PUT' || req.method === 'POST'))) {
     const b = await readJson(req); const [f, msg] = opsRequired[coll];
@@ -1079,6 +1085,7 @@ async function handleOps(req, res, pathname) {
       const nm = str(q.name, 150).replace(/[\\/:*?"<>|\r\n]/g, '_').trim();
       const ext = fileKind(buf, nm);
       if (!ext) return sendJson(res, 400, { error: 'Acceptăm poze (JPG, PNG), PDF, Word sau Excel' });
+      if (coll === 'catalog' && !['jpg', 'png', 'webp'].includes(ext)) return sendJson(res, 400, { error: 'Pentru echipamente încarcă o poză (JPG, PNG sau WebP)' });
       const f = { id: newId(), ext, name: nm || ('fisier.' + ext), size: buf.length, uploadedAt: Date.now() };
       fs.mkdirSync(dir, { recursive: true, mode: 0o700 }); fs.writeFileSync(path.join(dir, f.id + '.' + ext), buf, { mode: 0o600 });
       it.files = (it.files || []).concat(f); it.updatedAt = Date.now(); saveOps(all);
@@ -1092,7 +1099,7 @@ async function handleOps(req, res, pathname) {
         let data; try { data = fs.readFileSync(fp); } catch { return sendJson(res, 404, { error: 'Fișierul lipsește de pe server' }); }
         const ascii = f.name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '');
         res.writeHead(200, { 'Content-Type': CT[f.ext] || 'application/octet-stream', 'Content-Length': data.length, 'Cache-Control': 'private, no-store',
-          'Content-Disposition': `${['pdf', 'jpg', 'png'].includes(f.ext) ? 'inline' : 'attachment'}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(f.name)}`, ...CORS });
+          'Content-Disposition': `${['pdf', 'jpg', 'png', 'webp'].includes(f.ext) ? 'inline' : 'attachment'}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(f.name)}`, ...CORS });
         return res.end(data);
       }
       if (req.method === 'DELETE') {
@@ -1851,6 +1858,25 @@ async function readBodyAny(req) {
   }
   try { return JSON.parse(raw || '{}'); } catch { return {}; }
 }
+// Echipamentele bifate „Pe site” → pagina Echipamente de pe supraveghere24h.ro (doar ce e public: fără prețuri sau stoc)
+function catalogPublic(req, res, pathname) {
+  const db = loadDb(); const owner = quoteOwner(db); const uname = owner ? owner.username : '';
+  const items = ((loadOps()[uname] || {}).catalog || []).filter(x => x.visible).sort((a, b) => (a.order || 0) - (b.order || 0) || a.createdAt - b.createdAt);
+  const m = /^\/public\/catalog\/([\w-]+)\/photo$/.exec(pathname);
+  if (m) {
+    const it = items.find(x => x.id === m[1]); const f = it && (it.files || []).find(x => ['jpg', 'png', 'webp'].includes(x.ext));
+    if (!f) { res.writeHead(404, PUB_CORS); return res.end(); }
+    let data; try { data = fs.readFileSync(path.join(OPS_DIR, uname.replace(/[^\w.-]/g, '_'), 'catalog', it.id, f.id + '.' + f.ext)); } catch { res.writeHead(404, PUB_CORS); return res.end(); }
+    res.writeHead(200, { 'Content-Type': CT[f.ext], 'Content-Length': data.length, 'Cache-Control': 'public, max-age=86400', ...PUB_CORS });
+    return res.end(data);
+  }
+  const base = publicBase(req);
+  const out = items.map(x => { const f = (x.files || []).find(y => ['jpg', 'png', 'webp'].includes(y.ext));
+    return { id: x.id, name: x.name, brand: x.brand, model: x.model, cat: x.cat, tagline: x.tagline,
+      specs: String(x.specs || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 20), photo: f ? `${base}/public/catalog/${x.id}/photo?v=${f.id}` : '' }; });
+  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=300', ...PUB_CORS });
+  res.end(JSON.stringify({ items: out }));
+}
 function handlePublicPrices(req, res) {
   const db = loadDb(); const c = quoteCfg(db, quoteOwner(db));
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=300', ...PUB_CORS });
@@ -2251,7 +2277,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.1, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.2, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops' || pathname.startsWith('/ops/')) return await handleOps(req, res, pathname);
@@ -2276,6 +2302,7 @@ const server = http.createServer(async (req, res) => {
     if ((pathname === '/contact' || pathname === '/public/contact') && req.method === 'POST') return await handleSiteContact(req, res);
     if ((pathname === '/cerere' || pathname === '/public/cerere') && req.method === 'POST') return await handlePublicQuote(req, res, true);
     if (pathname === '/public/prices' && req.method === 'GET') return handlePublicPrices(req, res);
+    if ((pathname === '/public/catalog' || /^\/public\/catalog\/[\w-]+\/photo$/.test(pathname)) && req.method === 'GET') return catalogPublic(req, res, pathname);
     if (pathname.startsWith('/q/')) return await handleQuotePublic(req, res, pathname, parsed);
     if (pathname === '/quotes' || pathname.startsWith('/quotes/') || pathname === '/quote-settings') return await handleQuotesApi(req, res, pathname, parsed);
     if (pathname === '/company' && req.method === 'GET') return await handleCompany(req, res, parsed);
