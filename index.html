@@ -1823,6 +1823,32 @@ html:not(.unlocked) .app{display:none}
     </div>
   </div>
 </div>
+<div class="overlay hidden" id="ctr-modal" style="z-index:1200" role="dialog" aria-modal="true" aria-labelledby="ctr-title">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="ctr-title">Generează contract</div><div class="modal-x" id="ctr-x" role="button" aria-label="Închide">✕</div></div>
+    <div class="modal-body">
+      <div class="cm-hint" style="margin-bottom:8px">Câmpurile sunt completate din fișa clientului și din oferta acceptată. Ce lași gol apare în contract ca „……………” și completezi de mână.</div>
+      <div class="f2"><div class="fg"><label for="ctr-NR">Nr. contract</label><input class="form-input" id="ctr-NR"></div><div class="fg"><label for="ctr-DATA">Data</label><input class="form-input" id="ctr-DATA" placeholder="zz.ll.aaaa"></div></div>
+      <div class="fg"><label for="ctr-ASOC">Asociația de proprietari (fără „Asociația de proprietari”)</label><input class="form-input" id="ctr-ASOC" placeholder="ex. Bloc M12, Str. Exemplu nr. 3"></div>
+      <div class="f2"><div class="fg"><label for="ctr-CIF">CIF asociație</label><input class="form-input" id="ctr-CIF"></div><div class="fg"><label for="ctr-PRES">Președinte</label><input class="form-input" id="ctr-PRES"></div></div>
+      <div class="fg"><label for="ctr-SEDIU">Sediul asociației</label><input class="form-input" id="ctr-SEDIU"></div>
+      <div class="fg"><label for="ctr-IMOBIL">Adresa imobilului (unde se montează)</label><input class="form-input" id="ctr-IMOBIL"></div>
+      <div class="f2"><div class="fg"><label for="ctr-IBAN">IBAN asociație</label><input class="form-input" id="ctr-IBAN"></div><div class="fg"><label for="ctr-BANCA">Banca</label><input class="form-input" id="ctr-BANCA"></div></div>
+      <div class="f2"><div class="fg"><label for="ctr-HAG_NR">Hotărârea AG nr.</label><input class="form-input" id="ctr-HAG_NR"></div><div class="fg"><label for="ctr-HAG_DATA">din data</label><input class="form-input" id="ctr-HAG_DATA" placeholder="zz.ll.aaaa"></div></div>
+      <div class="f2"><div class="fg"><label for="ctr-PRET">Abonament (lei / lună)</label><input class="form-input" id="ctr-PRET" inputmode="decimal"></div><div class="fg"><label for="ctr-EMAIL">E-mail asociație</label><input class="form-input" id="ctr-EMAIL"></div></div>
+      <div class="fg"><label for="ctr-LICENTA">Licența IGP nr. (se ține minte)</label><input class="form-input" id="ctr-LICENTA"></div>
+      <div class="cm-sec">Anexa 1 — echipamente</div>
+      <div class="f2"><div class="fg"><label for="ctr-Q_EXT">Camere exterior (buc.)</label><input class="form-input" id="ctr-Q_EXT" inputmode="numeric"></div><div class="fg"><label for="ctr-M_EXT">Model exterior</label><input class="form-input" id="ctr-M_EXT"></div></div>
+      <div class="f2"><div class="fg"><label for="ctr-Q_INT">Camere interior (buc.)</label><input class="form-input" id="ctr-Q_INT" inputmode="numeric"></div><div class="fg"><label for="ctr-M_INT">Model interior</label><input class="form-input" id="ctr-M_INT"></div></div>
+      <div class="f2"><div class="fg"><label for="ctr-Q_LIFT">Camere lift (buc.)</label><input class="form-input" id="ctr-Q_LIFT" inputmode="numeric"></div><div class="fg"><label for="ctr-M_LIFT">Model lift</label><input class="form-input" id="ctr-M_LIFT"></div></div>
+      <div class="f2"><div class="fg"><label for="ctr-M_NVR">Model NVR</label><input class="form-input" id="ctr-M_NVR"></div><div class="fg"><label for="ctr-M_HDD">Hard disk</label><input class="form-input" id="ctr-M_HDD" placeholder="ex. 2 TB"></div></div>
+      <div class="f2"><div class="fg"><label for="ctr-M_RACK">Rack</label><input class="form-input" id="ctr-M_RACK"></div><div class="fg"><label for="ctr-Q_MON">Monitor (buc.)</label><input class="form-input" id="ctr-Q_MON" inputmode="numeric"></div></div>
+      <div class="fg"><label for="ctr-AMPLASARE">Amplasarea camerelor</label><textarea class="form-input" id="ctr-AMPLASARE" rows="2" placeholder="ex. 2 × intrare, 1 × parcare, 1 × scara A…"></textarea></div>
+      <div class="fg"><label for="ctr-VALOARE">Valoarea sistemului (lei, pentru art. 18)</label><input class="form-input" id="ctr-VALOARE" inputmode="decimal"></div>
+    </div>
+    <div class="modal-foot"><button class="btn" id="ctr-cancel" type="button">Anulează</button><button class="btn primary" id="ctr-go" type="button">⬇️ Descarcă contractul (Word)</button></div>
+  </div>
+</div>
 <div class="overlay hidden" id="cdoc-modal" role="dialog" aria-modal="true" aria-labelledby="cd-title">
   <div class="modal">
     <div class="modal-hdr">
@@ -1933,6 +1959,7 @@ html:not(.unlocked) .app{display:none}
     </div>
     <div class="modal-foot">
       <button class="btn cm-del" id="cm-delete" type="button">Șterge</button>
+      <button class="btn" id="cm-gen" type="button">📄 Generează contract</button>
       <button class="btn" id="cm-cancel" type="button">Anulează</button>
       <button class="btn primary" id="cm-save" type="button">Salvează</button>
     </div>
@@ -3688,7 +3715,7 @@ function openClientModal(c) {
   cmFillSuppliers(e.supplier || '');
   qs('#cm-anaf-msg').hidden = true;
   cmFillNvrSelect(c);
-  qs('#cm-delete').style.display = c ? '' : 'none';
+  qs('#cm-delete').style.display = c ? '' : 'none'; qs('#cm-gen').style.display = c ? '' : 'none';
   cmKindUi(); cmSubUi(); renderCmFiles();
   qs('#client-modal').classList.remove('hidden');
   qs('#client-modal .modal-body').scrollTop = 0;
@@ -5731,6 +5758,57 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('mess
   if (!/[?&](q|tab)=/.test(location.search)) return;
   let n = 0; const t = setInterval(() => { if (document.documentElement.classList.contains('unlocked') || ++n > 120) { clearInterval(t); if (n <= 120) setTimeout(() => openFromLink(location.href), 600); } }, 500);
 })();
+
+/* ═══ Generează contract (Word) din fișa clientului — șablon contract-template.docx, completat local cu JSZip ═══ */
+const CTR_KEYS = ['NR','DATA','LICENTA','ASOC','SEDIU','CIF','IBAN','BANCA','PRES','HAG_NR','HAG_DATA','IMOBIL','PRET','EMAIL','VALOARE','AMPLASARE','M_NVR','M_HDD','Q_HDD','M_EXT','Q_EXT','M_INT','Q_INT','M_LIFT','Q_LIFT','M_RACK','Q_MON'];
+const lsGet = (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+function loadScriptOnce(src) { return new Promise((ok, no) => { if ([...document.scripts].some(s => s.src === src)) return ok(); const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => no(new Error('Nu s-a putut încărca ' + src)); document.head.appendChild(s); }); }
+let ctrClient = null;
+async function openCtrModal() {
+  const c = cmDraft; if (!c || !c.id) return;
+  ctrClient = c;
+  if (!quotes) { try { await loadQuotes(true); } catch {} }
+  const q = (quotes || []).filter(x => x.clientId === c.id).sort((a, b) => b.createdAt - a.createdAt)[0];
+  const cams = (q && q.pricing && q.pricing.cams) || {}, tot = (q && q.pricing && q.pricing.totalCams) || (c.equip && c.equip.cams) || 0;
+  const qLift = cams.lift || 0, qExt = cams.ex || 0, qInt = Math.max(0, tot - qLift - qExt);
+  const d = new Date(), dd = String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
+  const pres = String(c.contact || '').split(/\s+[—-]\s+/)[0];
+  const V = { NR: lsGet('yca_ctr_next', '105'), DATA: dd, LICENTA: lsGet('yca_ctr_lic', ''), ASOC: String(c.name || '').replace(/^asocia[tț]ia\s+de\s+proprietari\s*/i, ''),
+    SEDIU: c.address || '', CIF: c.code || '', IBAN: '', BANCA: '', PRES: pres, HAG_NR: '', HAG_DATA: '', IMOBIL: c.address || '',
+    PRET: c.sub && c.sub.amount ? String(c.sub.amount) : (q ? String(q.pricing.total) : ''), EMAIL: c.email || '', VALOARE: '', AMPLASARE: '',
+    M_NVR: (c.equip && c.equip.nvr) || 'HiLook NVR-108MH-C(E)', M_HDD: '', Q_HDD: '1', M_EXT: 'HiLook IPC-B140HA-LUC', Q_EXT: qExt ? String(qExt) : '',
+    M_INT: 'HiLook IPC-T240HA-LUC', Q_INT: qInt ? String(qInt) : '', M_LIFT: 'Dahua HAC-HDBW2241F-A', Q_LIFT: qLift ? String(qLift) : '', M_RACK: 'Safer SAF-WMA-6604', Q_MON: '1' };
+  for (const k of CTR_KEYS) { const el = qs('#ctr-' + k); if (el) el.value = V[k] || ''; }
+  qs('#ctr-title').textContent = 'Contract — ' + c.name;
+  qs('#ctr-modal').classList.remove('hidden');
+}
+function closeCtrModal() { qs('#ctr-modal').classList.add('hidden'); }
+async function genContract() {
+  const btn = qs('#ctr-go'), old = btn.textContent; btn.disabled = true; btn.textContent = 'Se generează…';
+  try {
+    await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+    const r = await fetch('contract-template.docx?v=1', { cache: 'no-store' }); if (!r.ok) throw new Error('Nu găsesc șablonul de contract');
+    const zip = await JSZip.loadAsync(await r.arrayBuffer());
+    let xml = await zip.file('word/document.xml').async('string');
+    const esc = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const val = {}; for (const k of CTR_KEYS) { const el = qs('#ctr-' + k); val[k] = el ? el.value.trim() : ''; }
+    xml = xml.replace(/\{\{([A-Z_]+)\}\}/g, (m, k) => val[k] ? esc(val[k]) : (/^[QM]_/.test(k) ? '' : '……………………'));
+    zip.file('word/document.xml', xml);
+    const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const name = ('Contract ' + (val.NR || '') + ' - ' + (val.ASOC || ctrClient.name || 'client')).replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() + '.docx';
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+    if (val.LICENTA) lsSet('yca_ctr_lic', val.LICENTA);
+    if (/^\d+$/.test(val.NR)) lsSet('yca_ctr_next', String(+val.NR + 1));
+    closeCtrModal(); toast('Contract generat: ' + name, 'ok');
+  } catch (e) { toast(e.message, 'err'); }
+  finally { btn.disabled = false; btn.textContent = old; }
+}
+qs('#cm-gen').addEventListener('click', openCtrModal);
+qs('#ctr-x').addEventListener('click', closeCtrModal); qs('#ctr-cancel').addEventListener('click', closeCtrModal);
+qs('#ctr-modal').addEventListener('click', e => { if (e.target.id === 'ctr-modal') closeCtrModal(); });
+qs('#ctr-go').addEventListener('click', genContract);
 renderAuthUI();
 bootAuth();
 
