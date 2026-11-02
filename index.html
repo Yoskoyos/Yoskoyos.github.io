@@ -5616,7 +5616,7 @@ let ctDraft = null;
 const ctSorted = () => ((ops && ops.catalog) || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0) || a.createdAt - b.createdAt);
 function ctPhoto(it) {
   const f = (it.files || []).find(x => ['jpg', 'png', 'webp'].includes(x.ext)); const a = getAuth();
-  return f ? `${getProxyBase()}/ops/catalog/${encodeURIComponent(it.id)}/files/${encodeURIComponent(f.id)}?token=${encodeURIComponent(a ? a.token : '')}` : '';
+  return f ? `${getProxyBase()}/ops/catalog/${encodeURIComponent(it.id)}/files/${encodeURIComponent(f.id)}` : '';
 }
 function renderCatalog() {
   if (!ops) return; const L = ctSorted(), list = qs('#ct-list'); if (!list) return;
@@ -5625,15 +5625,27 @@ function renderCatalog() {
   if (!L.length) { list.innerHTML = '<div class="cl-empty">Nu ai adăugat încă echipamente.<br>Apasă „Echipament nou”, pune poza și caracteristicile, apoi bifează „Arată pe site”.</div>'; return; }
   list.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">${L.map((x, i) => { const ph = ctPhoto(x);
     return `<div class="cl-card" role="button" tabindex="0" data-ctid="${escapeHtml(x.id)}" style="align-items:center">
-      ${ph ? `<img src="${escapeHtml(ph)}" alt="" style="width:56px;height:56px;object-fit:contain;border-radius:10px;background:#fff;border:1px solid var(--border);flex-shrink:0">` : '<div style="width:56px;height:56px;border-radius:10px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--fg-3);flex-shrink:0;text-align:center">fără poză</div>'}
+      ${ph ? `<img data-authsrc="${escapeHtml(ph)}" alt="" style="width:56px;height:56px;object-fit:contain;border-radius:10px;background:#fff;border:1px solid var(--border);flex-shrink:0">` : '<div style="width:56px;height:56px;border-radius:10px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--fg-3);flex-shrink:0;text-align:center">fără poză</div>'}
       <div class="cl-main"><div class="cl-name"><span>${escapeHtml(x.name)}</span></div><div class="cl-sub">${[CT_CAT[x.cat], [x.brand, x.model].filter(Boolean).join(' ')].filter(Boolean).map(escapeHtml).join(' · ')}</div></div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
         ${(x.files || []).some(f => f.ext === 'pdf') ? '<span class="qpill" style="white-space:nowrap" title="Are fișă tehnică">PDF</span>' : ''}<span class="qpill ${x.visible ? 'accepted' : ''}" style="white-space:nowrap">${x.visible ? 'Pe site' : 'Ascuns'}</span>
         <button type="button" class="btn" data-mv="-1" aria-label="Mută mai sus" ${i ? '' : 'disabled'} style="min-width:40px;min-height:40px;padding:6px">↑</button>
         <button type="button" class="btn" data-mv="1" aria-label="Mută mai jos" ${i < L.length - 1 ? '' : 'disabled'} style="min-width:40px;min-height:40px;padding:6px">↓</button>
       </div></div>`; }).join('')}</div>`;
+  hydrateAuthImgs(list);
 }
-function ctFiles() { qs('#ctm-files').innerHTML = opFilesHtml('catalog', ctDraft); }
+const _authImg = new Map();
+function hydrateAuthImgs(root) {
+  const a = getAuth(); if (!root || !a) return;
+  root.querySelectorAll('img[data-authsrc]').forEach(async im => {
+    const u = im.dataset.authsrc; im.removeAttribute('data-authsrc');
+    try {
+      if (!_authImg.has(u)) _authImg.set(u, fetch(u, { headers: { Authorization: 'Bearer ' + a.token } }).then(r => r.ok ? r.blob() : Promise.reject()).then(b => URL.createObjectURL(b)));
+      im.src = await _authImg.get(u);
+    } catch { _authImg.delete(u); im.alt = 'poză indisponibilă'; }
+  });
+}
+function ctFiles() { qs('#ctm-files').innerHTML = opFilesHtml('catalog', ctDraft).replace(/<img src="([^"]+)"/g, (m, u) => `<img data-authsrc="${u.replace(/[?&]token=[^"&]*/, '')}"`); hydrateAuthImgs(qs('#ctm-files')); }
 function openCatalogModal(x) {
   ctDraft = x ? JSON.parse(JSON.stringify(x)) : { id: null, files: [] };
   qs('#ctm-title').textContent = x ? x.name : 'Echipament nou';
