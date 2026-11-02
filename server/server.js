@@ -1164,12 +1164,15 @@ async function cfStats(days) {
   const siteTag = await cfSiteTag(cf);
   const since = Date.parse(cf.since || '2026-11-01T19:25:00Z');            // lansarea site-ului: nu numărăm nimic de dinainte
   const to = new Date(), from = new Date(Math.max(since, days ? Date.now() - days * 864e5 : 0));
-  const filter = { AND: [{ datetime_geq: from.toISOString(), datetime_leq: to.toISOString() }, ...(siteTag ? [{ siteTag }] : []), { bot: 0 }] };
+  // vizitele venite din aplicație (proprietarul) nu se numără; dacă filtrul nu e acceptat, reîncercăm fără el
+  const base = [{ datetime_geq: from.toISOString(), datetime_leq: to.toISOString() }, ...(siteTag ? [{ siteTag }] : []), { bot: 0 }];
+  let filter = { AND: [...base, { refererHost_neq: 'app.supraveghere24h.ro' }] };
   const g = (alias, dims, limit, order) => `${alias}: rumPageloadEventsAdaptiveGroups(filter: $filter, limit: ${limit}${order ? `, orderBy: [${order}]` : ''}) { count sum { visits }${dims ? ` dimensions { ${dims} }` : ''} }`;
   const query = `query($accountTag: string, $filter: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject) { viewer { accounts(filter: { accountTag: $accountTag }) {
     ${g('total', '', 1)} ${g('daily', 'date', 100, 'date_ASC')} ${g('pages', 'requestPath', 10, 'count_DESC')}
     ${g('refs', 'refererHost', 10, 'sum_visits_DESC')} ${g('countries', 'countryName', 8, 'sum_visits_DESC')} ${g('devices', 'deviceType', 5, 'sum_visits_DESC')} } } }`;
-  const r = await cfApi('POST', '/graphql', cf.token, { query, variables: { accountTag: cf.accountId, filter } });
+  let r = await cfApi('POST', '/graphql', cf.token, { query, variables: { accountTag: cf.accountId, filter } });
+  if (((r.json && r.json.errors) || []).some(e => /refererHost/i.test(e.message || ''))) { filter = { AND: base }; r = await cfApi('POST', '/graphql', cf.token, { query, variables: { accountTag: cf.accountId, filter } }); }
   const errs = (r.json && r.json.errors) || [];
   if (errs.length) throw new Error('Cloudflare: ' + errs[0].message);
   const a = (((r.json.data || {}).viewer || {}).accounts || [])[0] || {};
@@ -2280,7 +2283,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.2, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.3, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops' || pathname.startsWith('/ops/')) return await handleOps(req, res, pathname);
