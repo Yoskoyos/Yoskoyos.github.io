@@ -2153,7 +2153,7 @@ function snapUrlFor(nvr, ch, mode){
 }
 const _snapDetect = {};
 const NOSNAP_RECHECK_MS = 24 * 3600 * 1000;   // NVR fără capturi → reverificăm o dată pe zi
-const SNAP_V = 2;                             // v2: verificăm și captura din stream RTSP
+const SNAP_V = 3;                             // v3: portul RTSP nou ajunge pe server înainte de test + motivul afișat
 function nvrHasNoSnap(nvr){ return nvr && nvr.snapMode === 'none' && nvr.snapV === SNAP_V && (Date.now() - (nvr.snapCheckedAt || 0)) < NOSNAP_RECHECK_MS; }
 function detectSnapMode(nvr, force){
   if (!nvr) return Promise.resolve(null);
@@ -2181,8 +2181,12 @@ function detectSnapMode(nvr, force){
     // NVR-ul răspunde, dar refuză toate variantele ISAPI → încercăm un cadru din stream-ul RTSP (prin server)
     if (refused === Object.keys(SNAP_MODES).length) {
       const n = nvrs.find(x => x.id === nvr.id) || nvr;
+      // serverul citește portul RTSP din setările lui: trimitem întâi modificările care așteaptă (ex. portul abia schimbat)
+      if (_syncTimer) { clearTimeout(_syncTimer); try { await pushSettings(); } catch {} }
+      n.snapErr = '';
       try {
         const r = await fetch(snapUrlFor(n, ch, 'rtsp'));
+        if (!r.ok) { try { const j = await r.json(); n.snapErr = String(j && j.error || '').slice(0, 160); } catch {} }
         if (r.ok && (r.headers.get('content-type') || '').startsWith('image')) {
           if (n.snapMode !== 'rtsp') {
             n.snapMode = 'rtsp'; save(SK.nvrs, nvrs);
@@ -2696,7 +2700,10 @@ function nvrCardHTML(n, showDetail){
       if (n.status === 'auth') return `<div class="nvr-warnbar"><span>⚠ NVR-ul răspunde, dar <b>refuză utilizatorul sau parola</b>.<small>Dacă parola e sigur corectă: după mai multe încercări greșite, NVR-urile Hikvision blochează accesul temporar (de obicei 30 de minute). Așteaptă sau repornește NVR-ul.</small></span><button type="button" class="nvr-fix-cred" data-nid="${n.id}">Corectează credențialele</button></div>`;
       const probs = camsArr.map((c, i) => c === 'err' ? [i + 1, camReasonLabel((n.camReasons || {})[i + 1])] : null).filter(x => x && x[1]);
       const noSnapNote = nvrHasNoSnap(n) && n.status !== 'offline'
-        ? `<span class="nosnap">ℹ Acest NVR nu dă poze direct, iar portul RTSP (${n.rtspPort || 554}) nu răspunde din internet. Ca să vezi imaginile aici, redirecționează în router un port spre portul 554 al NVR-ului și trece-l la ⋯ → Editează → Port RTSP. Starea camerelor e monitorizată normal.</span>` : '';
+        ? `<span class="nosnap">ℹ ${/parol/i.test(n.snapErr || '')
+            ? `Portul RTSP (${n.rtspPort || 554}) răspunde, dar NVR-ul refuză utilizatorul sau parola pentru stream. Verifică în NVR că utilizatorul are dreptul „Vizualizare live” la distanță.`
+            : `Acest NVR nu dă poze direct, iar portul RTSP (${n.rtspPort || 554}) nu răspunde din internet${n.snapErr ? ` (serverul: ${escapeHtml(n.snapErr)})` : ''}. Redirecționează în router portul extern ${n.rtspPort || 'ales'} spre portul RTSP al NVR-ului (implicit 554) și trece portul extern la ⋯ → Editează → Port RTSP.`} Starea camerelor e monitorizată normal.
+            <button type="button" class="nosnap-retry" data-nid="${n.id}" style="margin-left:8px;border:1px solid currentColor;background:transparent;color:inherit;border-radius:8px;padding:3px 10px;font:inherit;font-weight:700;cursor:pointer">Verifică din nou</button></span>` : '';
       const rb = n.status === 'offline' ? [] : (recBadMap[n.id] || []);
       const recRows = rb.map(x => `<span>⏺ <b>CH${x.ch}${x.ip ? ' · ' + escapeHtml(x.ip) : ''}</b> — nu înregistrează<small>${x.mode === 'continuu' ? 'Setată pe înregistrare continuă, dar nu are înregistrări în ultimele 2 ore.' : 'Setată pe înregistrare la mișcare, dar n-a înregistrat nimic în ultimele 12 ore.'} Verifică în NVR: Configurare → Eveniment → Detecție mișcare (Activare + „Declanșare înregistrare” pe canal) sau pune programul pe Continuu.</small></span>`).join('');
       if ((!probs.length || n.status === 'offline') && !recRows) return noSnapNote ? `<div class="nvr-infobar">${noSnapNote}</div>` : '';
@@ -3162,6 +3169,14 @@ function closeEditModal(){ qs('#edit-modal').classList.add('hidden'); editNid=nu
 qs('#edit-x').addEventListener('click', closeEditModal);
 qs('#edit-cancel').addEventListener('click', closeEditModal);
 qs('#edit-modal').addEventListener('click', e=>{ if(e.target===qs('#edit-modal')) closeEditModal(); });
+document.addEventListener('click', async e => {
+  const b = e.target.closest && e.target.closest('.nosnap-retry'); if (!b) return;
+  const n = nvrs.find(x => String(x.id) === b.dataset.nid); if (!n) return;
+  b.disabled = true; b.textContent = 'Verific...';
+  const m = await detectSnapMode(n, true);
+  renderAll();
+  toast(m && m !== 'none' ? `${n.name}: imaginile camerelor merg acum` : `${n.name}: tot nu primesc imagini${n.snapErr ? ' — ' + n.snapErr : ''}`, m && m !== 'none' ? 'ok' : 'err');
+});
 qs('#edit-save').addEventListener('click', ()=>{
   if (!editNid) return;
   const name = qs('#e-name').value.trim();
