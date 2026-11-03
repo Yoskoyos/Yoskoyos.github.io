@@ -6050,7 +6050,7 @@ async function openCtrModal(cArg, qArg) {
   const qLift = cams.lift || 0, qExt = cams.ex || 0, qInt = Math.max(0, tot - qLift - qExt);
   const d = new Date(), dd = String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
   const pres = String(c.contact || '').split(/\s+[—-]\s+/)[0];
-  const V = { NR: lsGet('yca_ctr_next', '105'), DATA: dd, LICENTA: lsGet('yca_ctr_lic', ''), ASOC: String(c.name || '').replace(/^asocia[tț]ia\s+de\s+proprietari\s*/i, ''),
+  const V = { NR: lsGet('yca_ctr_next', '105'), DATA: dd, LICENTA: lsGet('yca_ctr_lic', '') || '6310/T din 14.06.2022', ASOC: String(c.name || '').replace(/^asocia[tț]ia\s+de\s+proprietari\s*/i, ''),
     SEDIU: c.address || '', CIF: c.code || '', IBAN: '', BANCA: '', PRES: pres, HAG_NR: '', HAG_DATA: '', IMOBIL: (q && [q.customer.address, q.customer.city].filter(Boolean).join(', ')) || c.address || '',
     PRET: c.sub && c.sub.amount ? String(c.sub.amount) : (q ? String(q.pricing.total) : ''), EMAIL: c.email || '', VALOARE: '', AMPLASARE: '',
     M_NVR: (c.equip && c.equip.nvr) || 'HiLook NVR-108MH-C(E)', M_HDD: '', Q_HDD: '1', M_EXT: 'HiLook IPC-B140HA-LUC', Q_EXT: qExt ? String(qExt) : '',
