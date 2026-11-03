@@ -664,6 +664,7 @@ async function monitorRun() {
 
     try { await cdocReminders(db); } catch (e) { console.error('[acte] remindere:', e.message); }
     try { await opsMorning(db); } catch (e) { console.error('[lucrari] dimineata:', e.message); }
+    try { await grRefresh(db); } catch (e) { console.error('[recenzii]', e.message); }
 
     monLastRun = new Date().toISOString();
     saveMonState();
@@ -1205,6 +1206,108 @@ async function handleAnalytics(req, res, pathname, parsed) {
   if (pathname === '/analytics' && req.method === 'GET') {
     const days = [0, 1, 7, 30].includes(+parsed.query.days) ? +parsed.query.days : 7;   // 0 = de la lansare
     try { return sendJson(res, 200, await cfStats(days)); } catch (e) { return sendJson(res, 502, { error: e.message }); }
+  }
+  return sendJson(res, 405, { error: 'Operație necunoscută' });
+}
+/* ═════════════ Recenzii Google (Places API New) ═════════════
+   google-places.json (doar pe server, 0600): { key, placeId, name, address }  — cheie restricționată la IP-ul serverului și la Places API (New).
+   Recenziile se reîmprospătează la 6 h (din monitor) și se servesc public la GET /public/reviews (fără cheie).
+   Recenzie nouă → Telegram + push către proprietar. Stare: google-reviews.json { t, place, seen:[ids] }. */
+const GP_FILE = path.join(BASE_DIR, 'google-places.json');
+const GR_FILE = path.join(BASE_DIR, 'google-reviews.json');
+const GR_EVERY_MS = 6 * 3600e3;
+function loadGp() { try { const c = JSON.parse(fs.readFileSync(GP_FILE, 'utf8')); return c && c.key ? c : null; } catch { return null; } }
+function loadGr() { try { return JSON.parse(fs.readFileSync(GR_FILE, 'utf8')) || {}; } catch { return {}; } }
+function gpApi(method, apiPath, key, fieldMask, body) {
+  return new Promise((resolve, reject) => {
+    const data = body ? JSON.stringify(body) : null;
+    const rq = https.request({ host: 'places.googleapis.com', path: '/v1/' + apiPath, method, timeout: 20000,
+      headers: { 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': fieldMask, 'Content-Type': 'application/json', ...(data ? { 'Content-Length': Buffer.byteLength(data) } : {}) } }, r => {
+      let b = ''; r.on('data', d => b += d); r.on('end', () => {
+        let j; try { j = JSON.parse(b || '{}'); } catch { return reject(new Error('Răspuns invalid de la Google (HTTP ' + r.statusCode + ')')); }
+        if (r.statusCode >= 400) { const m = (j.error && j.error.message) || ('HTTP ' + r.statusCode);
+          return reject(new Error(/API key not valid/i.test(m) ? 'Cheia nu e validă' : /not authorized|IP address|referer/i.test(m) ? 'Cheia nu are voie de pe server — verifică restricția IP (2.31.113.25) și că e bifat „Places API (New)”'
+            : /has not been used|is disabled|SERVICE_DISABLED/i.test(m) ? 'Places API (New) nu e activat în proiect' : /billing/i.test(m) ? 'Proiectul nu are facturarea activă (Try for free / cont de facturare)' : 'Google: ' + m)); }
+        resolve(j);
+      });
+    });
+    rq.on('timeout', () => rq.destroy(new Error('Google nu răspunde')));
+    rq.on('error', reject); if (data) rq.write(data); rq.end();
+  });
+}
+async function gpFetch(gp) {
+  const p = await gpApi('GET', 'places/' + encodeURIComponent(gp.placeId) + '?languageCode=ro&regionCode=RO', gp.key, 'id,displayName,formattedAddress,rating,userRatingCount,googleMapsUri,reviews');
+  const reviews = (p.reviews || []).map(r => {
+    const a = r.authorAttribution || {}, t = r.originalText || r.text || {};
+    return { id: String(r.name || '').split('/').pop() || (a.displayName + r.publishTime), author: a.displayName || 'Utilizator Google', authorUrl: a.uri || '', photo: a.photoUri || '',
+      rating: r.rating || 0, text: t.text || '', when: r.relativePublishTimeDescription || '', time: r.publishTime || '', url: r.googleMapsUri || '' };
+  });
+  return { name: (p.displayName || {}).text || gp.name || '', address: p.formattedAddress || '', rating: p.rating || 0, count: p.userRatingCount || 0,
+    url: p.googleMapsUri || '', reviews };
+}
+let grBusy = null;
+async function grRefresh(db, force) {
+  const gp = loadGp(); if (!gp || !gp.placeId) return null;
+  const st = loadGr();
+  if (!force && st.t && Date.now() - st.t < GR_EVERY_MS) return st;
+  if (!force && st.failT && Date.now() - st.failT < 3600e3) return st;
+  if (grBusy) return grBusy;
+  grBusy = (async () => {
+    try {
+      const place = await gpFetch(gp);
+      const seen = new Set(st.seen || []); const fresh = place.reviews.filter(r => !seen.has(r.id));
+      const first = !st.seen;   // la prima citire nu anunțăm recenziile vechi
+      const next = { t: Date.now(), place, seen: [...new Set([...(st.seen || []), ...place.reviews.map(r => r.id)])].slice(-200) };
+      fs.writeFileSync(GR_FILE, JSON.stringify(next, null, 2), { mode: 0o600 });
+      if (!first && fresh.length && db) {
+        const owner = quoteOwner(db);
+        if (owner) for (const r of fresh) {
+          const txt = `⭐ <b>Recenzie nouă pe Google</b> — ${'★'.repeat(r.rating)}${'☆'.repeat(Math.max(0, 5 - r.rating))}\n<b>${escHtml(r.author)}</b>${r.text ? '\n' + escHtml(r.text.slice(0, 600)) : ''}\n\nNotă medie: ${place.rating.toFixed(1)} din ${place.count} recenzii`;
+          try { await notifyOwner(db, owner, txt, r.url || place.url || '/'); } catch {}
+        }
+      }
+      return next;
+    } catch (e) { console.error('[recenzii]', e.message); const s2 = { ...st, failT: Date.now(), err: e.message }; try { fs.writeFileSync(GR_FILE, JSON.stringify(s2, null, 2), { mode: 0o600 }); } catch {} return s2; }
+    finally { grBusy = null; }
+  })();
+  return grBusy;
+}
+function reviewsPublic(req, res) {
+  grRefresh(loadDb()).catch(() => {});   // reîmprospătare în fundal dacă datele sunt mai vechi de 6 h
+  const st = loadGr(); const gp = loadGp(); const p = st.place;
+  const out = gp && p ? { configured: true, name: p.name, rating: p.rating, count: p.count, url: p.url,
+    reviews: p.reviews.filter(r => r.rating >= 1).map(({ id, ...r }) => r) } : { configured: false, reviews: [] };
+  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=900', ...PUB_CORS });
+  res.end(JSON.stringify(out));
+}
+async function handleReviewsConfig(req, res) {
+  const ctx = requireUser(req, res); if (!ctx) return;
+  if (ctx.user.role !== 'admin') return sendJson(res, 403, { error: 'Doar administratorul poate seta recenziile Google' });
+  const info = () => { const gp = loadGp(), st = loadGr(); return { configured: !!(gp && gp.placeId), name: gp ? gp.name : '', address: gp ? gp.address : '', placeId: gp ? gp.placeId : '',
+    rating: st.place ? st.place.rating : 0, count: st.place ? st.place.count : 0, shown: st.place ? st.place.reviews.length : 0, updatedAt: st.t || 0, error: st.failT && (!st.t || st.failT > st.t) ? st.err : '' }; };
+  if (req.method === 'GET') return sendJson(res, 200, info());
+  if (req.method === 'DELETE') { try { fs.unlinkSync(GP_FILE); } catch {} try { fs.unlinkSync(GR_FILE); } catch {} return sendJson(res, 200, { configured: false }); }
+  if (req.method === 'PUT' || req.method === 'POST') {
+    const b = await readJson(req); const old = loadGp();
+    const key = str(b.key, 200).trim() || (old ? old.key : '');
+    if (!/^[A-Za-z0-9_-]{30,}$/.test(key)) return sendJson(res, 400, { error: 'Lipește cheia API din Google Cloud (începe de obicei cu „AIza”)' });
+    let placeId = str(b.placeId, 300).trim();
+    try {
+      let cand = [];
+      if (!placeId) {
+        const q = str(b.query, 120).trim() || 'SUPRAVEGHERE24h București';
+        const r = await gpApi('POST', 'places:searchText', key, 'places.id,places.displayName,places.formattedAddress', { textQuery: q, languageCode: 'ro', regionCode: 'RO' });
+        cand = (r.places || []).map(p => ({ placeId: p.id, name: (p.displayName || {}).text || '', address: p.formattedAddress || '' }));
+        if (!cand.length) return sendJson(res, 404, { error: 'Nu am găsit profilul pe Google. Scrie numele exact al profilului sau adresa.' });
+        placeId = cand[0].placeId;
+      }
+      const gp = { key, placeId };
+      const place = await gpFetch(gp); gp.name = place.name; gp.address = place.address;
+      fs.writeFileSync(GP_FILE, JSON.stringify(gp, null, 2), { mode: 0o600 });
+      try { fs.unlinkSync(GR_FILE); } catch {}
+      await grRefresh(loadDb(), true);
+      return sendJson(res, 200, { ...info(), candidates: cand.slice(0, 5) });
+    } catch (e) { return sendJson(res, 400, { error: e.message }); }
   }
   return sendJson(res, 405, { error: 'Operație necunoscută' });
 }
@@ -2283,7 +2386,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.3, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.4, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops' || pathname.startsWith('/ops/')) return await handleOps(req, res, pathname);
@@ -2308,6 +2411,8 @@ const server = http.createServer(async (req, res) => {
     if ((pathname === '/contact' || pathname === '/public/contact') && req.method === 'POST') return await handleSiteContact(req, res);
     if ((pathname === '/cerere' || pathname === '/public/cerere') && req.method === 'POST') return await handlePublicQuote(req, res, true);
     if (pathname === '/public/prices' && req.method === 'GET') return handlePublicPrices(req, res);
+    if (pathname === '/public/reviews' && req.method === 'GET') return reviewsPublic(req, res);
+    if (pathname === '/reviews/config') return await handleReviewsConfig(req, res);
     if ((pathname === '/public/catalog' || /^\/public\/catalog\/[\w-]+\/(photo|fisa)$/.test(pathname)) && req.method === 'GET') return catalogPublic(req, res, pathname);
     if (pathname.startsWith('/q/')) return await handleQuotePublic(req, res, pathname, parsed);
     if (pathname === '/quotes' || pathname.startsWith('/quotes/') || pathname === '/quote-settings') return await handleQuotesApi(req, res, pathname, parsed);
