@@ -87,8 +87,18 @@ function findUser(db, username) {
   return db.users.find(u => String(u.username).toLowerCase() === n) || null;
 }
 function publicUser(u) {
-  return { id: u.id, username: u.username, role: u.role, email: u.email || '', nvrIds: u.role === 'client' ? (u.nvrIds || []) : undefined };
+  return { id: u.id, username: u.username, name: u.name || '', role: u.role, email: u.email || '',
+    nvrIds: u.role === 'client' ? (u.nvrIds || []) : undefined, perms: u.role === 'staff' ? (u.perms || []) : undefined };
 }
+/* ───────────── Conturi: admin (proprietar) · staff (angajat, drepturi pe secțiuni) · client (doar NVR-urile lui) ─────────────
+   Angajații și clienții lucrează în datele proprietarului (u.owner); nu au configurație proprie. */
+const PERMS = ['nvr', 'clients', 'quotes', 'works', 'catalog', 'docs', 'stats'];
+function ownerName(db, u) {
+  if (u.role === 'admin') return u.username;
+  const o = (u.owner && db.users.find(x => x.username === u.owner && x.role === 'admin')) || db.users.find(x => x.role === 'admin');
+  return o ? o.username : u.username;
+}
+function userCan(u, perm) { return u.role === 'admin' || (u.role === 'staff' && (u.perms || []).includes(perm)); }
 function findUserByLogin(db, login) {
   const n = String(login || '').trim().toLowerCase();
   if (!n) return null;
@@ -188,7 +198,7 @@ function getAuth(req) {
   try { return jwt.verify(tok, JWT_SECRET); } catch { return null; }
 }
 // verifică tokenul și că utilizatorul încă există
-function requireUser(req, res) {
+function requireUser(req, res, perm) {
   const p = getAuth(req);
   if (!p) { sendJson(res, 401, { error: 'Sesiune invalidă sau expirată' }); return null; }
   const db = loadDb();
@@ -198,7 +208,13 @@ function requireUser(req, res) {
   if ((p.pwv || 0) !== (u.pwv || 0)) {
     sendJson(res, 401, { error: 'Parola a fost schimbată. Autentifică-te din nou.' }); return null;
   }
-  return { db, user: u };
+  if (u.disabled) { sendJson(res, 401, { error: 'Contul este dezactivat' }); return null; }
+  // perm: secțiunea cerută ('nvr', 'clients'…); 'admin' = doar proprietarul; 'client' = rutele pentru clienți; fără perm = rute de cont (oricine)
+  if (perm) {
+    const ok = perm === 'admin' ? u.role === 'admin' : perm === 'client' ? u.role === 'client' : perm === 'snap' ? (u.role !== 'staff' || userCan(u, 'nvr')) : userCan(u, perm);
+    if (!ok) { sendJson(res, 403, { error: 'Nu ai acces la această secțiune' }); return null; }
+  }
+  return { db, user: u, uname: ownerName(db, u) };
 }
 
 /* ───────────── Digest auth către NVR ───────────── */
@@ -295,6 +311,27 @@ function saveMonState() {
 
 // Cerere GET directă către NVR (cu Digest auth), întoarce {status, body}; status 0 = nu răspunde
 function nvrGet(nvr, cred, pathName, timeoutMs) { return nvrRequest(nvr, cred, 'GET', pathName, null, timeoutMs); }
+// la fel ca nvrGet, dar întoarce Buffer (pentru imagini)
+function nvrGetBuf(nvr, cred, pathName, timeoutMs) {
+  return new Promise(resolve => {
+    let finished = false; const done = (status, buf) => { if (!finished) { finished = true; resolve({ status, buf: buf || Buffer.alloc(0) }); } };
+    const opts = { hostname: String(nvr.ip).trim(), port: parseInt(nvr.port, 10) || 80, path: pathName, method: 'GET', timeout: timeoutMs || 8000 };
+    const collect = res => { const ch = []; let n = 0; res.on('data', d => { if (n < 4e6) { ch.push(d); n += d.length; } }); res.on('end', () => done(res.statusCode, Buffer.concat(ch))); res.on('error', () => done(0)); };
+    let r1;
+    try {
+      r1 = http.request(opts, res1 => {
+        if (res1.statusCode === 401) {
+          const wa = res1.headers['www-authenticate'] || ''; res1.resume();
+          if (!wa.toLowerCase().includes('digest')) return done(401);
+          const r2 = http.request({ ...opts, headers: { Authorization: buildDigestAuth(cred.user || 'admin', cred.pass || '', 'GET', pathName, wa) } }, collect);
+          r2.on('error', () => done(0)); r2.on('timeout', () => { r2.destroy(); done(0); }); r2.end(); return;
+        }
+        collect(res1);
+      });
+    } catch { return done(0); }
+    r1.on('error', () => done(0)); r1.on('timeout', () => { r1.destroy(); done(0); }); r1.end();
+  });
+}
 function nvrRequest(nvr, cred, method, pathName, body, timeoutMs) {
   return new Promise(resolve => {
     let finished = false;
@@ -721,17 +758,33 @@ function runFfmpeg(rtspUrl) {
 }
 
 async function handleSnap(req, res, parsed) {
-  const ctx = requireUser(req, res); if (!ctx) return;
-  if (!hasFfmpeg()) return sendJson(res, 501, { error: 'ffmpeg nu e instalat pe server' });
-  const conf = ctx.db.configs[ctx.user.username] || {};
+  const ctx = requireUser(req, res, 'snap'); if (!ctx) return;
+  const conf = ctx.db.configs[ctx.uname] || {};
   const nvr = (conf.nvrs || []).find(n => String(n.id) === String(parsed.query.nvr));
   const ch = parseInt(parsed.query.ch, 10);
+  if (ctx.user.role === 'client' && !(ctx.user.nvrIds || []).map(String).includes(String(parsed.query.nvr))) return sendJson(res, 403, { error: 'Nu ai acces la acest NVR' });
   if (!nvr || !(ch >= 1 && ch <= 64)) return sendJson(res, 404, { error: 'NVR sau canal inexistent' });
   const host = String(nvr.ip || '').trim();
   if (!/^[a-zA-Z0-9.\-]+$/.test(host)) return sendJson(res, 400, { error: 'Adresă NVR invalidă' });
   const cred = (conf.creds || {})[nvr.id] || (conf.creds || {})[String(nvr.id)] || {};
   const port = parseInt(nvr.rtspPort, 10) || 554;
-  const key = `${ctx.user.username}:${nvr.id}:${ch}`;
+  const key = `${ctx.uname}:${nvr.id}:${ch}`;
+  // ?auto=1 (clienți): întâi captura ISAPI direct de la NVR, apoi RTSP; aplicația proprietarului cere doar RTSP (ca până acum)
+  if (parsed.query.auto || ctx.user.role === 'client') {
+    const c0 = snapCache.get(key);
+    if (c0 && Date.now() - c0.t < 4000) { res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Content-Length': c0.buf.length, 'Cache-Control': 'no-store', ...CORS }); return res.end(c0.buf); }
+    const modes = { std: `/ISAPI/Streaming/channels/${ch}01/picture`, sub: `/ISAPI/Streaming/channels/${ch}02/picture`, proxy: `/ISAPI/ContentMgmt/StreamingProxy/channels/${ch}01/picture`, psub: `/ISAPI/ContentMgmt/StreamingProxy/channels/${ch}02/picture` };
+    const order = modes[nvr.snapMode] ? [modes[nvr.snapMode]] : nvr.snapMode === 'rtsp' || nvr.snapMode === 'none' ? [] : [modes.sub, modes.std, modes.psub, modes.proxy];
+    for (const pth of order) {
+      const r0 = await nvrGetBuf(nvr, cred, pth, 8000);
+      if (r0.status === 200 && r0.buf.length > 500 && r0.buf[0] === 0xFF && r0.buf[1] === 0xD8) {
+        snapCache.set(key, { t: Date.now(), buf: r0.buf }); if (snapCache.size > 300) snapCache.delete(snapCache.keys().next().value);
+        res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Content-Length': r0.buf.length, 'Cache-Control': 'no-store', ...CORS }); return res.end(r0.buf);
+      }
+      if (r0.status === 401 || r0.status === 0) break;
+    }
+  }
+  if (!hasFfmpeg()) return sendJson(res, 501, { error: 'Imaginea nu e disponibilă acum' });
 
   const cached = snapCache.get(key);
   let r = cached && Date.now() - cached.t < 3000 ? { buf: cached.buf } : null;
@@ -825,8 +878,8 @@ function clientFromQuote(q, msg) {
 }
 
 async function handleClients(req, res, pathname) {
-  const ctx = requireUser(req, res); if (!ctx) return;
-  const uname = ctx.user.username;
+  const ctx = requireUser(req, res, 'clients'); if (!ctx) return;
+  const uname = ctx.uname;
   const all = loadClients(); const list = userClients(all, uname);
   const parts = pathname.split('/').filter(Boolean);           // clients[/id[/contracts[/cid]]]
   const id = parts[1], cid = parts[3];
@@ -931,8 +984,8 @@ function fileKind(buf, name) {
 const CT = { pdf: 'application/pdf', jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
 async function handleCompanyDocs(req, res, pathname) {
-  const ctx = requireUser(req, res); if (!ctx) return;
-  const uname = ctx.user.username;
+  const ctx = requireUser(req, res, 'docs'); if (!ctx) return;
+  const uname = ctx.uname;
   const all = loadCDocs(); const list = Array.isArray(all[uname]) ? all[uname] : (all[uname] = []);
   const parts = pathname.split('/').filter(Boolean);          // company-docs[/id[/files[/fid]]]
   const id = parts[1], fid = parts[3];
@@ -1052,19 +1105,23 @@ function worksOnDone(u, w) {
   }
 }
 async function handleOps(req, res, pathname) {
-  const ctx = requireUser(req, res); if (!ctx) return;
-  const uname = ctx.user.username;
+  const coll0 = (/^\/ops\/(works|stock|gdpr|catalog)/.exec(pathname) || [])[1];
+  const ctx = requireUser(req, res, coll0 ? ({ works: 'works', stock: 'works', gdpr: 'clients', catalog: 'catalog' })[coll0] : null); if (!ctx) return;
+  if (!coll0 && ctx.user.role === 'client') return sendJson(res, 403, { error: 'Nu ai acces la această secțiune' });
+  const uname = ctx.uname;
   const all = loadOps(); const u = all[uname] = all[uname] || {}; for (const c of OPS_COLLS) if (!Array.isArray(u[c])) u[c] = [];
   const parts = pathname.split('/').filter(Boolean);       // ops/<coll>[/id[/files[/fid]]]
   const coll = parts[1], id = parts[2], fid = parts[4];
-  if (parts.length === 1 && req.method === 'GET') return sendJson(res, 200, { works: u.works, stock: u.stock, gdpr: u.gdpr, catalog: u.catalog });
+  const OPS_PERM = { works: 'works', stock: 'works', gdpr: 'clients', catalog: 'catalog' };
+  const view = () => { const o = {}; for (const c of OPS_COLLS) o[c] = userCan(ctx.user, OPS_PERM[c]) ? u[c] : []; return o; };   // angajatul vede doar secțiunile lui
+  if (parts.length === 1 && req.method === 'GET') return sendJson(res, 200, view());
   if (!OPS_COLLS.includes(coll)) return sendJson(res, 404, { error: 'Secțiune necunoscută' });
   const list = u[coll];
   if (id && !/^[\w-]+$/.test(id)) return sendJson(res, 400, { error: 'ID invalid' });
   const it = id ? list.find(x => x.id === id) : null;
   if (id && !it) return sendJson(res, 404, { error: 'Element inexistent' });
   const dir = id ? path.join(OPS_DIR, uname.replace(/[^\w.-]/g, '_'), coll, id) : null;
-  const reply = (code, extra) => sendJson(res, code, { works: u.works, stock: u.stock, gdpr: u.gdpr, catalog: u.catalog, ...extra });
+  const reply = (code, extra) => sendJson(res, code, { ...view(), ...extra });
   if (parts.length === 2 && req.method === 'GET') return sendJson(res, 200, { [coll]: list });
   if ((parts.length === 2 && req.method === 'POST') || (parts.length === 3 && (req.method === 'PUT' || req.method === 'POST'))) {
     const b = await readJson(req); const [f, msg] = opsRequired[coll];
@@ -1186,7 +1243,7 @@ async function cfStats(days) {
   cfCache.set(key, { t: Date.now(), v }); return v;
 }
 async function handleAnalytics(req, res, pathname, parsed) {
-  const ctx = requireUser(req, res); if (!ctx) return;
+  const ctx = requireUser(req, res, 'stats'); if (!ctx) return;
   if (pathname === '/analytics/config') {
     if (ctx.user.role !== 'admin') return sendJson(res, 403, { error: 'Doar administratorul poate seta legătura cu Cloudflare' });
     if (req.method === 'GET') { const cf = loadCf(); return sendJson(res, 200, { configured: !!cf, accountId: cf ? cf.accountId : '' }); }
@@ -1281,7 +1338,7 @@ function reviewsPublic(req, res) {
   res.end(JSON.stringify(out));
 }
 async function handleReviewsConfig(req, res) {
-  const ctx = requireUser(req, res); if (!ctx) return;
+  const ctx = requireUser(req, res, 'admin'); if (!ctx) return;
   if (ctx.user.role !== 'admin') return sendJson(res, 403, { error: 'Doar administratorul poate seta recenziile Google' });
   const info = () => { const gp = loadGp(), st = loadGr(); return { configured: !!(gp && gp.placeId), name: gp ? gp.name : '', address: gp ? gp.address : '', placeId: gp ? gp.placeId : '',
     rating: st.place ? st.place.rating : 0, count: st.place ? st.place.count : 0, shown: st.place ? st.place.reviews.length : 0, updatedAt: st.t || 0, error: st.failT && (!st.t || st.failT > st.t) ? st.err : '' }; };
@@ -1310,6 +1367,66 @@ async function handleReviewsConfig(req, res) {
     } catch (e) { return sendJson(res, 400, { error: e.message }); }
   }
   return sendJson(res, 405, { error: 'Operație necunoscută' });
+}
+
+/* ═════════════ Conturi pentru angajați și clienți (doar proprietarul) ═════════════ */
+function userRow(u) {
+  return { username: u.username, name: u.name || '', email: u.email || '', role: u.role, perms: u.role === 'staff' ? (u.perms || []) : undefined,
+    nvrIds: u.role === 'client' ? (u.nvrIds || []) : undefined, disabled: !!u.disabled, createdAt: u.createdAt || 0, lastLogin: u.lastLogin || 0 };
+}
+async function handleUsers(req, res, pathname) {
+  const ctx = requireUser(req, res, 'admin'); if (!ctx) return;
+  const db = ctx.db, me = ctx.user;
+  const mine = () => db.users.filter(u => u.role !== 'admin' && ownerName(db, u) === me.username);
+  const target = decodeURIComponent(pathname.split('/')[3] || '');
+  const clean = (b, u) => {
+    if (b.name !== undefined) u.name = str(b.name, 80).trim();
+    if (b.email !== undefined) { const e = str(b.email, 200).trim(); if (e && !EMAIL_RE.test(e)) throw new Error('Email invalid'); if (e && db.users.some(x => x !== u && (x.email || '').toLowerCase() === e.toLowerCase())) throw new Error('Emailul e folosit de alt cont'); u.email = e; }
+    if (u.role === 'staff' && Array.isArray(b.perms)) u.perms = b.perms.filter(x => PERMS.includes(x));
+    if (u.role === 'client' && Array.isArray(b.nvrIds)) { const ids = new Set(((db.configs[me.username] || {}).nvrs || []).map(n => String(n.id))); u.nvrIds = b.nvrIds.map(String).filter(x => ids.has(x)); }
+  };
+  try {
+    if (!target && req.method === 'GET') return sendJson(res, 200, { users: mine().map(userRow), perms: PERMS });
+    if (!target && req.method === 'POST') {
+      const b = await readJson(req);
+      const username = str(b.username, 40).trim();
+      if (!/^[a-zA-Z0-9._-]{3,40}$/.test(username)) return sendJson(res, 400, { error: 'Utilizatorul: 3–40 caractere, fără spații (litere, cifre, . _ -)' });
+      if (findUserByLogin(db, username)) return sendJson(res, 400, { error: 'Există deja un cont cu acest utilizator' });
+      const role = b.role === 'client' ? 'client' : 'staff';
+      const pass = String(b.password || '');
+      if (pass.length < MIN_PASS_LEN) return sendJson(res, 400, { error: `Parola trebuie să aibă minim ${MIN_PASS_LEN} caractere` });
+      const u = { id: Date.now(), username, role, owner: me.username, password: await bcrypt.hash(pass, 10), pwv: 0, createdAt: Date.now(), perms: [], nvrIds: [] };
+      clean(b, u); if (role === 'staff') delete u.nvrIds; else delete u.perms;
+      db.users.push(u); saveDb(db);
+      return sendJson(res, 200, { user: userRow(u), users: mine().map(userRow) });
+    }
+    const u = mine().find(x => x.username === target);
+    if (!u) return sendJson(res, 404, { error: 'Cont inexistent' });
+    if (req.method === 'PUT') {
+      const b = await readJson(req);
+      clean(b, u);
+      if (b.password) { const pass = String(b.password); if (pass.length < MIN_PASS_LEN) return sendJson(res, 400, { error: `Parola trebuie să aibă minim ${MIN_PASS_LEN} caractere` });
+        u.password = await bcrypt.hash(pass, 10); u.pwv = (u.pwv || 0) + 1; u.passwordChangedAt = Date.now(); }
+      if (b.disabled !== undefined && !!b.disabled !== !!u.disabled) { u.disabled = !!b.disabled; if (u.disabled) u.pwv = (u.pwv || 0) + 1; }
+      saveDb(db); return sendJson(res, 200, { user: userRow(u), users: mine().map(userRow) });
+    }
+    if (req.method === 'DELETE') { db.users.splice(db.users.indexOf(u), 1); saveDb(db); return sendJson(res, 200, { users: mine().map(userRow) }); }
+  } catch (e) { return sendJson(res, 400, { error: e.message }); }
+  return sendJson(res, 405, { error: 'Operație necunoscută' });
+}
+// Clientul: doar NVR-urile alocate lui, cu starea de la monitorul de pe server (fără adrese sau parole)
+function handleClientNvrs(req, res) {
+  const ctx = requireUser(req, res, 'client'); if (!ctx) return;
+  const conf = ctx.db.configs[ctx.uname] || {}; const ids = (ctx.user.nvrIds || []).map(String);
+  const nvrs = (conf.nvrs || []).filter(n => ids.includes(String(n.id))).map(n => {
+    const st = monState.nvr[ctx.uname + ':' + n.id] || {};
+    const chs = Object.keys(st.cams || {}).map(Number).filter(ch => st.seen && st.seen[ch]).sort((a, b) => a - b);
+    const total = Number(n.channels) || 0;
+    const list = chs.length ? chs : Array.from({ length: Math.min(total || 4, 64) }, (_, i) => i + 1);
+    return { id: n.id, name: n.name || 'NVR', location: n.location || '', status: st.status || 'unknown', lastCheck: st.lastCheck || null,
+      cams: list.map(ch => ({ ch, ok: (st.cams || {})[ch] ? st.cams[ch] === 'ok' : null, rec: !(st.recBad || {})[ch] })) };
+  });
+  return sendJson(res, 200, { nvrs, monitor: MONITOR_ENABLED });
 }
 // remindere de expirare — rulează din monitor; o dată pe zi după 09:00
 const cdocDaysLeft = exp => Math.round((Date.parse(exp + 'T00:00:00Z') - Date.parse(new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' }) + 'T00:00:00Z')) / 864e5);
@@ -1382,7 +1499,7 @@ function anafParse(f) {
   };
 }
 async function handleCompany(req, res, parsed) {
-  const ctx = requireUser(req, res); if (!ctx) return;
+  const ctx = requireUser(req, res, 'clients'); if (!ctx) return;
   const cui = String(parsed.query.cui || '').toUpperCase().replace(/^RO/, '').replace(/\s+/g, '');
   if (!/^\d{2,10}$/.test(cui)) return sendJson(res, 400, { error: 'CUI invalid — doar cifre, cu sau fără RO' });
   const c = anafCache.get(cui);
@@ -1448,8 +1565,8 @@ const safeName = t => String(t || '').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').rep
 const csvCell = v => { const t = String(v == null ? '' : v); return /[";\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
 
 function handleClientsBackup(req, res) {
-  const ctx = requireUser(req, res); if (!ctx) return;
-  const uname = ctx.user.username;
+  const ctx = requireUser(req, res, 'clients'); if (!ctx) return;
+  const uname = ctx.uname;
   const list = userClients(loadClients(), uname);
   const udir = path.join(CONTRACTS_DIR, uname.replace(/[^\w.-]/g, '_'));
   const stamp = new Date().toISOString().slice(0, 10);
@@ -2200,8 +2317,8 @@ var pre=${JSON.stringify(pre)}; if(pre) window.qaOpen(pre);
 }
 
 async function handleQuotesApi(req, res, pathname, parsed) {
-  const ctx = requireUser(req, res); if (!ctx) return;
-  const uname = ctx.user.username;
+  const ctx = requireUser(req, res, 'quotes'); if (!ctx) return;
+  const uname = ctx.uname;
   if (pathname === '/quote-settings') {
     if (req.method === 'GET') return sendJson(res, 200, { settings: quoteCfg(ctx.db, ctx.user), mail: mailReady(), base: publicBase(req) });
     if (req.method === 'PUT' || req.method === 'POST') {
@@ -2271,6 +2388,8 @@ async function handleLogin(req, res) {
   const ok = u && u.password ? await bcrypt.compare(password, u.password) : false;
   if (!ok) { addFail(key); return sendJson(res, 401, { error: 'Utilizator sau parolă greșită' }); }
   fails.delete(key);
+  if (u.disabled) return sendJson(res, 401, { error: 'Contul este dezactivat. Contactează administratorul.' });
+  try { u.lastLogin = Date.now(); saveDb(db); } catch {}
 
   const remember = body.remember !== false;
   const token = issueToken(u, remember);
@@ -2386,7 +2505,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.4, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.5, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops' || pathname.startsWith('/ops/')) return await handleOps(req, res, pathname);
@@ -2420,13 +2539,15 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/clients' || pathname.startsWith('/clients/')) return await handleClients(req, res, pathname);
     if (pathname.startsWith('/push/')) return await handlePush(req, res, pathname);
     if (pathname === '/company-docs' || pathname.startsWith('/company-docs/')) return await handleCompanyDocs(req, res, pathname);
+    if (pathname === '/admin/users' || pathname.startsWith('/admin/users/')) return await handleUsers(req, res, pathname);
+    if (pathname === '/client/nvrs' && req.method === 'GET') return handleClientNvrs(req, res);
 
     // Starea monitorizării pentru utilizatorul logat
     if (pathname === '/monitor' && req.method === 'GET') {
-      const ctx = requireUser(req, res); if (!ctx) return;
-      const conf = ctx.db.configs[ctx.user.username] || {};
+      const ctx = requireUser(req, res, 'nvr'); if (!ctx) return;
+      const conf = ctx.db.configs[ctx.uname] || {};
       const list = (conf.nvrs || []).map(n => {
-        const st = monState.nvr[ctx.user.username + ':' + n.id] || {};
+        const st = monState.nvr[ctx.uname + ':' + n.id] || {};
         const modes = {}; for (const t of (Array.isArray(st.recTracks) ? st.recTracks : [])) if (t && typeof t === 'object') modes[Math.floor(t.id / 100)] = t.cont ? 'continuu' : 'mișcare';
         const recBad = Object.entries(st.recBad || {}).filter(([, b]) => b).map(([ch]) => ({ ch: +ch, ip: (st.camIp || {})[ch] || '', mode: modes[ch] || '' })).sort((a, b) => a.ch - b.ch);
         return { id: n.id, name: n.name, status: st.status || 'unknown', camsOk: st.camsOk != null ? st.camsOk : null, camsTotal: st.camsTotal != null ? st.camsTotal : null, lastCheck: st.lastCheck || null, since: st.since || null,
@@ -2437,16 +2558,21 @@ const server = http.createServer(async (req, res) => {
 
     // ── Configurație sincronizată ──
     if (pathname === '/config' && req.method === 'GET') {
-      const ctx = requireUser(req, res); if (!ctx) return;
-      return sendJson(res, 200, ctx.db.configs[ctx.user.username] || {});
+      const ctx = requireUser(req, res, 'nvr'); if (!ctx) return;
+      const conf = ctx.db.configs[ctx.uname] || {};
+      if (ctx.user.role === 'admin') return sendJson(res, 200, conf);
+      // angajat: NVR-urile firmei (cu parolele, ca aplicația să le poată verifica), fără setările proprietarului (Telegram, prețuri…)
+      return sendJson(res, 200, { nvrs: conf.nvrs || [], creds: conf.creds || {}, updatedAt: conf.updatedAt || 0 });
     }
     if (pathname === '/config' && req.method === 'POST') {
-      const ctx = requireUser(req, res); if (!ctx) return;
-      const body = await readJson(req);
+      const ctx = requireUser(req, res, 'nvr'); if (!ctx) return;
+      let body = await readJson(req);
       if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJson(res, 400, { error: 'Config invalid' });
+      if (ctx.user.role !== 'admin' && Array.isArray(body.nvrs) && !body.nvrs.length && ((ctx.db.configs[ctx.uname] || {}).nvrs || []).length) delete body.nvrs;   // siguranță: un telefon gol nu șterge NVR-urile firmei
+      if (ctx.user.role !== 'admin') body = { ...(Array.isArray(body.nvrs) ? { nvrs: body.nvrs } : {}), ...(body.creds && typeof body.creds === 'object' ? { creds: body.creds } : {}), updatedAt: body.updatedAt };
       // îmbinare: aplicația poate trimite doar setările (nvrs/creds/cfg) fără alerte/jurnal
-      const prev = ctx.db.configs[ctx.user.username] || {};
-      ctx.db.configs[ctx.user.username] = { ...prev, ...body, updatedAt: Number(body.updatedAt) || Date.now() };
+      const prev = ctx.db.configs[ctx.uname] || {};
+      ctx.db.configs[ctx.uname] = { ...prev, ...body, updatedAt: Number(body.updatedAt) || Date.now() };
       saveDb(ctx.db);
       return sendJson(res, 200, { ok: true });
     }
