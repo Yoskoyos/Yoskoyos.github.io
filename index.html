@@ -1029,6 +1029,37 @@ html:not(.unlocked) .app{display:none}
 .an-foot{font-size:11.5px;color:var(--fg-3);margin-top:10px}
 @media(max-width:900px){.an-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.an-grid3{grid-template-columns:1fr}}
 @media(max-width:600px){.an-grid{grid-template-columns:1fr}.an-kpi-v{font-size:26px}.an-step{padding:9px 10px}.an-step b{font-size:19px}.an-step span{font-size:11.5px}}
+
+/* ── Ferestre (modale) — aspect unitar: antet cu iconiță, etichete clare, câmpuri mari, butoane aliniate ── */
+.modal{border-radius:18px;box-shadow:0 24px 60px -20px rgba(0,0,0,.45),0 2px 6px rgba(0,0,0,.08)}
+.modal-hdr{padding:16px 20px;gap:12px;background:var(--bg-2)}
+.modal-hdr .intg-ic{width:36px;height:36px;border-radius:10px}
+.modal-title{font-size:16.5px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fg)}
+.modal-x{width:36px;height:36px;font-size:15px;transition:background .15s,color .15s;flex-shrink:0}.modal-x:hover{background:var(--bg-1);color:var(--fg)}
+.modal-body{padding:20px 22px;gap:16px}
+.fg{gap:6px}
+.fg label{font-size:13px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--fg-2)}
+.fg input,.fg select,.fg textarea{background:var(--bg-1);border:1px solid var(--border-2,var(--border));border-radius:10px;padding:11px 13px;font-size:14px;font-family:var(--sans);min-height:44px;transition:border-color .15s,box-shadow .15s}
+.fg textarea{min-height:90px;line-height:1.5}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft,rgba(0,217,255,.18))}
+.fg select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b98a8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:34px}
+.f2{gap:14px}
+.fg input[list]::-webkit-calendar-picker-indicator{opacity:.35;cursor:pointer}
+.cm-sec{display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:700;text-transform:none;letter-spacing:0;color:var(--fg);margin-top:4px;padding-top:16px}
+.cm-sec::before{content:"";width:4px;height:16px;border-radius:2px;background:var(--accent);flex-shrink:0}
+.cm-hint{font-size:12px;line-height:1.55}
+.cm-file{padding:10px 12px;border-radius:12px;background:var(--bg-1);gap:12px}
+.cm-file-ic{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(229,72,77,.1)}
+.cm-file a,.cm-file button{border-radius:8px;padding:7px 12px;min-height:36px;display:inline-flex;align-items:center}
+.cm-file a{background:var(--bg-2);border:1px solid var(--border)}.cm-file a:hover{border-color:var(--accent)}
+.cm-file button.del:hover{color:var(--err);background:rgba(229,72,77,.08)}
+.cm-upload>.btn{border:1.5px dashed var(--border-2,var(--border));background:var(--bg-2);min-height:48px;border-radius:12px;color:var(--fg-2)}
+.cm-upload>.btn:hover{border-color:var(--accent);color:var(--fg)}
+.cm-check{font-size:14px}
+.modal-foot{padding:14px 20px;justify-content:flex-end;background:var(--bg-2)}
+.modal-foot .btn{flex:0 0 auto;min-width:112px;min-height:44px;border-radius:10px;padding:10px 20px;font-size:14px}
+.modal-foot .cm-del{background:transparent!important;border-color:transparent!important;min-width:0}.modal-foot .cm-del:hover{background:rgba(229,72,77,.08)!important}
+@media(max-width:480px){.modal-foot .btn:not(.cm-del){flex:1 1 0;min-width:0}.f2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -6267,6 +6298,26 @@ document.querySelectorAll('.nav-tab[data-tab="settings"]').forEach(t => t.addEve
 function actPing() { const a = getAuth(); if (!a || document.hidden || !document.documentElement.classList.contains('unlocked')) return; fetch(getProxyBase() + '/auth/ping', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token } }).catch(() => {}); }
 setInterval(() => { actPing(); if (myRole() === 'admin' && qs('#panel-settings.on') && qs('#user-modal').classList.contains('hidden')) usLoad(); }, 60000);
 document.addEventListener('visibilitychange', actPing);
+
+/* iconițe în antetul ferestrelor */
+(function () {
+  const P = { doc: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>', user: '<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    tool: '<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>',
+    box: '<path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/>', stock: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v6"/>',
+    quote: '<path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>', set: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/>',
+    shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>', folder: '<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>',
+    nvr: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01M15 12h3"/>', key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3L21 2M16 7l3 3M19 4l2 2"/>',
+    cam: '<path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>', sort: '<path d="M3 6h13M3 12h9M3 18h5M17 8l3-3 3 3M20 5v14"/>', pen: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/>' };
+  const M = { 'order-modal': ['sort', '#64748B'], 'quote-modal': ['quote', '#F5A100'], 'qset-modal': ['set', '#F5A100'], 'work-modal': ['tool', '#0D1F33'], 'stock-modal': ['stock', '#8B5CF6'],
+    'catalog-modal': ['box', '#0EA5E9'], 'user-modal': ['user', '#0EA5E9'], 'gdpr-modal': ['shield', '#8B5CF6'], 'ctr-modal': ['pen', '#16A34A'], 'cdoc-modal': ['folder', '#F59E0B'],
+    'client-modal': ['user', '#0EA5E9'], 'snap-modal': ['cam', '#6366F1'], 'edit-modal': ['nvr', '#0EA5E9'], 'cred-modal': ['key', '#64748B'] };
+  for (const [id, [k, c]] of Object.entries(M)) {
+    const h = document.querySelector('#' + id + ' .modal-hdr'); if (!h || h.querySelector('.intg-ic')) continue;
+    const sp = document.createElement('span'); sp.className = 'intg-ic'; sp.style.background = c; sp.setAttribute('aria-hidden', 'true');
+    sp.innerHTML = `<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${P[k]}</svg>`;
+    h.insertBefore(sp, h.firstChild);
+  }
+})();
 qs('#alert-list').addEventListener('click', e => { const b = e.target.closest('.al-work'); if (b) workFromAlert(+b.dataset.ai); });
 qs('#open-log-btn').addEventListener('click', () => {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('on')); document.querySelectorAll('.panel').forEach(x => x.classList.remove('on'));
