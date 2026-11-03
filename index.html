@@ -1564,7 +1564,7 @@ html:not(.unlocked) .app{display:none}
         <div class="settings-section-title">Recenzii Google pe site</div>
         <div class="form-hint" id="gr-state" style="margin-bottom:10px">Se verifică…</div>
         <div class="fg"><label for="gr-key">Cheia API din Google Cloud (Places API New)</label><input class="form-input" type="password" id="gr-key" placeholder="începe cu AIza… — se păstrează doar pe server" autocomplete="off" spellcheck="false"></div>
-        <div class="fg"><label for="gr-q">Numele profilului pe Google</label><input class="form-input" type="text" id="gr-q" value="SUPRAVEGHERE24h București" autocomplete="off" spellcheck="false"></div>
+        <div class="fg"><label for="gr-q">Numele profilului pe Google (sau Place ID)</label><input class="form-input" type="text" id="gr-q" value="SUPRAVEGHERE24h București" autocomplete="off" spellcheck="false"></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn primary" id="gr-save">Conectează</button><button type="button" class="btn" id="gr-ref" hidden>Actualizează acum</button><button type="button" class="btn" id="gr-del" hidden>Deconectează</button></div>
       </div>
 
@@ -5942,23 +5942,39 @@ qs('#an-del').addEventListener('click', async () => { if (!(await confirmDialog(
 document.querySelectorAll('.nav-tab[data-tab="settings"]').forEach(t => t.addEventListener('click', anCfgLoad));
 async function grLoad() {
   const st = qs('#gr-state'); if (!st || !getAuth()) return;
-  try { const r = await clApi('/reviews/config');
+  try { const r = await clApi('/reviews/config'); grPlace = r.placeId || '';
     st.innerHTML = r.configured ? `✓ <b>Conectat</b>: ${escapeHtml(r.name)}${r.address ? ' · ' + escapeHtml(r.address) : ''}<br>${r.count ? `Notă ${(+r.rating).toFixed(1)} din ${r.count} recenzii · ${r.shown} afișate pe site` : 'Încă nu există recenzii — pe site rămâne butonul „Lasă o recenzie”.'}${r.updatedAt ? ' · actualizat ' + new Date(r.updatedAt).toLocaleString('ro-RO', { dateStyle: 'short', timeStyle: 'short' }) : ''}${r.error ? `<br><span style="color:var(--err,#e5484d)">Ultima încercare: ${escapeHtml(r.error)}</span>` : ''}<br>Recenziile noi îți vin și pe Telegram / notificare.`
       : 'Neconectat. Lipește cheia API și apasă Conectează — serverul caută singur profilul după nume.';
     qs('#gr-del').hidden = qs('#gr-ref').hidden = !r.configured; }
   catch (e) { st.textContent = /403|administrator/.test(e.message) ? 'Doar administratorul poate conecta recenziile.' : /HTTP 40[45]|Operație/.test(e.message) ? 'Serverul nu are încă această funcție — actualizează serverul (v7.4).' : e.message; }
 }
+let grPlace = '';
+const grNorm = x => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 async function grSave(btn, body, okMsg) {
   const lbl = btn.textContent; btn.disabled = true; btn.textContent = 'Se verifică…';
-  try { const r = await clApi('/reviews/config', jsonOpt('PUT', body)); qs('#gr-key').value = '';
-    toast(okMsg + (r.name ? ': ' + r.name : ''), 'ok'); grLoad();
-    if ((r.candidates || []).length > 1) toast('Am ales primul profil găsit. Dacă nu e cel bun, scrie numele exact și apasă din nou Conectează.', 'warn'); }
+  const q = String(body.query || '');
+  if (q && !/\s/.test(q) && q.length >= 20 && /^[A-Za-z0-9_-]+$/.test(q)) { body = { ...body, placeId: q, query: '' }; }   // a lipit direct Place ID
+  try { let r = await clApi('/reviews/config', jsonOpt('PUT', body)); qs('#gr-key').value = '';
+    const cand = r.candidates || [], want = grNorm(q.split(/\s+/)[0]) || 'supraveghere24h';
+    if (cand.length && !grNorm(r.name).includes(want)) {
+      // primul rezultat de la Google nu e profilul nostru → alegi tu din listă sau nu păstrăm nimic
+      const hit = cand.find(c => grNorm(c.name).includes(want));
+      const list = cand.map((c, i) => `<label style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--border);cursor:pointer;text-align:left"><input type="radio" name="gr-pick" value="${escapeHtml(c.placeId)}" ${(hit ? c === hit : i === -1) ? 'checked' : ''} style="margin-top:3px"><span><b>${escapeHtml(c.name)}</b><br><small style="color:var(--fg-3)">${escapeHtml(c.address || 'fără adresă')}</small></span></label>`).join('');
+      const ok = await confirmDialog({ title: 'Care e profilul tău?', tone: 'watch', okLabel: 'Folosește profilul ales', cancelLabel: 'Niciunul',
+        html: `Google a găsit întâi „${escapeHtml(r.name)}”, care nu pare a fi profilul tău.<div style="margin-top:10px">${list}</div>` });
+      const pick = (qs('#confirm-text input[name="gr-pick"]:checked') || {}).value;
+      if (ok && pick) { r = await clApi('/reviews/config', jsonOpt('PUT', { placeId: pick })); toast(okMsg + ': ' + r.name, 'ok'); }
+      else { await clApi('/reviews/config', { method: 'DELETE' });
+        toast('Nu am păstrat niciun profil. Scrie numele exact din Google Maps sau lipește Place ID-ul profilului și apasă din nou Conectează.', 'warn'); }
+      grLoad(); return;
+    }
+    toast(okMsg + (r.name ? ': ' + r.name : ''), 'ok'); grLoad(); }
   catch (e) { toast(e.message, 'err'); } finally { btn.disabled = false; btn.textContent = lbl; }
 }
 qs('#gr-save').addEventListener('click', e => { const key = qs('#gr-key').value.trim();
   if (!key && qs('#gr-del').hidden) { toast('Lipește cheia API', 'warn'); qs('#gr-key').focus(); return; }
   grSave(e.currentTarget, { key, query: qs('#gr-q').value.trim() }, 'Recenzii conectate ✓'); });
-qs('#gr-ref').addEventListener('click', e => grSave(e.currentTarget, { query: qs('#gr-q').value.trim() }, 'Recenzii actualizate'));
+qs('#gr-ref').addEventListener('click', e => grSave(e.currentTarget, grPlace ? { placeId: grPlace } : { query: qs('#gr-q').value.trim() }, 'Recenzii actualizate'));
 qs('#gr-del').addEventListener('click', async () => { if (!(await confirmDialog({ title: 'Deconectezi recenziile Google?', html: 'Cheia se șterge de pe server, iar pe site rămâne doar butonul „Lasă o recenzie”.', okLabel: 'Deconectează' }))) return;
   try { await clApi('/reviews/config', { method: 'DELETE' }); toast('Deconectat', 'ok'); grLoad(); } catch (e) { toast(e.message, 'err'); } });
 document.querySelectorAll('.nav-tab[data-tab="settings"]').forEach(t => t.addEventListener('click', grLoad));
