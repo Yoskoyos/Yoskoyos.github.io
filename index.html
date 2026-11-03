@@ -3078,7 +3078,7 @@ function bindNvrActions(container){
   container.querySelectorAll('.nvr-fix-cred').forEach(btn => {
     btn.addEventListener('click', e => { e.stopPropagation(); openCredModal(parseInt(btn.dataset.nid)); });
   });
-  container.querySelectorAll('.nvr-web-btn').forEach(a => a.addEventListener('click', e => { e.stopPropagation(); nvrCopyPass(parseInt(a.dataset.nid)); }));
+  container.querySelectorAll('.nvr-web-btn').forEach(a => a.addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); openNvrWebUi(parseInt(a.dataset.nid)); }));
   container.querySelectorAll('.nvr-menu-btn').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
@@ -3225,11 +3225,19 @@ document.querySelectorAll('.order-nvr-open').forEach(b => b.addEventListener('cl
 
 // adresa interfeței web a NVR-ului (pagina de login Hikvision); parola NU se pune în adresă
 function nvrWebUrl(n) { const h = String(n.ip || '').trim(), p = parseInt(n.port, 10) || 80; return /^https?:\/\//i.test(h) ? h : `http://${h}${p === 80 ? '' : ':' + p}/`; }
-function openNvrWebUi(nid){
+// „NVR”: întâi încercăm deschiderea prin server, deja logat (portul 8443); dacă nu merge, deschidem NVR-ul direct și copiem parola
+async function openNvrWebUi(nid){
   const n = nvrs.find(x=>x.id===nid);
   if (!n) return;
-  window.open(nvrWebUrl(n), '_blank', 'noopener');
-  nvrCopyPass(nid);
+  const w = window.open('about:blank', '_blank');
+  const direct = () => { if (w) w.location.href = nvrWebUrl(n); else window.open(nvrWebUrl(n), '_blank', 'noopener'); nvrCopyPass(nid); };
+  try {
+    if (w) { w.document.title = 'Se deschide ' + n.name + '…'; w.document.body.innerHTML = '<p style="font-family:system-ui;padding:40px;text-align:center;color:#52606F">Se deschide ' + escapeHtml(n.name) + '…</p>'; }
+    const r = await clApi('/nvrweb/open', jsonOpt('POST', { nvr: n.id }));
+    if (!r.url) throw new Error('fără link');
+    if (w) w.location.href = r.url; else window.open(r.url, '_blank');
+    toast('Se deschide ' + n.name + ' — te loghez automat', 'ok');
+  } catch (e) { direct(); }
 }
 // la deschiderea interfeței NVR: parola NVR-ului ajunge în clipboard (pagina de login a NVR-ului nu poate fi completată din aplicație)
 function nvrCopyPass(nid) {

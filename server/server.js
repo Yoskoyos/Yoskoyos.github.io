@@ -1480,6 +1480,99 @@ function handleClientNvrs(req, res) {
   });
   return sendJson(res, 200, { nvrs, monitor: MONITOR_ENABLED });
 }
+/* ═════════════ Interfața web a NVR-ului, deschisă din aplicație deja logată (test) ═════════════
+   Aplicația cere POST /nvrweb/open {nvr} → bilet de unică folosință (60 s) → https://<server>:8443/__yca/go?t=…
+   Pe portul 8443 serverul face proxy către NVR (aceleași căi ca pe NVR, deci pagina NVR-ului merge ca atare)
+   și completează singur utilizatorul și parola pe pagina de login. Sesiunea (cookie HttpOnly) ține 4 ore.
+   Certificatul: cel Let's Encrypt al proxy.supraveghere24h.ro (citit din /etc/letsencrypt, reîncărcat la 12 h). */
+const NVRWEB_PORT = parseInt(process.env.NVRWEB_PORT || '8443', 10);
+const LE_DIR = process.env.NVRWEB_CERT_DIR || '/etc/letsencrypt/live/proxy.supraveghere24h.ro';
+const nvrTickets = new Map(), nvrSess = new Map();
+let nvrWebOn = false;
+function nvrWebCtx() { try { return { cert: fs.readFileSync(path.join(LE_DIR, 'fullchain.pem')), key: fs.readFileSync(path.join(LE_DIR, 'privkey.pem')) }; } catch { return null; } }
+setInterval(() => { const now = Date.now(); for (const [k, v] of nvrTickets) if (v.exp < now) nvrTickets.delete(k); for (const [k, v] of nvrSess) if (v.exp < now) nvrSess.delete(k); }, 60000).unref();
+async function handleNvrWebOpen(req, res) {
+  const ctx = requireUser(req, res, 'nvr'); if (!ctx) return;
+  if (!userCan(ctx.user, 'nvr', true)) return sendJson(res, 403, { error: 'Ai doar drept de vizualizare la NVR-uri' });
+  if (!nvrWebOn) return sendJson(res, 501, { error: 'Deschiderea automată nu e pornită pe server' });
+  const b = await readJson(req);
+  const conf = ctx.db.configs[ctx.uname] || {};
+  const nvr = (conf.nvrs || []).find(n => String(n.id) === String(b.nvr));
+  if (!nvr) return sendJson(res, 404, { error: 'NVR inexistent' });
+  const t = crypto.randomBytes(18).toString('hex');
+  nvrTickets.set(t, { owner: ctx.uname, user: ctx.user.username, nvrId: String(nvr.id), exp: Date.now() + 60000 });
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'proxy.supraveghere24h.ro').split(':')[0];
+  return sendJson(res, 200, { url: `https://${host}:${NVRWEB_PORT}/__yca/go?t=${t}` });
+}
+const nvrWebPage = (code, title, msg) => `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><body style="font-family:system-ui;padding:48px 20px;text-align:center;color:#14202E;background:#F5F7FA"><h2>${title}</h2><p style="color:#52606F">${msg}</p></body>`;
+function nvrLoginScript(user, pass) {
+  const j = v => JSON.stringify(String(v)).replace(/</g, '\\u003c');
+  return `<script>(function(){try{var k='ycaAutoLogin',l=+sessionStorage.getItem(k)||0;if(Date.now()-l<60000)return;}catch(e){}
+var U=${j(user)},P=${j(pass)},n=0;
+function setv(el,v){el.focus();el.value=v;try{if(window.angular){var a=angular.element(el);a.val(v);a.triggerHandler('input');a.triggerHandler('change');}}catch(e){}
+['input','change','keyup'].forEach(function(t){el.dispatchEvent(new Event(t,{bubbles:true}));});}
+function go(){var u=document.getElementById('username'),p=document.getElementById('password');
+if(!u||!p||!u.offsetWidth){if(++n<100)setTimeout(go,200);return;}
+try{sessionStorage.setItem('ycaAutoLogin',String(Date.now()));}catch(e){}
+setv(u,U);setv(p,P);
+setTimeout(function(){var c=[].slice.call(document.querySelectorAll('button,a,input[type=button],input[type=submit],[ng-click]')).filter(function(x){return x.offsetWidth&&/login|logare|autentific|conectare|sign in/i.test((x.className||'')+' '+(x.id||'')+' '+(x.getAttribute('ng-click')||'')+' '+(x.textContent||x.value||''));});
+var b=c.filter(function(x){return x.tagName==='BUTTON'||/btn/i.test(x.className||'');})[0]||c[0];
+if(b)b.click();else p.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',keyCode:13,which:13,bubbles:true}));},500);}
+if(document.readyState==='complete')go();else window.addEventListener('load',go);})();</script>`;
+}
+function nvrWebHandler(req, res) {
+  const u = url.parse(req.url, true);
+  if (u.pathname === '/__yca/go') {
+    const t = nvrTickets.get(String(u.query.t || '')); nvrTickets.delete(String(u.query.t || ''));
+    if (!t || t.exp < Date.now()) { res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end(nvrWebPage(403, 'Link expirat', 'Deschide din nou NVR-ul din aplicația SUPRAVEGHERE24h (butonul „NVR”).')); }
+    const sid = crypto.randomBytes(24).toString('hex');
+    nvrSess.set(sid, { owner: t.owner, user: t.user, nvrId: t.nvrId, exp: Date.now() + 4 * 3600e3 });
+    res.writeHead(302, { 'Set-Cookie': `yca_nvrs=${sid}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=14400`, Location: '/doc/page/login.asp', 'Cache-Control': 'no-store' });
+    return res.end();
+  }
+  const ck = String(req.headers.cookie || ''); const sid = (/(?:^|;\s*)yca_nvrs=([a-f0-9]{48})/.exec(ck) || [])[1];
+  const s = sid && nvrSess.get(sid);
+  if (!s || s.exp < Date.now()) { res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end(nvrWebPage(403, 'Sesiune expirată', 'Deschide NVR-ul din aplicația SUPRAVEGHERE24h (butonul „NVR” de pe cardul NVR-ului).')); }
+  const db = loadDb(); const conf = db.configs[s.owner] || {};
+  const nvr = (conf.nvrs || []).find(n => String(n.id) === s.nvrId);
+  if (!nvr) { res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end(nvrWebPage(404, 'NVR inexistent', 'NVR-ul a fost șters din aplicație.')); }
+  const cred = (conf.creds || {})[nvr.id] || (conf.creds || {})[String(nvr.id)] || {};
+  const host = String(nvr.ip || '').trim(), port = parseInt(nvr.port, 10) || 80, base = `http://${host}${port === 80 ? '' : ':' + port}`;
+  const headers = { ...req.headers };
+  delete headers['accept-encoding']; delete headers['x-forwarded-for']; delete headers['x-forwarded-host']; delete headers['x-forwarded-proto'];
+  headers.host = host + (port === 80 ? '' : ':' + port);
+  const rest = ck.split(/;\s*/).filter(c => c && !/^yca_nvrs=/.test(c)).join('; ');
+  if (rest) headers.cookie = rest; else delete headers.cookie;
+  if (headers.origin) headers.origin = base;
+  if (headers.referer) headers.referer = String(headers.referer).replace(/^https:\/\/[^/]+/, base);
+  const isLogin = /^\/doc\/page\/login\.asp/i.test(u.pathname || '');
+  const pr = http.request({ hostname: host, port, method: req.method, path: req.url, headers, timeout: 30000 }, r => {
+    const h = { ...r.headers };
+    if (h.location) h.location = String(h.location).replace(/^https?:\/\/[^/]+/i, '');
+    if (h['set-cookie']) h['set-cookie'] = [].concat(h['set-cookie']).map(c => c.replace(/;\s*domain=[^;]*/ig, ''));
+    if (isLogin && /html/i.test(h['content-type'] || '') && r.statusCode === 200 && cred.pass) {
+      const ch = []; r.on('data', d => ch.push(d)); r.on('end', () => {
+        let html = Buffer.concat(ch).toString('utf8'); const inj = nvrLoginScript(cred.user || 'admin', cred.pass || '');
+        html = /<\/body>/i.test(html) ? html.replace(/<\/body>/i, inj + '</body>') : html + inj;
+        const buf = Buffer.from(html, 'utf8'); delete h['content-length']; delete h['transfer-encoding'];
+        h['cache-control'] = 'no-store'; res.writeHead(200, { ...h, 'content-length': buf.length }); res.end(buf);
+      });
+      return;
+    }
+    res.writeHead(r.statusCode, h); r.pipe(res);
+  });
+  pr.on('timeout', () => pr.destroy(new Error('timeout')));
+  pr.on('error', () => { if (!res.headersSent) { res.writeHead(502, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(nvrWebPage(502, 'NVR-ul nu răspunde', `Serverul nu se poate conecta la ${escHtml(host)}:${port}.`)); } else try { res.end(); } catch {} });
+  req.pipe(pr);
+  s.exp = Math.max(s.exp, Date.now() + 3600e3);
+}
+function startNvrWeb() {
+  const c = nvrWebCtx(); if (!c) { console.log('[nvrweb] fără certificat în ' + LE_DIR + ' — oprit'); return; }
+  const srv = https.createServer(c, nvrWebHandler);
+  srv.on('error', e => { nvrWebOn = false; console.error('[nvrweb]', e.message); });
+  srv.listen(NVRWEB_PORT, () => { nvrWebOn = true; console.log('[nvrweb] pornit pe portul ' + NVRWEB_PORT); });
+  setInterval(() => { const n = nvrWebCtx(); if (n) try { srv.setSecureContext(n); } catch {} }, 12 * 3600e3).unref();
+}
 // remindere de expirare — rulează din monitor; o dată pe zi după 09:00
 const cdocDaysLeft = exp => Math.round((Date.parse(exp + 'T00:00:00Z') - Date.parse(new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' }) + 'T00:00:00Z')) / 864e5);
 async function cdocReminders(db) {
@@ -2559,7 +2652,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.5, mail: mailReady(), rtsp: hasFfmpeg(), push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.6, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops' || pathname.startsWith('/ops/')) return await handleOps(req, res, pathname);
@@ -2595,6 +2688,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/company-docs' || pathname.startsWith('/company-docs/')) return await handleCompanyDocs(req, res, pathname);
     if (pathname === '/admin/users' || pathname.startsWith('/admin/users/')) return await handleUsers(req, res, pathname);
     if (pathname === '/client/nvrs' && req.method === 'GET') return handleClientNvrs(req, res);
+    if (pathname === '/nvrweb/open' && req.method === 'POST') return await handleNvrWebOpen(req, res);
 
     // Starea monitorizării pentru utilizatorul logat
     if (pathname === '/monitor' && req.method === 'GET') {
@@ -2674,4 +2768,5 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+if (process.env.NVRWEB !== '0') startNvrWeb();
 server.listen(PORT, () => console.log('NVR Proxy v6.6 running on port ' + PORT + (hasFfmpeg() ? ' (ffmpeg OK)' : ' (fără ffmpeg)')));

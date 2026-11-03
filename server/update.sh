@@ -34,6 +34,8 @@ if [ -n "$NG" ] && ! grep -q "X-Forwarded-For" "$NG"; then
 fi
 [ -d node_modules/nodemailer ] || npm install --silent nodemailer@latest >/dev/null 2>&1 || true
 [ -d node_modules/web-push ] || { echo "Instalez modulul pentru notificări push..."; npm install --silent web-push@latest >/dev/null 2>&1 || echo "ATENȚIE: web-push nu s-a instalat — notificările push nu vor merge"; }
+# portul 8443: interfața web a NVR-urilor deschisă din aplicație (deja logată)
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then ufw allow 8443/tcp >/dev/null 2>&1 && echo "firewall: port 8443 deschis"; fi
 cp server.js server.js.prev
 mv server.new.js server.js
 systemctl restart nvr-proxy
