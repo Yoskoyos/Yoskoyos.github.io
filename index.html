@@ -6408,7 +6408,7 @@ async function ctrStamp() {
   } catch {}
   return null;   // fără ștampilă (sau eroare): reîncercăm la următorul contract
 }
-const STAMP_RUN = i => `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="1188000" cy="1180000"/><wp:docPr id="${900 + i}" name="Stampila ${i}"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${900 + i}" name="stampila.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdStampYca"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1188000" cy="1180000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+const STAMP_RUN = i => `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${251660000 + i}" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>1480000</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>-640000</wp:posOffset></wp:positionV><wp:extent cx="1080000" cy="1073000"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="${900 + i}" name="Stampila ${i}"/><wp:cNvGraphicFramePr/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${900 + i}" name="stampila.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdStampYca"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1080000" cy="1073000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>`;   // ștampila plutește peste semnătură, ca una reală
 // completează un șablon Word ({{CÂMP}}) și pune ștampila în locul {{STAMPILA}}
 async function docxFill(tplBuf, val, stamp, dflt) {
   await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
@@ -6430,7 +6430,7 @@ async function docxFill(tplBuf, val, stamp, dflt) {
 async function genContract() {
   const btn = qs('#ctr-go'), old = btn.textContent; btn.disabled = true; btn.textContent = 'Se generează…';
   try {
-    const r = await fetch('contract-template.docx?v=2', { cache: 'no-store' }); if (!r.ok) throw new Error('Nu găsesc șablonul de contract');
+    const r = await fetch('contract-template.docx?v=3', { cache: 'no-store' }); if (!r.ok) throw new Error('Nu găsesc șablonul de contract');
     const val = {}; for (const k of CTR_KEYS) { const el = qs('#ctr-' + k); val[k] = el ? el.value.trim() : ''; }
     const blob = await docxFill(await r.arrayBuffer(), val, await ctrStamp());
     const name = ('Contract ' + (val.NR || '') + ' - ' + (val.ASOC || ctrClient.name || 'client')).replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() + '.docx';
