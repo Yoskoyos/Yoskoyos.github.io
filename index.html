@@ -6395,18 +6395,44 @@ async function openCtrModal(cArg, qArg) {
   qs('#ctr-modal').classList.remove('hidden');
 }
 function closeCtrModal() { qs('#ctr-modal').classList.add('hidden'); }
+// Ștampila firmei: imaginea „stampila….png” din Acte firmă (doar pe server; nu stă în fișierele publice ale aplicației)
+let ctrStampCache;
+async function ctrStamp() {
+  if (ctrStampCache !== undefined) return ctrStampCache;
+  try {
+    const r = await clApi('/company-docs'); const a = getAuth();
+    for (const d of r.docs || []) for (const f of d.files || []) if (f.ext === 'png' && /stampil|ștampil/i.test(f.name)) {
+      const res = await fetch(`${getProxyBase()}/company-docs/${encodeURIComponent(d.id)}/files/${encodeURIComponent(f.id)}`, { headers: { Authorization: 'Bearer ' + a.token } });
+      if (res.ok) return (ctrStampCache = await res.arrayBuffer());
+    }
+  } catch {}
+  return null;   // fără ștampilă (sau eroare): reîncercăm la următorul contract
+}
+const STAMP_RUN = i => `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="1188000" cy="1180000"/><wp:docPr id="${900 + i}" name="Stampila ${i}"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${900 + i}" name="stampila.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdStampYca"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1188000" cy="1180000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+// completează un șablon Word ({{CÂMP}}) și pune ștampila în locul {{STAMPILA}}
+async function docxFill(tplBuf, val, stamp, dflt) {
+  await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+  const zip = await JSZip.loadAsync(tplBuf);
+  let xml = await zip.file('word/document.xml').async('string');
+  const esc = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  let n = 0;
+  xml = xml.replace(/<w:r>(?:(?!<\/w:r>)[\s\S])*?\{\{STAMPILA\}\}(?:(?!<\/w:r>)[\s\S])*?<\/w:r>/g, () => stamp ? STAMP_RUN(++n) : '');
+  if (n) {
+    zip.file('word/media/stampila_yca.png', stamp);
+    let rels = await zip.file('word/_rels/document.xml.rels').async('string');
+    if (!rels.includes('rIdStampYca')) rels = rels.replace('</Relationships>', '<Relationship Id="rIdStampYca" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/stampila_yca.png"/></Relationships>');
+    zip.file('word/_rels/document.xml.rels', rels);
+  }
+  xml = xml.replace(/\{\{([A-Z_]+)\}\}/g, (m, k) => val[k] ? esc(val[k]) : (dflt && dflt[k]) ? esc(dflt[k]) : (/^[QM]_/.test(k) ? '' : '……………………'));
+  zip.file('word/document.xml', xml);
+  return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+}
 async function genContract() {
   const btn = qs('#ctr-go'), old = btn.textContent; btn.disabled = true; btn.textContent = 'Se generează…';
   try {
-    await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
-    const r = await fetch('contract-template.docx?v=1', { cache: 'no-store' }); if (!r.ok) throw new Error('Nu găsesc șablonul de contract');
-    const zip = await JSZip.loadAsync(await r.arrayBuffer());
-    let xml = await zip.file('word/document.xml').async('string');
-    const esc = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const r = await fetch('contract-template.docx?v=2', { cache: 'no-store' }); if (!r.ok) throw new Error('Nu găsesc șablonul de contract');
     const val = {}; for (const k of CTR_KEYS) { const el = qs('#ctr-' + k); val[k] = el ? el.value.trim() : ''; }
-    xml = xml.replace(/\{\{([A-Z_]+)\}\}/g, (m, k) => val[k] ? esc(val[k]) : (/^[QM]_/.test(k) ? '' : '……………………'));
-    zip.file('word/document.xml', xml);
-    const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const blob = await docxFill(await r.arrayBuffer(), val, await ctrStamp());
     const name = ('Contract ' + (val.NR || '') + ' - ' + (val.ASOC || ctrClient.name || 'client')).replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() + '.docx';
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);

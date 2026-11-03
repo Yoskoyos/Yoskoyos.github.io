@@ -33,7 +33,8 @@ const sign = (left, right) => [
   new Paragraph({ keepNext: true, keepLines: true, spacing: { before: 400 }, tabStops: [{ type: TabStopType.LEFT, position: 5200 }], children: [t('PRESTATOR', { bold: true }), t('\t'), t('BENEFICIAR', { bold: true })] }),
   new Paragraph({ keepNext: true, tabStops: [{ type: TabStopType.LEFT, position: 5200 }], children: [t(left[0]), t('\t'), t(right[0])] }),
   new Paragraph({ keepNext: true, tabStops: [{ type: TabStopType.LEFT, position: 5200 }], children: [t(left[1]), t('\t'), t(right[1])] }),
-  new Paragraph({ spacing: { before: 360 }, tabStops: [{ type: TabStopType.LEFT, position: 5200 }], children: [t('Semnătura: ____________________'), t('\t'), t('Semnătura: ____________________')] }),
+  ...(TPL ? [new Paragraph({ keepNext: true, spacing: { before: 120 }, children: [t('{{STAMPILA}}')] })] : []),   // ștampila se adaugă de aplicație, doar pentru utilizatorul logat
+  new Paragraph({ spacing: { before: TPL ? 60 : 360 }, tabStops: [{ type: TabStopType.LEFT, position: 5200 }], children: [t('Semnătura: ____________________'), t('\t'), t('Semnătura: ____________________')] }),
 ];
 
 
