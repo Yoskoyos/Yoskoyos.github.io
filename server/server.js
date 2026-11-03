@@ -88,7 +88,7 @@ function findUser(db, username) {
 }
 function publicUser(u) {
   return { id: u.id, username: u.username, name: u.name || '', role: u.role, email: u.email || '',
-    nvrIds: u.role === 'client' ? (u.nvrIds || []) : undefined, perms: u.role === 'staff' ? (u.perms || []) : undefined };
+    nvrIds: u.role === 'client' ? (u.nvrIds || []) : undefined, perms: u.role === 'staff' ? permsObj(u) : undefined };
 }
 /* ───────────── Conturi: admin (proprietar) · staff (angajat, drepturi pe secțiuni) · client (doar NVR-urile lui) ─────────────
    Angajații și clienții lucrează în datele proprietarului (u.owner); nu au configurație proprie. */
@@ -98,7 +98,16 @@ function ownerName(db, u) {
   const o = (u.owner && db.users.find(x => x.username === u.owner && x.role === 'admin')) || db.users.find(x => x.role === 'admin');
   return o ? o.username : u.username;
 }
-function userCan(u, perm) { return u.role === 'admin' || (u.role === 'staff' && (u.perms || []).includes(perm)); }
+// drepturi angajat: { secțiune: 'view' | 'edit' } (formatul vechi, listă = editare)
+function permLevel(u, perm) {
+  if (u.role === 'admin') return 'edit';
+  if (u.role !== 'staff') return '';
+  const p = u.perms || {};
+  if (Array.isArray(p)) return p.includes(perm) ? 'edit' : '';
+  return p[perm] === 'edit' || p[perm] === 'view' ? p[perm] : '';
+}
+function userCan(u, perm, write) { const l = permLevel(u, perm); return write ? l === 'edit' : !!l; }
+function permsObj(u) { const o = {}; for (const k of PERMS) { const l = permLevel(u, k); if (l) o[k] = l; } return o; }
 function findUserByLogin(db, login) {
   const n = String(login || '').trim().toLowerCase();
   if (!n) return null;
@@ -213,6 +222,8 @@ function requireUser(req, res, perm) {
   if (perm) {
     const ok = perm === 'admin' ? u.role === 'admin' : perm === 'client' ? u.role === 'client' : perm === 'snap' ? (u.role !== 'staff' || userCan(u, 'nvr')) : userCan(u, perm);
     if (!ok) { sendJson(res, 403, { error: 'Nu ai acces la această secțiune' }); return null; }
+    const write = !['GET', 'HEAD'].includes(req.method);
+    if (write && u.role === 'staff' && !['snap', 'client', 'admin'].includes(perm) && !userCan(u, perm, true)) { sendJson(res, 403, { error: 'Ai doar drept de vizualizare în această secțiune' }); return null; }
   }
   return { db, user: u, uname: ownerName(db, u) };
 }
@@ -1371,7 +1382,7 @@ async function handleReviewsConfig(req, res) {
 
 /* ═════════════ Conturi pentru angajați și clienți (doar proprietarul) ═════════════ */
 function userRow(u) {
-  return { username: u.username, name: u.name || '', email: u.email || '', role: u.role, perms: u.role === 'staff' ? (u.perms || []) : undefined,
+  return { username: u.username, name: u.name || '', email: u.email || '', role: u.role, perms: u.role === 'staff' ? permsObj(u) : undefined,
     nvrIds: u.role === 'client' ? (u.nvrIds || []) : undefined, disabled: !!u.disabled, createdAt: u.createdAt || 0, lastLogin: u.lastLogin || 0 };
 }
 async function handleUsers(req, res, pathname) {
@@ -1382,7 +1393,11 @@ async function handleUsers(req, res, pathname) {
   const clean = (b, u) => {
     if (b.name !== undefined) u.name = str(b.name, 80).trim();
     if (b.email !== undefined) { const e = str(b.email, 200).trim(); if (e && !EMAIL_RE.test(e)) throw new Error('Email invalid'); if (e && db.users.some(x => x !== u && (x.email || '').toLowerCase() === e.toLowerCase())) throw new Error('Emailul e folosit de alt cont'); u.email = e; }
-    if (u.role === 'staff' && Array.isArray(b.perms)) u.perms = b.perms.filter(x => PERMS.includes(x));
+    if (u.role === 'staff' && b.perms && typeof b.perms === 'object') {
+      const o = {}; if (Array.isArray(b.perms)) b.perms.filter(x => PERMS.includes(x)).forEach(k => o[k] = 'edit');
+      else for (const k of PERMS) if (b.perms[k] === 'view' || b.perms[k] === 'edit') o[k] = b.perms[k];
+      u.perms = o;
+    }
     if (u.role === 'client' && Array.isArray(b.nvrIds)) { const ids = new Set(((db.configs[me.username] || {}).nvrs || []).map(n => String(n.id))); u.nvrIds = b.nvrIds.map(String).filter(x => ids.has(x)); }
   };
   try {
@@ -1395,7 +1410,7 @@ async function handleUsers(req, res, pathname) {
       const role = b.role === 'client' ? 'client' : 'staff';
       const pass = String(b.password || '');
       if (pass.length < MIN_PASS_LEN) return sendJson(res, 400, { error: `Parola trebuie să aibă minim ${MIN_PASS_LEN} caractere` });
-      const u = { id: Date.now(), username, role, owner: me.username, password: await bcrypt.hash(pass, 10), pwv: 0, createdAt: Date.now(), perms: [], nvrIds: [] };
+      const u = { id: Date.now(), username, role, owner: me.username, password: await bcrypt.hash(pass, 10), pwv: 0, createdAt: Date.now(), perms: {}, nvrIds: [] };
       clean(b, u); if (role === 'staff') delete u.nvrIds; else delete u.perms;
       db.users.push(u); saveDb(db);
       return sendJson(res, 200, { user: userRow(u), users: mine().map(userRow) });
