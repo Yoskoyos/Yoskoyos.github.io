@@ -180,6 +180,9 @@ header{
 .nvr-cams.warn{color:var(--warn)}
 .nvr-chev{flex-shrink:0;color:var(--fg-3);transition:transform .2s}
 .nvr-card:has(.nvr-detail.open) .nvr-chev{transform:rotate(180deg)}
+.nvr-web-btn{flex-shrink:0;height:34px;padding:0 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-2);color:var(--fg-2);display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;text-decoration:none;transition:all .15s}.nvr-web-btn:hover{border-color:var(--accent);color:var(--fg)}
+@media(max-width:600px){.nvr-web-btn{height:40px;padding:0 10px}.nvr-web-btn span{display:none}}
+html[data-role="client"] .nvr-web-btn{display:none!important}
 .nvr-menu-btn{flex-shrink:0;width:34px;height:34px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--fg-2);display:grid;place-items:center;cursor:pointer;transition:all .15s}
 .nvr-menu-btn:hover,.nvr-menu-btn[aria-expanded="true"]{background:var(--bg-3);border-color:var(--border);color:var(--fg)}
 .nvr-menu{position:fixed;z-index:220;min-width:210px;background:var(--bg-1);border:1px solid var(--border-2);border-radius:12px;padding:6px;box-shadow:0 14px 40px rgba(0,0,0,.28);animation:menu-in .12s ease}
@@ -2886,6 +2889,8 @@ function nvrCardHTML(n, showDetail){
       </div>
       <span class="nvr-badge ${n.status}" title="${n.status==='warning' ? offlineCams+' camere offline' : n.status==='offline' ? 'NVR nu răspunde' : ''}">${nvrStatusLabel(n.status)}${n.status==='warning'&&offlineCams>0?`<span class="badge-x"> · ${offlineCams} cam offline</span>`:''}</span>
       <svg class="nvr-chev" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      <a class="nvr-web-btn" href="${escapeHtml(nvrWebUrl(n))}" target="_blank" rel="noopener" data-nid="${n.id}" title="Deschide interfața NVR-ului (setări)" aria-label="Deschide interfața NVR-ului ${escapeHtml(n.name)}">
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6M10 14L21 3"/></svg><span>NVR</span></a>
       <button class="nvr-menu-btn" type="button" data-nid="${n.id}" aria-haspopup="menu" aria-label="Acțiuni NVR" title="Acțiuni">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
       </button>
@@ -3073,6 +3078,7 @@ function bindNvrActions(container){
   container.querySelectorAll('.nvr-fix-cred').forEach(btn => {
     btn.addEventListener('click', e => { e.stopPropagation(); openCredModal(parseInt(btn.dataset.nid)); });
   });
+  container.querySelectorAll('.nvr-web-btn').forEach(a => a.addEventListener('click', e => { e.stopPropagation(); const c = creds[parseInt(a.dataset.nid)] || {}; if (c.user) toast(`Utilizator NVR: ${c.user} — parola o ai în ⋯ → Credențiale`, 'info'); }));
   container.querySelectorAll('.nvr-menu-btn').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
@@ -3217,13 +3223,14 @@ qs('#order-modal').addEventListener('click', e => { if (e.target === qs('#order-
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !qs('#order-modal').classList.contains('hidden')) closeOrderModal(); });
 document.querySelectorAll('.order-nvr-open').forEach(b => b.addEventListener('click', () => openOrderModal()));
 
+// adresa interfeței web a NVR-ului (pagina de login Hikvision); parola NU se pune în adresă
+function nvrWebUrl(n) { const h = String(n.ip || '').trim(), p = parseInt(n.port, 10) || 80; return /^https?:\/\//i.test(h) ? h : `http://${h}${p === 80 ? '' : ':' + p}/`; }
 function openNvrWebUi(nid){
   const n = nvrs.find(x=>x.id===nid);
   if (!n) return;
-  const c = creds[n.id]||{};
-  let url = `http://${n.ip}:${n.port}`;
-  try{ const u=new URL(url); if(c.user)u.username=c.user; if(c.pass)u.password=c.pass; url=u.toString(); }catch{}
-  window.open(url, '_blank');
+  window.open(nvrWebUrl(n), '_blank', 'noopener');
+  const c = creds[n.id] || {};
+  if (c.user) toast(`Utilizator NVR: ${c.user} — parola o ai în Credențiale`, 'info');
 }
 
 async function deleteNvr(nid){
