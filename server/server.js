@@ -225,7 +225,44 @@ function requireUser(req, res, perm) {
     const write = !['GET', 'HEAD'].includes(req.method);
     if (write && u.role === 'staff' && !['snap', 'client', 'admin'].includes(perm) && !userCan(u, perm, true)) { sendJson(res, 403, { error: 'Ai doar drept de vizualizare în această secțiune' }); return null; }
   }
+  actTouch(u.username, req);
   return { db, user: u, uname: ownerName(db, u) };
+}
+
+
+/* ───────────── Activitate conturi (activity.json, doar pe server): ultima logare, ultima activitate, sesiuni, timp pe zi ─────────────
+   O sesiune = cereri la cel mult 10 minute una de alta; aplicația trimite /auth/ping la fiecare minut cât e deschisă. */
+const ACT_FILE = path.join(BASE_DIR, 'activity.json');
+const SESS_GAP = 10 * 60e3;
+let act = null, actDirty = false;
+function loadAct() { if (!act) { try { act = JSON.parse(fs.readFileSync(ACT_FILE, 'utf8')) || {}; } catch { act = {}; } } return act; }
+function saveAct() { if (!actDirty) return; try { fs.writeFileSync(ACT_FILE, JSON.stringify(act), { mode: 0o600 }); actDirty = false; } catch {} }
+setInterval(saveAct, 30000).unref();
+for (const sig of ['SIGTERM', 'SIGINT']) process.once(sig, () => { saveAct(); process.exit(0); });
+const roDay = t => new Date(t).toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' });
+function devName(req) {
+  const ua = String(req.headers['user-agent'] || '');
+  const os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac OS X|Macintosh/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : '';
+  const br = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /SamsungBrowser/.test(ua) ? 'Samsung Internet' : /Firefox\//.test(ua) ? 'Firefox' : /CriOS|Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : '';
+  return [os, br].filter(Boolean).join(' · ');
+}
+function actTouch(username, req, login) {
+  const A = loadAct(); const a = A[username] || (A[username] = { sessions: [], days: {}, logins: [] }); const now = Date.now();
+  if (!login && a.lastSeen && now - a.lastSeen < 20000) return;          // cel mult o scriere la 20 s
+  if (login) { a.lastLogin = now; a.logins = (a.logins || []).filter(t => now - t < 30 * 864e5).concat(now); }
+  const cur = a.sessions[a.sessions.length - 1];
+  if (cur && !login && now - cur.e < SESS_GAP) { const add = now - cur.e; cur.e = now; a.days[roDay(now)] = (a.days[roDay(now)] || 0) + add; }
+  else { a.sessions.push({ s: now, e: now, dev: devName(req) }); if (a.sessions.length > 30) a.sessions.shift(); }
+  a.lastSeen = now;
+  for (const d of Object.keys(a.days)) if (Date.parse(d) < now - 35 * 864e5) delete a.days[d];
+  actDirty = true;
+}
+function actSummary(username) {
+  const a = loadAct()[username]; if (!a) return { online: false, lastSeen: 0, today: 0, week: 0, logins30: 0, sessions: [] };
+  const now = Date.now(), cur = a.sessions[a.sessions.length - 1];
+  let week = 0; for (let i = 0; i < 7; i++) week += a.days[roDay(now - i * 864e5)] || 0;
+  return { online: !!a.lastSeen && now - a.lastSeen < 150000, lastSeen: a.lastSeen || 0, lastLogin: a.lastLogin || 0, today: a.days[roDay(now)] || 0, week,
+    logins30: (a.logins || []).filter(t => now - t < 30 * 864e5).length, sessions: a.sessions.slice(-10).reverse().map(x => ({ s: x.s, e: x.e, dev: x.dev || '' })) };
 }
 
 /* ───────────── Digest auth către NVR ───────────── */
@@ -1383,7 +1420,7 @@ async function handleReviewsConfig(req, res) {
 /* ═════════════ Conturi pentru angajați și clienți (doar proprietarul) ═════════════ */
 function userRow(u) {
   return { username: u.username, name: u.name || '', email: u.email || '', role: u.role, perms: u.role === 'staff' ? permsObj(u) : undefined,
-    nvrIds: u.role === 'client' ? (u.nvrIds || []) : undefined, disabled: !!u.disabled, createdAt: u.createdAt || 0, lastLogin: u.lastLogin || 0 };
+    nvrIds: u.role === 'client' ? (u.nvrIds || []) : undefined, disabled: !!u.disabled, createdAt: u.createdAt || 0, lastLogin: u.lastLogin || 0, act: actSummary(u.username) };
 }
 async function handleUsers(req, res, pathname) {
   const ctx = requireUser(req, res, 'admin'); if (!ctx) return;
@@ -2405,6 +2442,7 @@ async function handleLogin(req, res) {
   fails.delete(key);
   if (u.disabled) return sendJson(res, 401, { error: 'Contul este dezactivat. Contactează administratorul.' });
   try { u.lastLogin = Date.now(); saveDb(db); } catch {}
+  actTouch(u.username, req, true);
 
   const remember = body.remember !== false;
   const token = issueToken(u, remember);
@@ -2510,6 +2548,7 @@ const server = http.createServer(async (req, res) => {
     // ── Autentificare ──
     if ((pathname === '/auth/login' || pathname === '/login') && req.method === 'POST') return await handleLogin(req, res);
 
+    if (pathname === '/auth/ping' && req.method === 'POST') { const ctx = requireUser(req, res); if (!ctx) return; return sendJson(res, 200, { ok: true }); }
     if (pathname === '/auth/me' && req.method === 'GET') {
       const ctx = requireUser(req, res); if (!ctx) return;
       return sendJson(res, 200, { username: ctx.user.username, role: ctx.user.role, email: ctx.user.email || '', mail: mailReady(), monitor: MONITOR_ENABLED, user: publicUser(ctx.user) });
