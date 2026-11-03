@@ -3078,7 +3078,7 @@ function bindNvrActions(container){
   container.querySelectorAll('.nvr-fix-cred').forEach(btn => {
     btn.addEventListener('click', e => { e.stopPropagation(); openCredModal(parseInt(btn.dataset.nid)); });
   });
-  container.querySelectorAll('.nvr-web-btn').forEach(a => a.addEventListener('click', e => { e.stopPropagation(); const c = creds[parseInt(a.dataset.nid)] || {}; if (c.user) toast(`Utilizator NVR: ${c.user} — parola o ai în ⋯ → Credențiale`, 'info'); }));
+  container.querySelectorAll('.nvr-web-btn').forEach(a => a.addEventListener('click', e => { e.stopPropagation(); nvrCopyPass(parseInt(a.dataset.nid)); }));
   container.querySelectorAll('.nvr-menu-btn').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
@@ -3229,8 +3229,14 @@ function openNvrWebUi(nid){
   const n = nvrs.find(x=>x.id===nid);
   if (!n) return;
   window.open(nvrWebUrl(n), '_blank', 'noopener');
-  const c = creds[n.id] || {};
-  if (c.user) toast(`Utilizator NVR: ${c.user} — parola o ai în Credențiale`, 'info');
+  nvrCopyPass(nid);
+}
+// la deschiderea interfeței NVR: parola NVR-ului ajunge în clipboard (pagina de login a NVR-ului nu poate fi completată din aplicație)
+function nvrCopyPass(nid) {
+  const c = creds[nid] || {};
+  if (!c.pass) { toast('Pentru acest NVR nu ai parola salvată în aplicație (⋯ → Credențiale)', 'warn'); return; }
+  const done = () => toast(`Parola copiată ✓ Utilizator: ${c.user || 'admin'} — în pagina NVR-ului lipește parola cu Ctrl+V (pe telefon: apasă lung → Lipește)`, 'ok');
+  try { navigator.clipboard.writeText(c.pass).then(done, () => toast(`Utilizator: ${c.user || 'admin'} — parola o găsești în ⋯ → Credențiale`, 'info')); } catch { toast(`Utilizator: ${c.user || 'admin'}`, 'info'); }
 }
 
 async function deleteNvr(nid){
