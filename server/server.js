@@ -1086,7 +1086,7 @@ async function handleCompanyDocs(req, res, pathname) {
       if (req.method === 'GET') {
         let data; try { data = fs.readFileSync(fp); } catch { return sendJson(res, 404, { error: 'Fișierul lipsește de pe server' }); }
         const ascii = f.name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '');
-        const inline = !url.parse(req.url, true).query.dl && ['pdf', 'jpg', 'png'].includes(f.ext);
+        const inline = !url.parse(req.url, true).query.dl && ['pdf', 'jpg', 'png', 'webp', 'docx', 'xlsx'].includes(f.ext);   // pe telefon, Word/Excel se deschid în previzualizare (iPhone) sau în aplicația Word (Android)
         res.writeHead(200, { 'Content-Type': CT[f.ext] || 'application/octet-stream', 'Content-Length': data.length, 'Cache-Control': 'private, no-store',
           'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(f.name)}`, ...CORS });
         return res.end(data);
@@ -2652,7 +2652,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.6, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.7, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops' || pathname.startsWith('/ops/')) return await handleOps(req, res, pathname);

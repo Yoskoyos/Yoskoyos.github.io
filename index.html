@@ -4149,7 +4149,7 @@ function renderCdFiles() {
     const size = f.size < 1048576 ? Math.max(1, Math.round(f.size / 1024)) + ' KB' : (f.size / 1048576).toFixed(1) + ' MB';
     return `<div class="cm-file"><svg class="cm-file-ic" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9">${icon}</svg>
       <div class="cm-file-main"><div class="cm-file-name">${escapeHtml(f.name)}</div><div class="cm-file-meta">${size} · încărcat ${fmtTs(f.uploadedAt)}</div></div>
-      <a href="${escapeHtml(href)}" target="_blank" rel="noopener">Deschide</a><button type="button" class="del" data-fid="${escapeHtml(f.id)}">Șterge</button></div>`;
+      <a href="${escapeHtml(href)}" target="_blank" rel="noopener">Deschide</a><a href="${escapeHtml(href + '&dl=1')}" download="${escapeHtml(f.name)}" title="Descarcă" aria-label="Descarcă ${escapeHtml(f.name)}" style="padding:7px 10px"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></a><button type="button" class="del" data-fid="${escapeHtml(f.id)}">Șterge</button></div>`;
   }).join('') : '<div class="cm-hint">Niciun fișier încărcat.</div>';
 }
 function openCdocModal(d) {
