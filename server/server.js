@@ -200,7 +200,7 @@ function getAuth(req) {
   if (!tok) {   // <img src> nu poate trimite antete → tokenul poate veni și în ?token= (doar pentru /snap)
     try {
       const q = url.parse(req.url, true);
-      const tokOk = q.pathname === '/snap' || (req.method === 'GET' && (q.pathname === '/clients-backup' || /^\/clients\/[\w-]+\/contracts\/[\w-]+$/.test(q.pathname || '') || /^\/company-docs\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/ops\/(works|stock|gdpr|catalog)\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/seap\/[\w:-]+\/zip$/.test(q.pathname || '')));
+      const tokOk = q.pathname === '/snap' || (req.method === 'GET' && (q.pathname === '/clients-backup' || /^\/clients\/[\w-]+\/contracts\/[\w-]+$/.test(q.pathname || '') || /^\/company-docs\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/ops\/(works|stock|gdpr|catalog)\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/seap\/[\w:%-]+\/zip$/.test(q.pathname || '')));
       if (tokOk && q.query.token) tok = String(q.query.token);
     } catch {}
   }

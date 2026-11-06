@@ -6548,7 +6548,7 @@ async function spZip(key, btn) {
   const url = `${getProxyBase()}/seap/${encodeURIComponent(key)}/zip?token=${encodeURIComponent(a.token)}`;
   btn.disabled = true; const old = btn.innerHTML; btn.textContent = 'Se descarcă de pe SEAP…';
   try {
-    const r = await fetch(url); if (!r.ok) { let j = null; try { j = await r.json(); } catch {} throw new Error((j && j.error) || 'Eroare ' + r.status); }
+    const r = await fetch(url, { headers: { Authorization: 'Bearer ' + a.token } }); if (!r.ok) { let j = null; try { j = await r.json(); } catch {} throw new Error((j && j.error) || 'Eroare ' + r.status); }
     const blob = await r.blob();
     const cd = r.headers.get('Content-Disposition') || ''; let name = 'SEAP.zip';
     const m = /filename\*=UTF-8''([^;]+)/i.exec(cd) || /filename="([^"]+)"/i.exec(cd); if (m) { try { name = decodeURIComponent(m[1]); } catch { name = m[1]; } }
