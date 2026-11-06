@@ -1591,12 +1591,17 @@ const COUNTY_CODE = { 'bucuresti': 'B', 'municipiul bucuresti': 'B', 'ilfov': 'I
 const seapNorm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 function loadSeap() { try { const d = JSON.parse(fs.readFileSync(SEAP_FILE, 'utf8')); d.items = d.items || {}; d.ca = d.ca || {}; return d; } catch { return { items: {}, ca: {} }; } }
 function saveSeap(d) { const tmp = SEAP_FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(d), { mode: 0o600 }); fs.renameSync(tmp, SEAP_FILE); }
+// SEAP leagă linkurile spre fișiere de sesiune (cookie) → păstrăm cookie-urile primite, ca un browser
+const seapJar = {};
+function seapCookies() { return Object.entries(seapJar).map(([k, v]) => k + '=' + v).join('; '); }
+async function seapSession() { if (!Object.keys(seapJar).length) { try { await seapReq('GET', 'pub', null, true); } catch {} } }
 function seapReq(method, p, body, bin) {
   return new Promise((resolve, reject) => {
     const data = body ? JSON.stringify(body) : null;
     const rq = https.request({ host: SEAP_HOST, path: '/' + p.replace(/^\//, ''), method, timeout: 45000,
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; YCA-SEAP/1.0)', Accept: bin ? '*/*' : 'application/json', Referer: 'https://www.e-licitatie.ro/pub',
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; YCA-SEAP/1.0)', Accept: bin ? '*/*' : 'application/json', Referer: 'https://www.e-licitatie.ro/pub', ...(Object.keys(seapJar).length ? { Cookie: seapCookies() } : {}),
         ...(data ? { 'Content-Type': 'application/json;charset=UTF-8', 'Content-Length': Buffer.byteLength(data) } : {}) } }, r => {
+      for (const c of [].concat(r.headers['set-cookie'] || [])) { const m = /^([^=;\s]+)=([^;]*)/.exec(c); if (m) seapJar[m[1]] = m[2]; }
       const ch = []; let n = 0; r.on('data', d => { n += d.length; if (n < 40e6) ch.push(d); });
       r.on('end', () => { const buf = Buffer.concat(ch);
         if (r.statusCode >= 400) return reject(new Error('SEAP HTTP ' + r.statusCode));
@@ -1661,6 +1666,7 @@ function seapExp(text) {
   return any ? { status: 'unknown', snippet: '' } : { status: 'none' };
 }
 async function seapDocs(it) {
+  await seapSession();
   try {
     if (it.type === 'da') { const v = await seapReq('GET', `api-pub/PUBLICAdvNotice/getForView/${it.id}`);
       return { v, docs: v && v.documentUrl ? [{ name: v.documentName || 'document', url: v.documentUrl }] : [] }; }
@@ -2854,7 +2860,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.9, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 8.0, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops' || pathname.startsWith('/ops/')) return await handleOps(req, res, pathname);
