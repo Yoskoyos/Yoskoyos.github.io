@@ -478,6 +478,44 @@ async function recSearch(nvr, cred, id, wall, minutes) {
   const n = parseInt((/<numOfMatches>(\d+)<\/numOfMatches>/.exec(r.body) || [])[1] || '0', 10);
   return n > 0 || /<searchMatchItem>/.test(r.body);
 }
+/* ───────────── Ora pe NVR-uri: verificată de server la 6 ore; fus orar România cu oră de vară + corectare dacă diferă > 30 s ─────────────
+   Nu trimite alerte; modul NTP/manual rămâne cum era (dacă era NTP, revine pe NTP după setare). TIME_FIX=0 în env oprește corectarea. */
+const RO_TZ = 'CST-2:00:00DST01:00:00,M3.5.0/03:00:00,M10.5.0/04:00:00';
+const TIME_EVERY = 6 * 3600e3, TIME_MAX_DRIFT = 30;
+function bucWall(d) {   // ora din București ca „ceas” (Date în UTC cu cifrele orei locale) + offset ±hh:mm
+  const f = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Bucharest', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).formatToParts(d);
+  const g = t => +f.find(x => x.type === t).value;
+  const wall = new Date(Date.UTC(g('year'), g('month') - 1, g('day'), g('hour') % 24, g('minute'), g('second')));
+  const off = Math.round((wall - d) / 60e3), sg = off < 0 ? '-' : '+', a = Math.abs(off);
+  return { wall, off: `${sg}${pad2(Math.floor(a / 60))}:${pad2(a % 60)}` };
+}
+const tzOk = tz => /^CST-2:00:00DST01:00:00,M3\.5\.0(\/0?3(:00:00)?)?,M10\.5\.0(\/0?4(:00:00)?)?$/.test(String(tz || '').trim()) || /^EET-2:00:00EEST01:00:00,M3\.5\.0\/0?3:00:00,M10\.5\.0\/0?4:00:00$/.test(String(tz || '').trim());
+async function timeCheck(key, nvr, cred) {
+  if (process.env.TIME_FIX === '0') return;
+  const st = monState.nvr[key] || (monState.nvr[key] = {});
+  if (st.timeAt && Date.now() - st.timeAt < TIME_EVERY) return;
+  st.timeAt = Date.now();
+  const r = await nvrGet(nvr, cred, '/ISAPI/System/time', 8000);
+  if (r.status !== 200) return;
+  const mode = ((/<timeMode>\s*([^<\s]+)/.exec(r.body) || [])[1] || 'manual');
+  const tz = ((/<timeZone>([^<]*)<\/timeZone>/.exec(r.body) || [])[1] || '').trim();
+  const nw = nvrWall(r.body); if (!nw) return;
+  const now = bucWall(new Date());
+  const drift = Math.round((nw - now.wall) / 1000);
+  const badTz = !tzOk(tz), badTime = Math.abs(drift) > TIME_MAX_DRIFT;
+  st.time = { at: Date.now(), mode, drift, tz };
+  if (!badTz && !badTime) return;
+  const head = '<?xml version="1.0" encoding="UTF-8"?><Time version="1.0" xmlns="http://www.hikvision.com/ver20/XMLSchema">';
+  const fresh = bucWall(new Date());
+  const w = fresh.wall, lt = `${w.getUTCFullYear()}-${pad2(w.getUTCMonth() + 1)}-${pad2(w.getUTCDate())}T${pad2(w.getUTCHours())}:${pad2(w.getUTCMinutes())}:${pad2(w.getUTCSeconds())}${fresh.off}`;
+  const p1 = await nvrRequest(nvr, cred, 'PUT', '/ISAPI/System/time', `${head}<timeMode>manual</timeMode><localTime>${lt}</localTime><timeZone>${RO_TZ}</timeZone></Time>`, 8000);
+  let p2 = { status: 200 };
+  if (/ntp/i.test(mode)) p2 = await nvrRequest(nvr, cred, 'PUT', '/ISAPI/System/time', `${head}<timeMode>NTP</timeMode><timeZone>${RO_TZ}</timeZone></Time>`, 8000);
+  const ok = p1.status === 200 && p2.status === 200;
+  st.time.fixedAt = ok ? Date.now() : st.time.fixedAt; st.time.fixErr = ok ? '' : `HTTP ${p1.status}/${p2.status}`;
+  console.log(`[ora] ${nvr.name}: ${badTz ? `fus orar „${tz}” → România` : ''}${badTz && badTime ? ', ' : ''}${badTime ? `abatere ${drift}s` : ''} → ${ok ? 'corectat' : 'EROARE ' + st.time.fixErr}`);
+}
+
 async function recCheck(key, nvr, cred) {
   const st = monState.nvr[key]; if (!st) return [];
   const now = Date.now(), lines = [];
@@ -711,6 +749,7 @@ async function monitorRun() {
         try { res = await probeNvr(t.nvr, t.cred); } catch { res = { online: false }; }
         let lines = evaluateNvr(t.key, t.nvr, res);
         if (res.online && res.authOk) { try { lines = lines.concat(await recCheck(t.key, t.nvr, t.cred)); } catch (e) { console.error('[monitor] înregistrare:', e.message); } }
+        if (res.online && res.authOk) { try { await timeCheck(t.key, t.nvr, t.cred); } catch (e) { console.error('[ora]', e.message); } }
         if (lines.length) (out[t.user] || (out[t.user] = { ucfg: t.ucfg, blocks: [] })).blocks.push({ nvr: t.nvr, lines });
       }
     }));
@@ -2860,7 +2899,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 8.0, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 8.1, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops' || pathname.startsWith('/ops/')) return await handleOps(req, res, pathname);
