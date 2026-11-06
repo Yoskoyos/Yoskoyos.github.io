@@ -1579,14 +1579,14 @@ function startNvrWeb() {
    Sursa: serviciul intern (nedocumentat) al e-licitatie.ro, folosit de site-ul public — se poate schimba fără anunț.
    Filtre: CPV-urile firmei, zona București + Ilfov + ~100 km, termen de depunere în viitor.
    Experiența similară: căutată în textul anunțului și în documente (fișa de date / caiet) cu pdftotext → none | ok (≤ 100.000 lei) | over | unknown.
-   Rulează din monitor: actualizare la 06:00, 09:40, 14:00, 18:00 · alertă zilnică la 10:00 (Telegram + push). Stare: seap.json */
+   Rulează din monitor: căutare o dată pe zi la 09:15 · alertă zilnică la 10:00 (Telegram + push). Stare: seap.json */
 const SEAP_FILE = path.join(BASE_DIR, 'seap.json');
 const SEAP_HOST = 'www.e-licitatie.ro';
 const SEAP_CPV = { 12489: '32323500-8', 13840: '35125300-2', 13836: '35125000-6', 13818: '35120000-1', 13819: '35121000-8', 12511: '32333200-8', 17635: '51314000-6',
   17021: '45312000-7', 17023: '45312200-9', 17507: '50343000-1', 17557: '50610000-4', 19296: '92222000-3', 18834: '79711000-1', 12581: '32420000-3', 11982: '30231000-7' };
 const SEAP_COUNTIES = ['B', 'IF', 'GR', 'PH', 'DB', 'TR', 'IL', 'CL'];
 const SEAP_EXP_MAX = 100000;
-const SEAP_RUN_AT = ['06:00', '09:40', '14:00', '18:00'], SEAP_ALERT_AT = '10:00';
+const SEAP_RUN_AT = ['09:15'], SEAP_ALERT_AT = '10:00';
 const COUNTY_CODE = { 'bucuresti': 'B', 'municipiul bucuresti': 'B', 'ilfov': 'IF', 'giurgiu': 'GR', 'prahova': 'PH', 'dambovita': 'DB', 'teleorman': 'TR', 'ialomita': 'IL', 'calarasi': 'CL', 'arges': 'AG', 'buzau': 'BZ' };
 const seapNorm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 function loadSeap() { try { const d = JSON.parse(fs.readFileSync(SEAP_FILE, 'utf8')); d.items = d.items || {}; d.ca = d.ca || {}; return d; } catch { return { items: {}, ca: {} }; } }
