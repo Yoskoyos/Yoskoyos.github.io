@@ -1754,6 +1754,9 @@ async function handleSeap(req, res, pathname, parsed) {
     saveSeap(st); return sendJson(res, 200, { item: it });
   }
   if (parts[2] === 'zip' && req.method === 'GET') {
+    // linkurile SEAP spre fișiere sunt temporare (se schimbă la fiecare afișare) → le cerem din nou acum
+    const fresh = await seapDocs(it);
+    if ((fresh.docs || []).length) { it.docs = fresh.docs; saveSeap(st); }
     if (!(it.docs || []).length) return sendJson(res, 404, { error: 'Anunțul nu are documente publicate' });
     const nm = `${it.no || 'SEAP'} ${it.title}`.replace(/[\\/:*?"<>|\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90);
     const files = [];
@@ -2851,7 +2854,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.8, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.9, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops' || pathname.startsWith('/ops/')) return await handleOps(req, res, pathname);
