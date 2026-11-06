@@ -16,6 +16,10 @@ if ! command -v ffmpeg >/dev/null 2>&1; then
   echo "Instalez ffmpeg (pentru imaginile din stream RTSP)..."
   (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg) >/dev/null 2>&1 || echo "ATENȚIE: ffmpeg nu s-a instalat — restul merge normal"
 fi
+if ! command -v pdftotext >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then
+  echo "Instalez poppler-utils + unzip (pentru citirea documentației SEAP)..."
+  (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq poppler-utils unzip) >/dev/null 2>&1 || echo "ATENȚIE: poppler-utils nu s-a instalat — SEAP merge, dar fără verificarea experienței din PDF"
+fi
 # contracte PDF: nginx acceptă implicit doar 1 MB → ridicăm limita la 25 MB (o singură dată)
 NG=$(grep -ls "server_name proxy.supraveghere24h.ro" /etc/nginx/sites-enabled/* /etc/nginx/conf.d/*.conf 2>/dev/null | head -1)
 if [ -n "$NG" ]; then

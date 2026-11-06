@@ -568,6 +568,28 @@ select.qpill option{background:var(--bg-1,#fff);color:var(--fg-1,#111)}
 .cl-empty{text-align:center;padding:40px 16px;color:var(--fg-3);font-size:13px;line-height:1.6}
 #cdoc-modal .modal{max-width:560px}
 #cdoc-modal .modal-body{max-height:74vh}
+.sp-chips{display:flex;gap:6px;overflow-x:auto;margin-bottom:8px;padding-bottom:2px;scrollbar-width:none}
+.sp-chips::-webkit-scrollbar{display:none}
+.sp-chip{border:1px solid var(--border);background:var(--bg-1);color:var(--fg-2);border-radius:999px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans);white-space:nowrap;flex:0 0 auto}
+.sp-chip.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent-tx)}
+.sp-card{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.sp-card.is-new{border-color:#6366F1}
+.sp-top{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.sp-tag{font-size:10.5px;font-weight:700;letter-spacing:.03em;padding:3px 8px;border-radius:999px;background:var(--bg-3);color:var(--fg-2);white-space:nowrap}
+.sp-tag.da{background:rgba(99,102,241,.14);color:#818cf8}.sp-tag.sp{background:var(--blue-dim);color:var(--blue)}
+.sp-tag.ok{background:var(--ok-dim);color:var(--ok)}.sp-tag.unk{background:var(--warn-dim);color:var(--warn)}.sp-tag.over{background:var(--err-dim);color:var(--err)}
+.sp-tag.new{background:#6366F1;color:#fff}.sp-tag.late{background:var(--err-dim);color:var(--err)}
+.sp-title{font-weight:600;font-size:14px;line-height:1.4;color:var(--fg)}
+.sp-ca{font-size:12px;color:var(--fg-2);line-height:1.45}
+.sp-row{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--fg-2)}
+.sp-row b{color:var(--fg);font-weight:600}
+.sp-exp{font-size:11.5px;color:var(--fg-3);line-height:1.5;border-left:2px solid var(--border-2);padding-left:8px;max-height:4.6em;overflow:hidden}
+.sp-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.sp-btn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);background:var(--bg-2);color:var(--fg);border-radius:8px;padding:7px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans);text-decoration:none}
+.sp-btn.pri{background:#6366F1;border-color:#6366F1;color:#fff}
+.sp-btn.on{border-color:var(--accent);color:var(--accent-tx);background:var(--accent-dim)}
+.sp-btn[disabled]{opacity:.55;pointer-events:none}
+html:not([data-role="admin"]) .ro-admin{display:none!important}
 .cd-grp{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--fg-3);margin:14px 2px 6px}
 .cd-grp:first-child{margin-top:0}
 .cd-ic{width:38px;height:38px;border-radius:10px;background:var(--bg-3);color:var(--fg-2);display:grid;place-items:center;flex-shrink:0}
@@ -1101,6 +1123,7 @@ html:not(.unlocked) .app{display:none}
     <div class="nav-tab" data-tab="works"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg><span class="lbl-l">Lucrări</span><span class="lbl-s">Lucrări</span> <span class="badge" id="wk-badge" style="display:none">0</span></div>
     <div class="nav-tab" data-tab="catalog"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg><span class="lbl-l">Echipamente</span><span class="lbl-s">Echipam.</span><span class="lbl-d">Echipamente</span></div>
     <div class="nav-tab" data-tab="docs"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><span class="lbl-l">Acte firmă</span><span class="lbl-s">Acte</span> <span class="badge" id="cd-badge" style="display:none">0</span></div>
+    <div class="nav-tab" data-tab="seap"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M4 10h16"/><path d="M12 3l9 5H3z"/><path d="M6 10v8M10 10v8M14 10v8M18 10v8"/></svg><span class="lbl-l">SEAP</span><span class="lbl-s">SEAP</span> <span class="badge" id="sp-badge" style="display:none">0</span></div>
     <div class="nav-tab nav-desk" data-tab="stats"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg><span class="lbl-l">Statistici site</span><span class="lbl-s">Statistici site</span></div>
     <div class="nav-tab" data-tab="alerts"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg><span class="lbl-l">Alerte</span><span class="lbl-s">Alerte</span> <span class="badge" id="alert-badge" style="display:none">0</span></div>
     <div class="nav-tab role-hide" data-tab="mine"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg><span class="lbl-l">Camerele mele</span><span class="lbl-s">Camere</span></div>
@@ -1312,6 +1335,28 @@ html:not(.unlocked) .app{display:none}
         <div class="cl-list" id="cd-list"><div class="cl-empty">Se încarcă…</div></div>
         <div class="cm-hint" style="margin-top:12px">Actele se păstrează doar pe serverul tău, se deschid numai după autentificare și intră în „Copie de siguranță” de la Clienți. Primești alertă pe Telegram și pe telefon cu 30, 7 și 1 zile înainte să expire un act.</div>
       </div>
+      </div>
+    </div>
+
+    <!-- ── SEAP: achiziții directe + proceduri simplificate ── -->
+    <div class="panel" id="panel-seap">
+      <div class="section">
+        <div class="section-hdr">
+          <div class="section-title sec-t"><span class="intg-ic" style="background:#6366F1"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M4 10h16"/><path d="M12 3l9 5H3z"/><path d="M6 10v8M10 10v8M14 10v8M18 10v8"/></svg></span>Licitații SEAP</div>
+          <div class="section-action ro-admin" id="sp-refresh" style="margin-left:auto"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12a9 9 0 11-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>Actualizează</div>
+        </div>
+        <div class="cl-tools">
+          <input type="search" class="cl-search" id="sp-search" placeholder="Caută: autoritate, oraș, obiect…" autocomplete="off">
+        </div>
+        <div class="sp-chips" id="sp-type">
+          <button class="sp-chip on" data-v="">Toate</button><button class="sp-chip" data-v="da">Achiziții directe</button><button class="sp-chip" data-v="sp">Proceduri simplificate</button>
+        </div>
+        <div class="sp-chips" id="sp-st">
+          <button class="sp-chip on" data-v="active">De văzut</button><button class="sp-chip" data-v="interest">⭐ Mă interesează</button><button class="sp-chip" data-v="applied">✔ Ofertat</button><button class="sp-chip" data-v="ignored">Ignorate</button><button class="sp-chip" data-v="over">Experiență peste 100.000</button>
+        </div>
+        <div class="cm-hint" id="sp-info" style="margin:4px 2px 10px"></div>
+        <div class="cl-list" id="sp-list"><div class="cl-empty">Se încarcă…</div></div>
+        <div class="cm-hint" style="margin-top:12px">Anunțurile sunt luate de pe e-licitatie.ro de 4 ori pe zi (06:00, 09:40, 14:00, 18:00), filtrate pe codurile CPV ale firmei și pe zona București, Ilfov și județele la ~100 km (Giurgiu, Prahova, Dâmbovița, Teleorman, Ialomița, Călărași). Experiența similară e citită automat din fișa de date / caietul de sarcini — verifică-o mereu și tu în documentație. La 10:00 primești alertă pe Telegram și pe telefon cu anunțurile noi.</div>
       </div>
     </div>
 
@@ -6154,8 +6199,8 @@ qs('#gr-del').addEventListener('click', async () => { if (!(await confirmDialog(
   try { await clApi('/reviews/config', { method: 'DELETE' }); toast('Deconectat', 'ok'); grLoad(); } catch (e) { toast(e.message, 'err'); } });
 document.querySelectorAll('.nav-tab[data-tab="settings"]').forEach(t => t.addEventListener('click', grLoad));
 /* ═══ Roluri: admin (tot) · angajat (secțiunile bifate de admin) · client (doar „Camerele mele”) ═══ */
-const TAB_PERM = { dashboard: 'nvr', nvrs: 'nvr', snapshots: 'nvr', alerts: 'nvr', clients: 'clients', quotes: 'quotes', stats: 'stats', works: 'works', catalog: 'catalog', docs: 'docs' };
-const PERM_LBL = { nvr: 'NVR-uri, camere și alerte', clients: 'Clienți, încasări și GDPR', quotes: 'Cereri de ofertă', works: 'Lucrări și stoc', catalog: 'Echipamente (site)', docs: 'Acte firmă', stats: 'Statistici site' };
+const TAB_PERM = { dashboard: 'nvr', nvrs: 'nvr', snapshots: 'nvr', alerts: 'nvr', clients: 'clients', quotes: 'quotes', stats: 'stats', works: 'works', catalog: 'catalog', docs: 'docs', seap: 'seap' };
+const PERM_LBL = { nvr: 'NVR-uri, camere și alerte', clients: 'Clienți, încasări și GDPR', quotes: 'Cereri de ofertă', works: 'Lucrări și stoc', catalog: 'Echipamente (site)', docs: 'Acte firmă', stats: 'Statistici site', seap: 'Licitații SEAP' };
 function myRole() { const a = getAuth(); return (a && a.role) || 'admin'; }
 function roleLevel(p) { const a = getAuth() || {}; const r = a.role || 'admin'; if (r === 'admin') return 'edit'; if (r !== 'staff') return '';
   const pm = a.perms || {}; return Array.isArray(pm) ? (pm.includes(p) ? 'edit' : '') : (pm[p] || ''); }
@@ -6347,7 +6392,7 @@ qs('#open-log-btn').addEventListener('click', () => {
 
 /* ═══ Deschidere din notificare: /?q=<id ofertă> · /?tab=alerts|works|clients&v=docs ═══ */
 /* Taburi ascunse pe telefon (preferință pe acest dispozitiv) */
-const MOB_TABS = [['nvrs','NVR-uri'],['snapshots','Camere'],['clients','Clienți'],['quotes','Oferte'],['works','Lucrări'],['docs','Acte firmă'],['catalog','Echipamente'],['alerts','Alerte']];
+const MOB_TABS = [['nvrs','NVR-uri'],['snapshots','Camere'],['clients','Clienți'],['quotes','Oferte'],['works','Lucrări'],['docs','Acte firmă'],['catalog','Echipamente'],['seap','SEAP'],['alerts','Alerte']];
 function mobHidden(){ try { const a = JSON.parse(localStorage.getItem('yca_mob_hide') || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } }
 function applyMobTabs(){
   const h = mobHidden();
@@ -6423,6 +6468,111 @@ function setLang(l) { try { localStorage.setItem('yca_lang', l === 'en' ? 'en' :
     }
   }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['placeholder', 'title', 'aria-label'] });
 })();
+/* ───────────── SEAP ───────────── */
+let seap = null, spType = '', spSt = 'active', spPoll = null;
+const SP_SEEN_KEY = 'yca_seap_seen';
+function spSeen() { try { return +localStorage.getItem(SP_SEEN_KEY) || 0; } catch { return 0; } }
+function spMarkSeen() { try { localStorage.setItem(SP_SEEN_KEY, String(Date.now())); } catch {} }
+const spLei = v => v ? Math.round(v).toLocaleString('ro-RO') + ' lei' : '—';
+function spDead(d) {
+  if (!d) return { txt: '—', late: false };
+  const t = Date.parse(d), ms = t - Date.now(), days = Math.floor(ms / 864e5), dt = new Date(t);
+  const when = dt.toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' }) + ' ' + dt.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+  if (ms < 0) return { txt: when + ' · expirat', late: true };
+  return { txt: when + ' · ' + (days >= 1 ? 'mai sunt ' + days + (days === 1 ? ' zi' : ' zile') : 'mai sunt ' + Math.max(1, Math.round(ms / 36e5)) + ' ore'), late: days < 2 };
+}
+function spExpTag(e) {
+  e = e || {};
+  if (e.status === 'none') return '<span class="sp-tag ok">Fără experiență similară</span>';
+  if (e.status === 'ok') return `<span class="sp-tag ok">Experiență ${escapeHtml(spLei(e.amount))}</span>`;
+  if (e.status === 'over') return `<span class="sp-tag over">Experiență ${escapeHtml(spLei(e.amount))}</span>`;
+  return '<span class="sp-tag unk">Experiență: de verificat</span>';
+}
+async function loadSeap(force) {
+  if (seap && !force) return renderSeap();
+  const list = qs('#sp-list');
+  if (!seap) list.innerHTML = '<div class="cl-empty">Se încarcă…</div>';
+  try { seap = await clApi('/seap'); renderSeap(); }
+  catch (e) { list.innerHTML = `<div class="cl-empty">${escapeHtml(/HTTP 40[45]|Operație|actualizează serverul/.test(e.message) ? 'Serverul nu are încă secțiunea SEAP — actualizează serverul' : e.message)}</div>`; }
+  clearTimeout(spPoll); if (seap && seap.running) spPoll = setTimeout(() => loadSeap(true), 8000);
+}
+function spFiltered() {
+  const q = qs('#sp-search').value.trim().toLowerCase(), now = Date.now();
+  return (seap.items || []).filter(it => {
+    if (spType && it.type !== spType) return false;
+    const over = it.exp && it.exp.status === 'over', past = it.deadline && Date.parse(it.deadline) < now;
+    if (spSt === 'active') { if (over || past || it.status === 'ignored' || it.status === 'applied') return false; }
+    else if (spSt === 'over') { if (!over) return false; }
+    else if (it.status !== spSt) return false;
+    return !q || [it.title, it.ca, it.city, it.county, it.no, it.cpv].join(' ').toLowerCase().includes(q);
+  }).sort((a, b) => (spSt === 'active' ? Date.parse(a.deadline || 0) - Date.parse(b.deadline || 0) : b.firstSeen - a.firstSeen));
+}
+function renderSeap() {
+  if (!seap) return;
+  const seen = spSeen();
+  const act = (seap.items || []).filter(it => (!it.exp || it.exp.status !== 'over') && it.status === 'new' && (!it.deadline || Date.parse(it.deadline) > Date.now()));
+  const nNew = act.filter(it => it.firstSeen > seen).length;
+  const b = qs('#sp-badge'); if (b) { b.textContent = nNew; b.style.display = nNew ? '' : 'none'; }
+  const lr = seap.lastRun ? new Date(seap.lastRun).toLocaleString('ro-RO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'încă nu';
+  qs('#sp-info').innerHTML = (seap.running ? '⏳ Se caută anunțuri noi pe SEAP… (durează câteva minute)' : `Ultima verificare: <b>${escapeHtml(lr)}</b>`) + (seap.lastErr ? ` · <span style="color:var(--warn)">${escapeHtml(seap.lastErr)}</span>` : '') + ` · ${(seap.cpv || []).length} coduri CPV`;
+  const list = spFiltered();
+  if (!(seap.items || []).length) { qs('#sp-list').innerHTML = `<div class="cl-empty">${seap.lastRun ? 'Niciun anunț activ în zona ta pe codurile CPV ale firmei.' : 'Prima căutare pe SEAP nu a rulat încă.' + (myRole() === 'admin' ? '<br>Apasă „Actualizează” ca să caut acum.' : '')}</div>`; return; }
+  if (!list.length) { qs('#sp-list').innerHTML = '<div class="cl-empty">Niciun anunț în această listă.</div>'; return; }
+  const ed = myRole() !== 'staff' || roleLevel('seap') === 'edit';
+  qs('#sp-list').innerHTML = list.map(it => {
+    const d = spDead(it.deadline), isNew = it.firstSeen > seen && it.status === 'new';
+    const nd = (it.docs || []).length;
+    const sb = (v, l) => ed ? `<button class="sp-btn${it.status === v ? ' on' : ''}" data-sps="${v}">${l}</button>` : '';
+    return `<div class="sp-card${isNew ? ' is-new' : ''}" data-k="${escapeHtml(it.key)}">
+      <div class="sp-top">${isNew ? '<span class="sp-tag new">NOU</span>' : ''}<span class="sp-tag ${it.type}">${it.type === 'da' ? 'Achiziție directă' : 'Procedură simplificată'}</span>${spExpTag(it.exp)}${it.kind ? `<span class="sp-tag">${escapeHtml(it.kind)}</span>` : ''}</div>
+      <div class="sp-title">${escapeHtml(it.title || '—')}</div>
+      <div class="sp-ca">${escapeHtml(it.ca || '')}${it.city || it.county ? ' · ' + escapeHtml([it.city, it.county].filter(Boolean).join(', ')) : ''}</div>
+      <div class="sp-row"><span>Valoare: <b>${escapeHtml(spLei(it.value))}</b></span><span>Termen: <b${d.late ? ' style="color:var(--err)"' : ''}>${escapeHtml(d.txt)}</b></span><span>${escapeHtml(it.no || '')}</span></div>
+      ${it.cpv ? `<div class="sp-ca" style="font-size:11px;color:var(--fg-3)">CPV ${escapeHtml(String(it.cpv).slice(0, 110))}</div>` : ''}
+      ${it.exp && it.exp.snippet ? `<div class="sp-exp">„…${escapeHtml(it.exp.snippet.trim())}…”</div>` : ''}
+      <div class="sp-acts">
+        <a class="sp-btn" href="${escapeHtml(it.url)}" target="_blank" rel="noopener">Vezi în SEAP ↗</a>
+        <button class="sp-btn pri" data-spzip ${nd ? '' : 'disabled'}><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>${nd ? 'Documentație (' + nd + ')' : 'Fără documente'}</button>
+        ${sb('interest', '⭐ Mă interesează')}${sb('applied', '✔ Ofertat')}${sb('ignored', 'Ignor')}
+      </div></div>`;
+  }).join('');
+}
+async function spSetStatus(key, status) {
+  const it = (seap.items || []).find(x => x.key === key); if (!it) return;
+  const nv = it.status === status ? 'new' : status;
+  try { const r = await clApi('/seap/' + encodeURIComponent(key), jsonOpt('PUT', { status: nv })); Object.assign(it, r.item || { status: nv }); renderSeap(); }
+  catch (e) { toast(e.message, 'err'); }
+}
+async function spZip(key, btn) {
+  const a = getAuth(); if (!a) return;
+  const url = `${getProxyBase()}/seap/${encodeURIComponent(key)}/zip?token=${encodeURIComponent(a.token)}`;
+  btn.disabled = true; const old = btn.innerHTML; btn.textContent = 'Se descarcă de pe SEAP…';
+  try {
+    const r = await fetch(url); if (!r.ok) { let j = null; try { j = await r.json(); } catch {} throw new Error((j && j.error) || 'Eroare ' + r.status); }
+    const blob = await r.blob();
+    const cd = r.headers.get('Content-Disposition') || ''; let name = 'SEAP.zip';
+    const m = /filename\*=UTF-8''([^;]+)/i.exec(cd) || /filename="([^"]+)"/i.exec(cd); if (m) { try { name = decodeURIComponent(m[1]); } catch { name = m[1]; } }
+    const href = URL.createObjectURL(blob), l = document.createElement('a'); l.href = href; l.download = name; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(href), 60000);
+  } catch (e) { toast(e.message, 'err'); }
+  btn.disabled = false; btn.innerHTML = old;
+}
+qs('#sp-list').addEventListener('click', e => {
+  const card = e.target.closest('.sp-card'); if (!card) return;
+  const s = e.target.closest('[data-sps]'); if (s) return spSetStatus(card.dataset.k, s.dataset.sps);
+  const z = e.target.closest('[data-spzip]'); if (z) return spZip(card.dataset.k, z);
+});
+['sp-type', 'sp-st'].forEach(id => qs('#' + id).addEventListener('click', e => {
+  const b = e.target.closest('.sp-chip'); if (!b) return;
+  qs('#' + id).querySelectorAll('.sp-chip').forEach(x => x.classList.toggle('on', x === b));
+  if (id === 'sp-type') spType = b.dataset.v; else spSt = b.dataset.v; renderSeap();
+}));
+qs('#sp-search').addEventListener('input', () => renderSeap());
+qs('#sp-refresh').addEventListener('click', async () => {
+  try { await clApi('/seap/refresh', { method: 'POST' }); toast('Caut anunțuri noi pe SEAP… durează câteva minute', 'ok'); if (seap) seap.running = true; renderSeap(); clearTimeout(spPoll); spPoll = setTimeout(() => loadSeap(true), 6000); }
+  catch (e) { toast(e.message, 'err'); }
+});
+document.querySelectorAll('.nav-tab[data-tab="seap"]').forEach(t => t.addEventListener('click', () => { loadSeap(true).then(() => setTimeout(spMarkSeen, 1500)); }));
+
 function goTab(tab) { const t = document.querySelector('.nav-tab[data-tab="' + tab + '"]'); if (t) t.click(); window.scrollTo(0, 0); }
 async function openFromLink(href) {
   let u; try { u = new URL(href, location.origin); } catch { return; }

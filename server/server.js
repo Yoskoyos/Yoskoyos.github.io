@@ -29,6 +29,7 @@ const url     = require('url');
 const fs      = require('fs');
 const path    = require('path');
 const crypto  = require('crypto');
+const os      = require('os');
 const { spawn, execFileSync } = require('child_process');
 const jwt     = require('jsonwebtoken');
 const bcrypt  = require('bcryptjs');
@@ -92,7 +93,7 @@ function publicUser(u) {
 }
 /* ───────────── Conturi: admin (proprietar) · staff (angajat, drepturi pe secțiuni) · client (doar NVR-urile lui) ─────────────
    Angajații și clienții lucrează în datele proprietarului (u.owner); nu au configurație proprie. */
-const PERMS = ['nvr', 'clients', 'quotes', 'works', 'catalog', 'docs', 'stats'];
+const PERMS = ['nvr', 'clients', 'quotes', 'works', 'catalog', 'docs', 'stats', 'seap'];
 function ownerName(db, u) {
   if (u.role === 'admin') return u.username;
   const o = (u.owner && db.users.find(x => x.username === u.owner && x.role === 'admin')) || db.users.find(x => x.role === 'admin');
@@ -199,7 +200,7 @@ function getAuth(req) {
   if (!tok) {   // <img src> nu poate trimite antete → tokenul poate veni și în ?token= (doar pentru /snap)
     try {
       const q = url.parse(req.url, true);
-      const tokOk = q.pathname === '/snap' || (req.method === 'GET' && (q.pathname === '/clients-backup' || /^\/clients\/[\w-]+\/contracts\/[\w-]+$/.test(q.pathname || '') || /^\/company-docs\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/ops\/(works|stock|gdpr|catalog)\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '')));
+      const tokOk = q.pathname === '/snap' || (req.method === 'GET' && (q.pathname === '/clients-backup' || /^\/clients\/[\w-]+\/contracts\/[\w-]+$/.test(q.pathname || '') || /^\/company-docs\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/ops\/(works|stock|gdpr|catalog)\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/seap\/[\w:-]+\/zip$/.test(q.pathname || '')));
       if (tokOk && q.query.token) tok = String(q.query.token);
     } catch {}
   }
@@ -749,6 +750,7 @@ async function monitorRun() {
 
     try { await cdocReminders(db); } catch (e) { console.error('[acte] remindere:', e.message); }
     try { await opsMorning(db); } catch (e) { console.error('[lucrari] dimineata:', e.message); }
+    try { await seapTick(db); } catch (e) { console.error('[seap]', e.message); }
     try { await grRefresh(db); } catch (e) { console.error('[recenzii]', e.message); }
 
     monLastRun = new Date().toISOString();
@@ -1572,6 +1574,203 @@ function startNvrWeb() {
   srv.on('error', e => { nvrWebOn = false; console.error('[nvrweb]', e.message); });
   srv.listen(NVRWEB_PORT, () => { nvrWebOn = true; console.log('[nvrweb] pornit pe portul ' + NVRWEB_PORT); });
   setInterval(() => { const n = nvrWebCtx(); if (n) try { srv.setSecureContext(n); } catch {} }, 12 * 3600e3).unref();
+}
+/* ═════════════ SEAP / SICAP: achiziții directe (anunțuri publicitare) + proceduri simplificate ═════════════
+   Sursa: serviciul intern (nedocumentat) al e-licitatie.ro, folosit de site-ul public — se poate schimba fără anunț.
+   Filtre: CPV-urile firmei, zona București + Ilfov + ~100 km, termen de depunere în viitor.
+   Experiența similară: căutată în textul anunțului și în documente (fișa de date / caiet) cu pdftotext → none | ok (≤ 100.000 lei) | over | unknown.
+   Rulează din monitor: actualizare la 06:00, 09:40, 14:00, 18:00 · alertă zilnică la 10:00 (Telegram + push). Stare: seap.json */
+const SEAP_FILE = path.join(BASE_DIR, 'seap.json');
+const SEAP_HOST = 'www.e-licitatie.ro';
+const SEAP_CPV = { 12489: '32323500-8', 13840: '35125300-2', 13836: '35125000-6', 13818: '35120000-1', 13819: '35121000-8', 12511: '32333200-8', 17635: '51314000-6',
+  17021: '45312000-7', 17023: '45312200-9', 17507: '50343000-1', 17557: '50610000-4', 19296: '92222000-3', 18834: '79711000-1', 12581: '32420000-3', 11982: '30231000-7' };
+const SEAP_COUNTIES = ['B', 'IF', 'GR', 'PH', 'DB', 'TR', 'IL', 'CL'];
+const SEAP_EXP_MAX = 100000;
+const SEAP_RUN_AT = ['06:00', '09:40', '14:00', '18:00'], SEAP_ALERT_AT = '10:00';
+const COUNTY_CODE = { 'bucuresti': 'B', 'municipiul bucuresti': 'B', 'ilfov': 'IF', 'giurgiu': 'GR', 'prahova': 'PH', 'dambovita': 'DB', 'teleorman': 'TR', 'ialomita': 'IL', 'calarasi': 'CL', 'arges': 'AG', 'buzau': 'BZ' };
+const seapNorm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+function loadSeap() { try { const d = JSON.parse(fs.readFileSync(SEAP_FILE, 'utf8')); d.items = d.items || {}; d.ca = d.ca || {}; return d; } catch { return { items: {}, ca: {} }; } }
+function saveSeap(d) { const tmp = SEAP_FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(d), { mode: 0o600 }); fs.renameSync(tmp, SEAP_FILE); }
+function seapReq(method, p, body, bin) {
+  return new Promise((resolve, reject) => {
+    const data = body ? JSON.stringify(body) : null;
+    const rq = https.request({ host: SEAP_HOST, path: '/' + p.replace(/^\//, ''), method, timeout: 45000,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; YCA-SEAP/1.0)', Accept: bin ? '*/*' : 'application/json', Referer: 'https://www.e-licitatie.ro/pub',
+        ...(data ? { 'Content-Type': 'application/json;charset=UTF-8', 'Content-Length': Buffer.byteLength(data) } : {}) } }, r => {
+      const ch = []; let n = 0; r.on('data', d => { n += d.length; if (n < 40e6) ch.push(d); });
+      r.on('end', () => { const buf = Buffer.concat(ch);
+        if (r.statusCode >= 400) return reject(new Error('SEAP HTTP ' + r.statusCode));
+        if (bin) return resolve({ buf, name: decodeURIComponent(((/filename\*?=(?:UTF-8'')?"?([^";]+)/i.exec(r.headers['content-disposition'] || '') || [])[1]) || '') });
+        try { resolve(JSON.parse(buf.toString('utf8') || 'null')); } catch { reject(new Error('Răspuns invalid de la SEAP')); } });
+    });
+    rq.on('timeout', () => rq.destroy(new Error('SEAP nu răspunde')));
+    rq.on('error', reject); if (data) rq.write(data); rq.end();
+  });
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function seapCaCounty(st, nameAndFN) {
+  const cif = ((/^(?:RO\s*)?(\d{2,10})\s*-/i.exec(String(nameAndFN || '').trim()) || [])[1]) || '';
+  if (!cif) return { cif: '', county: '', city: '' };
+  if (st.ca[cif]) return st.ca[cif];
+  let out = { cif, county: '', city: '' };
+  try {
+    const s = await seapReq('GET', `api-pub/ComboPub/searchContractingAuthorities?pageIndex=0&pageSize=5&filter=${cif}`);
+    const it = (s && s.items || [])[0];
+    if (it) { const v = await seapReq('GET', `api-pub/Entity/getCAEntityView/${it.id}`); out = { cif, county: COUNTY_CODE[seapNorm(v && v.county)] || seapNorm(v && v.county).toUpperCase().slice(0, 3), city: (v && v.city) || '' }; }
+  } catch {}
+  st.ca[cif] = out; return out;
+}
+// text din documente: PDF direct sau scos din semnătura .p7s/.p7m; Word (.docx) din XML
+function seapUnsign(buf) {
+  const tmp = path.join(os.tmpdir(), 'seap-' + crypto.randomBytes(6).toString('hex'));
+  try {
+    fs.writeFileSync(tmp + '.p7', buf);
+    for (const inf of ['DER', 'PEM']) { try { execFileSync('openssl', ['cms', '-verify', '-noverify', '-inform', inf, '-in', tmp + '.p7', '-out', tmp + '.out'], { stdio: 'ignore', timeout: 20000 }); const o = fs.readFileSync(tmp + '.out'); if (o.length) return o; } catch {} }
+    return null;
+  } finally { for (const e of ['.p7', '.out']) try { fs.unlinkSync(tmp + e); } catch {} }
+}
+function seapCleanName(n) { return String(n || 'document').replace(/\.(p7s|p7m)$/i, '').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 150); }
+function seapText(buf, name) {
+  let b = buf, n = String(name || '');
+  if (/\.(p7s|p7m)$/i.test(n) || (b[0] === 0x30 && b[1] === 0x82)) { const u = seapUnsign(b); if (u) { b = u; n = n.replace(/\.(p7s|p7m)$/i, ''); } }
+  if (b.slice(0, 5).toString('latin1') === '%PDF-') {
+    const tmp = path.join(os.tmpdir(), 'seap-' + crypto.randomBytes(6).toString('hex') + '.pdf');
+    try { fs.writeFileSync(tmp, b); return execFileSync('pdftotext', ['-layout', '-l', '40', tmp, '-'], { timeout: 30000, maxBuffer: 20e6 }).toString('utf8'); } catch { return ''; } finally { try { fs.unlinkSync(tmp); } catch {} }
+  }
+  if (b.slice(0, 2).toString('latin1') === 'PK' && /\.docx$/i.test(n)) {
+    try { const tmp = path.join(os.tmpdir(), 'seap-' + crypto.randomBytes(6).toString('hex') + '.docx'); fs.writeFileSync(tmp, b);
+      const x = execFileSync('unzip', ['-p', tmp, 'word/document.xml'], { timeout: 20000, maxBuffer: 30e6 }).toString('utf8'); try { fs.unlinkSync(tmp); } catch {}
+      return x.replace(/<\/w:p>/g, '\n').replace(/<[^>]+>/g, ''); } catch { return ''; }
+  }
+  return '';
+}
+// experiență similară: caută fraza și o sumă în lei în apropiere
+function seapExp(text) {
+  const t = String(text || '').replace(/\s+/g, ' ');
+  if (t.length < 200) return { status: 'unknown' };
+  const re = /experien[tţț][aăe]\s+similar/gi; let m, best = null, any = false;
+  while ((m = re.exec(t))) {
+    any = true;
+    const win = t.slice(Math.max(0, m.index - 250), m.index + 700);
+    if (/nu se (solicit|impun|cer)|nu este (solicitat|necesar)|nu (se )?aplic/i.test(win.slice(150, 520))) { best = best || { status: 'none', snippet: win.slice(200, 520) }; continue; }
+    const amts = [...win.matchAll(/(\d{1,3}(?:[.\s]\d{3})+|\d{4,9})(?:,\d{1,2})?\s*(?:lei|ron)\b/gi)].map(a => +a[1].replace(/[.\s]/g, '')).filter(v => v >= 1000);
+    if (amts.length) { const v = Math.max(...amts); const st = v <= SEAP_EXP_MAX ? 'ok' : 'over';
+      if (!best || best.status !== 'over') best = { status: st, amount: v, snippet: win.slice(200, 560) }; }
+  }
+  if (best) return best;
+  return any ? { status: 'unknown', snippet: '' } : { status: 'none' };
+}
+async function seapDocs(it) {
+  try {
+    if (it.type === 'da') { const v = await seapReq('GET', `api-pub/PUBLICAdvNotice/getForView/${it.id}`);
+      return { v, docs: v && v.documentUrl ? [{ name: v.documentName || 'document', url: v.documentUrl }] : [] }; }
+    const f = await seapReq('GET', `api-pub/NoticeCommon/GetDfNoticeSectionFiles/?initNoticeId=${it.id}&sysNoticeTypeId=17`);
+    const docs = []; for (const k of ['dfNoticeDocs', 'contractingStrategyDocs', 'decisionDocs']) for (const d of (f && f[k]) || []) docs.push({ name: d.noticeDocumentName, url: d.noticeDocumentUrl });
+    return { docs };
+  } catch { return { docs: [] }; }
+}
+let seapBusy = null;
+async function seapRun(db, reason) {
+  if (seapBusy) return seapBusy;
+  seapBusy = (async () => {
+    const st = loadSeap(); const now = Date.now(); const since = new Date(now - 30 * 864e5).toISOString(); const found = new Map();
+    let errs = 0;
+    for (const [cid, code] of Object.entries(SEAP_CPV)) {
+      try {
+        const da = await seapReq('POST', 'api-pub/AdvNoticeCommon/GetAdvNoticeList/', { pageSize: 100, pageIndex: 0, publicationDateStart: since, cpvCodeId: +cid, sysNoticeStateId: 2 });
+        for (const x of (da && da.items) || []) if (!/^anulare/i.test(x.contractObject || '')) found.set('da:' + x.advNoticeId, { key: 'da:' + x.advNoticeId, type: 'da', id: x.advNoticeId, no: x.noticeNo, title: x.contractObject, ca: String(x.contractingAuthority || '').replace(/^(RO\s*)?\d+\s*/, ''), cpv: x.cpvCode, value: x.estimatedValue || x.maxEstimatedValue || null, deadline: x.tenderReceiptDeadline, published: x.publicationDate, kind: x.sysAcquisitionContractType || '' });
+        await sleep(400);
+        const sp = await seapReq('POST', 'api-pub/NoticeCommon/GetCNoticeList/', { sysNoticeTypeIds: [17], sortProperties: [], pageSize: 100, pageIndex: 0, startPublicationDate: since, sysProcedureStateId: 2, cPVId: +cid });
+        for (const x of (sp && sp.items) || []) found.set('sp:' + x.cNoticeId, { key: 'sp:' + x.cNoticeId, type: 'sp', id: x.cNoticeId, no: x.noticeNo, title: x.contractTitle, caFN: x.contractingAuthorityNameAndFN, ca: String(x.contractingAuthorityNameAndFN || '').replace(/^(RO\s*)?\d+\s*-\s*/, ''), cpv: x.cpvCodeAndName, value: x.estimatedValueRon || null, deadline: x.maxTenderReceiptDeadline || x.minTenderReceiptDeadline, published: x.noticeStateDate, kind: (x.sysAcquisitionContractType || {}).text || '' });
+        await sleep(400);
+      } catch (e) { errs++; console.error('[seap]', code, e.message); }
+    }
+    let added = 0;
+    for (const [k, x] of found) {
+      const old = st.items[k];
+      if (old) { Object.assign(old, { title: x.title, value: x.value, deadline: x.deadline }); continue; }
+      if (x.deadline && Date.parse(x.deadline) < now) continue;
+      const it = { ...x, firstSeen: now, status: 'new', url: x.type === 'da' ? `https://www.e-licitatie.ro/pub/notices/adv-notices/view/${x.id}` : `https://www.e-licitatie.ro/pub/notices/simplified-notice/v1/view/${x.id}` };
+      const { v, docs } = await seapDocs(it); it.docs = docs;
+      if (x.type === 'da' && v && v.noticeEntityAddress) { const a = v.noticeEntityAddress; it.county = (a.county && a.county.localeKey) || COUNTY_CODE[seapNorm(a.county && a.county.text)] || ''; it.city = a.city || ''; }
+      else { const c = await seapCaCounty(st, x.caFN); it.county = c.county; it.city = c.city; }
+      it.inArea = SEAP_COUNTIES.includes(it.county);
+      if (it.inArea) {
+        let text = x.type === 'da' && v ? [v.contractDescription, v.participationConditions, v.contractRelatedConditions, v.additionalInformation].join('\n') : '';
+        const pick = docs.filter(d => x.type === 'da' || /fisa|fișa|instructiuni|instrucțiuni|caiet|documentatie|documentație/i.test(d.name)).slice(0, 3);
+        for (const d of pick) { try { const f = await seapReq('GET', d.url, null, true); text += '\n' + seapText(f.buf, d.name); } catch {} await sleep(300); }
+        it.exp = seapExp(text);
+      } else it.exp = { status: 'unknown' };
+      st.items[k] = it; added++;
+      await sleep(300);
+    }
+    for (const [k, it] of Object.entries(st.items)) if (it.deadline && Date.parse(it.deadline) < now - 7 * 864e5) delete st.items[k];   // păstrăm o săptămână după termen
+    st.lastRun = now; st.lastErr = errs ? `${errs} căutări eșuate` : ''; st.lastReason = reason || '';
+    saveSeap(st);
+    return { added, total: Object.keys(st.items).length, errs };
+  })().finally(() => { seapBusy = null; });
+  return seapBusy;
+}
+const seapVisible = it => it.inArea && it.exp && it.exp.status !== 'over' && (!it.deadline || Date.parse(it.deadline) > Date.now()) && it.status !== 'ignored';
+async function seapTick(db) {
+  if (process.env.SEAP === '0') return;
+  const hm = new Date().toLocaleTimeString('ro-RO', { timeZone: 'Europe/Bucharest', hour: '2-digit', minute: '2-digit', hour12: false });
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' });
+  const st0 = loadSeap();
+  const slot = [...SEAP_RUN_AT].reverse().find(s => hm >= s);
+  if (slot && st0.lastSlot !== today + ' ' + slot) { const s2 = loadSeap(); s2.lastSlot = today + ' ' + slot; saveSeap(s2); seapRun(db, 'program ' + slot).catch(e => console.error('[seap]', e.message)); return; }
+  if (hm >= SEAP_ALERT_AT && st0.lastAlertDay !== today && !seapBusy) {
+    const st = loadSeap(); st.lastAlertDay = today;
+    const since = st.lastAlertAt || 0;
+    const fresh = Object.values(st.items).filter(it => it.firstSeen > since && seapVisible(it)).sort((a, b) => Date.parse(a.deadline || 0) - Date.parse(b.deadline || 0));
+    st.lastAlertAt = Date.now(); saveSeap(st);
+    const owner = quoteOwner(db); if (!owner || !fresh.length) return;
+    const fmtV = v => v ? Math.round(v).toLocaleString('ro-RO') + ' lei' : 'valoare nespecificată';
+    const fmtD = d => d ? new Date(d).toLocaleString('ro-RO', { timeZone: 'Europe/Bucharest', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+    const expL = e => e.status === 'none' ? 'fără experiență similară' : e.status === 'ok' ? `experiență ${fmtV(e.amount)}` : 'experiență: de verificat';
+    const lines = fresh.slice(0, 12).map(it => `• <b>${escHtml(it.title.slice(0, 120))}</b>\n  ${escHtml(it.ca.slice(0, 80))} (${escHtml(it.city || it.county)}) · ${it.type === 'da' ? 'achiziție directă' : 'procedură simplificată'}\n  ${fmtV(it.value)} · termen ${fmtD(it.deadline)} · ${expL(it.exp)}`);
+    try { await notifyOwner(db, owner, `🏛 <b>SEAP: ${fresh.length} ${fresh.length === 1 ? 'anunț nou' : 'anunțuri noi'}</b>\n\n${lines.join('\n\n')}${fresh.length > 12 ? `\n\n… și încă ${fresh.length - 12} în aplicație` : ''}`, '/?tab=seap'); } catch {}
+  }
+}
+async function handleSeap(req, res, pathname, parsed) {
+  const ctx = requireUser(req, res, 'seap'); if (!ctx) return;
+  const parts = pathname.split('/').filter(Boolean);   // seap[/refresh | /<key>[/zip]]
+  if (parts.length === 1 && req.method === 'GET') {
+    const st = loadSeap();
+    const items = Object.values(st.items).filter(it => it.inArea && (!it.deadline || Date.parse(it.deadline) > Date.now() - 864e5)).sort((a, b) => b.firstSeen - a.firstSeen || Date.parse(a.deadline || 0) - Date.parse(b.deadline || 0));
+    return sendJson(res, 200, { items, lastRun: st.lastRun || 0, lastErr: st.lastErr || '', running: !!seapBusy, cpv: Object.values(SEAP_CPV), counties: SEAP_COUNTIES, expMax: SEAP_EXP_MAX, alertAt: SEAP_ALERT_AT });
+  }
+  if (parts[1] === 'refresh' && req.method === 'POST') {
+    if (ctx.user.role !== 'admin') return sendJson(res, 403, { error: 'Doar administratorul' });
+    seapRun(ctx.db, 'manual').catch(e => console.error('[seap]', e.message));
+    return sendJson(res, 200, { ok: true, running: true });
+  }
+  const key = decodeURIComponent(parts[1] || '');
+  const st = loadSeap(); const it = st.items[key];
+  if (!it) return sendJson(res, 404, { error: 'Anunț inexistent' });
+  if (parts.length === 2 && req.method === 'PUT') {
+    const b = await readJson(req); if (['new', 'interest', 'ignored', 'applied'].includes(b.status)) it.status = b.status;
+    if (b.note !== undefined) it.note = str(b.note, 1000);
+    saveSeap(st); return sendJson(res, 200, { item: it });
+  }
+  if (parts[2] === 'zip' && req.method === 'GET') {
+    if (!(it.docs || []).length) return sendJson(res, 404, { error: 'Anunțul nu are documente publicate' });
+    const nm = `${it.no || 'SEAP'} ${it.title}`.replace(/[\\/:*?"<>|\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90);
+    const files = [];
+    for (const d of it.docs) {
+      try { const f = await seapReq('GET', d.url, null, true); let buf = f.buf, name = seapCleanName(d.name || f.name);
+        if (/\.(p7s|p7m)$/i.test(d.name || '') || (buf[0] === 0x30 && buf[1] === 0x82)) { const u = seapUnsign(buf); if (u) buf = u; else name = String(d.name || name); }
+        files.push([name, buf]); } catch (e) { files.push([seapCleanName(d.name) + ' - EROARE.txt', Buffer.from('Nu am putut descărca documentul de pe SEAP: ' + e.message + '\n' + d.url)]); }
+      await sleep(200);
+    }
+    const ascii = nm.normalize('NFD').replace(/[^\x20-\x7e]/g, '').replace(/"/g, '') || 'SEAP';
+    res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${ascii}.zip"; filename*=UTF-8''${encodeURIComponent(nm)}.zip`, 'Cache-Control': 'no-store', ...CORS });
+    const z = zipWriter(res); const seen = new Set();
+    for (let [n, b] of files) { let u = n, i = 2; while (seen.has(u)) u = n.replace(/(\.[^.]*)?$/, ` (${i++})$1`); seen.add(u); z.add(nm + '/' + u, b); }
+    z.add(nm + '/Anunț SEAP.txt', Buffer.from(`${it.title}\n${it.ca}\nNr. ${it.no}\nValoare estimată: ${it.value || '—'} lei\nTermen: ${it.deadline || '—'}\nLink: ${it.url}\n`, 'utf8'));
+    return z.end();
+  }
+  return sendJson(res, 405, { error: 'Operație necunoscută' });
 }
 // remindere de expirare — rulează din monitor; o dată pe zi după 09:00
 const cdocDaysLeft = exp => Math.round((Date.parse(exp + 'T00:00:00Z') - Date.parse(new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' }) + 'T00:00:00Z')) / 864e5);
@@ -2652,7 +2851,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.7, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 7.8, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops' || pathname.startsWith('/ops/')) return await handleOps(req, res, pathname);
@@ -2689,6 +2888,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/admin/users' || pathname.startsWith('/admin/users/')) return await handleUsers(req, res, pathname);
     if (pathname === '/client/nvrs' && req.method === 'GET') return handleClientNvrs(req, res);
     if (pathname === '/nvrweb/open' && req.method === 'POST') return await handleNvrWebOpen(req, res);
+    if (pathname === '/seap' || pathname.startsWith('/seap/')) return await handleSeap(req, res, pathname, parsed);
 
     // Starea monitorizării pentru utilizatorul logat
     if (pathname === '/monitor' && req.method === 'GET') {
