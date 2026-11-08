@@ -1346,7 +1346,7 @@ async function handlePurchase(req, res, pathname) {
       purchase.lines.push({ sku, name, qty, price, stockId: st.id });
       if (l.toCatalog && !u.catalog.find(c => normSku(c.model) === normSku(sku))) {
         const order = u.catalog.reduce((m, c) => Math.max(m, c.order || 0), 0) + 1;
-        const c = cleanOp('catalog', { name: name.replace(/,.*$/, '').slice(0, 160), brand: str(l.brand, 60), model: sku, cat: l.catalogCat, specs: str(l.specs, 3000), visible: false, order }, null);
+        const c = cleanOp('catalog', { name: name.split(',').slice(0, 2).join(',').trim().slice(0, 160), brand: str(l.brand, 60), model: sku, cat: l.catalogCat, specs: str(l.specs, 3000), visible: false, order }, null);
         u.catalog.push(c); cats++;
         if (l.image && PHOTO_BRANDS.includes(str(l.brand, 60))) {
           const img = await a2tImage(str(l.image, 300));
@@ -3318,7 +3318,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 8.5, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 8.6, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);

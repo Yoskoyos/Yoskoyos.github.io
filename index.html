@@ -594,6 +594,8 @@ body.sa-open{overflow:hidden}
 .sp-btn.ai.run{background:var(--bg-2);color:var(--fg-2);border-color:var(--border)}
 .sp-tag.v-yes{background:var(--ok-dim);color:var(--ok)}.sp-tag.v-maybe{background:var(--warn-dim);color:var(--warn)}.sp-tag.v-no{background:var(--err-dim);color:var(--err)}
 @media(max-width:600px){.sa-view{padding:0}.sa-box{border-radius:0;border:0}.sa-body{padding:12px 14px 40px}}
+.ct-stq{display:inline-flex;align-items:center;gap:4px}.ct-stq button[data-sd]{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--bg-1);font-size:16px;font-weight:700;cursor:pointer;color:var(--fg);line-height:1}
+button.ct-stk{border:0;cursor:pointer;font-family:var(--sans)}.ct-stk.add{background:transparent;border:1px dashed var(--border-2);color:var(--fg-2)}
 .ct-stk{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--bg-3);color:var(--fg-3);white-space:nowrap}.ct-stk.on{background:var(--blue-dim);color:var(--blue)}
 .pur-inv{font-size:13px;color:var(--fg-2);margin-bottom:12px;line-height:1.5}
 .pur-row{border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;display:grid;grid-template-columns:22px 1fr;gap:4px 10px;background:var(--bg-1)}
@@ -5936,7 +5938,7 @@ function openStockModal(s) {
 function closeStockModal() { qs('#stock-modal').classList.add('hidden'); smDraft = null; }
 async function stSave(id, body) {
   const r = id ? await clApi('/ops/stock/' + encodeURIComponent(id), jsonOpt('PUT', body)) : await clApi('/ops/stock', jsonOpt('POST', body));
-  opsApply(r); renderStock(); return r.item;
+  opsApply(r); renderStock(); renderCatalog(); return r.item;
 }
 qs('#st-add-btn').addEventListener('click', () => openStockModal(null));
 qs('#st-search').addEventListener('input', renderStock);
@@ -5974,7 +5976,7 @@ function ctPhoto(it) {
 function renderCatalog() {
   if (!ops) return; const L = ctSorted(), list = qs('#ct-list'); if (!list) return;
   const vis = L.filter(x => x.visible).length;
-  const skuN = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); const stk = {}; for (const st of ops.stock || []) { const k = skuN(st.model); if (k) stk[k] = (stk[k] || 0) + (st.qty || 0); }
+  const skuN = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); const stk = {}, stId = {}; for (const st of ops.stock || []) { const k = skuN(st.model); if (k) { stk[k] = (stk[k] || 0) + (st.qty || 0); if (!stId[k]) stId[k] = st.id; } }
   const stOf = x => { const k = skuN(x.model); return k && k in stk ? stk[k] : null; };
   qs('#ct-stats').innerHTML = [[L.length, 'echipamente'], [vis, 'pe site'], [L.length - vis, 'ascunse'], [L.filter(x => !ctPhoto(x)).length, 'fără poză'], [L.filter(x => stOf(x) > 0).length, 'în stoc']].map(([n, l]) => `<div class="qt-stat"><b>${n}</b> ${l}</div>`).join('');
   if (!L.length) { list.innerHTML = '<div class="cl-empty">Nu ai adăugat încă echipamente.<br>Apasă „Echipament nou”, pune poza și caracteristicile, apoi bifează „Arată pe site”.</div>'; return; }
@@ -5983,7 +5985,7 @@ function renderCatalog() {
       ${ph ? `<img data-authsrc="${escapeHtml(ph)}" alt="" style="width:56px;height:56px;object-fit:contain;border-radius:10px;background:#fff;border:1px solid var(--border);flex-shrink:0">` : '<div style="width:56px;height:56px;border-radius:10px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--fg-3);flex-shrink:0;text-align:center">fără poză</div>'}
       <div class="cl-main"><div class="cl-name"><span>${escapeHtml(x.name)}</span></div><div class="cl-sub">${[CT_CAT[x.cat], [x.brand, x.model].filter(Boolean).join(' ')].filter(Boolean).map(escapeHtml).join(' · ')}</div></div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-        ${(() => { const q = stOf(x); return q === null ? '' : `<span class="ct-stk ${q > 0 ? 'on' : ''}" title="Bucăți în stoc">Stoc: ${q}</span>`; })()}        ${(x.files || []).some(f => f.ext === 'pdf') ? '<span class="qpill" style="white-space:nowrap" title="Are fișă tehnică">PDF</span>' : ''}<span class="qpill ${x.visible ? 'accepted' : ''}" style="white-space:nowrap">${x.visible ? 'Pe site' : 'Ascuns'}</span>
+        ${(() => { const q = stOf(x), sid = stId[skuN(x.model)]; return q === null ? `<button type="button" class="ct-stk add" data-stnew title="Pune echipamentul în stoc">+ Stoc</button>` : `<span class="ct-stq" data-stid="${escapeHtml(sid)}"><button type="button" data-sd="-1" aria-label="Scade stocul">−</button><button type="button" class="ct-stk ${q > 0 ? 'on' : ''}" data-sedit title="Modifică stocul">Stoc: ${q}</button><button type="button" data-sd="1" aria-label="Crește stocul">+</button></span>`; })()}        ${(x.files || []).some(f => f.ext === 'pdf') ? '<span class="qpill" style="white-space:nowrap" title="Are fișă tehnică">PDF</span>' : ''}<span class="qpill ${x.visible ? 'accepted' : ''}" style="white-space:nowrap">${x.visible ? 'Pe site' : 'Ascuns'}</span>
         <button type="button" class="btn" data-mv="-1" aria-label="Mută mai sus" ${i ? '' : 'disabled'} style="min-width:40px;min-height:40px;padding:6px">↑</button>
         <button type="button" class="btn" data-mv="1" aria-label="Mută mai jos" ${i < L.length - 1 ? '' : 'disabled'} style="min-width:40px;min-height:40px;padding:6px">↓</button>
       </div></div>`; }).join('')}</div>`;
@@ -6025,6 +6027,18 @@ async function ctmSave(stay) {
 qs('#ct-add-btn').addEventListener('click', () => openCatalogModal(null));
 qs('#ct-list').addEventListener('click', async e => {
   const c = e.target.closest('[data-ctid]'); if (!c) return; const L = ctSorted(); const i = L.findIndex(x => x.id === c.dataset.ctid); if (i < 0) return;
+  const sq = e.target.closest('[data-sd],[data-sedit],[data-stnew]');
+  if (sq) { e.stopPropagation(); const x = L[i];
+    try {
+      if (sq.hasAttribute('data-stnew')) { const t = (x.name + ' ' + x.cat).toLowerCase();
+        const cat = ['exterior', 'interior', 'lift'].includes(x.cat) ? 'camera' : x.cat === 'nvr' ? 'nvr' : x.cat === 'hdd' ? 'hdd' : /switch/.test(t) ? 'switch' : /sursa|ups/.test(t) ? 'sursa' : 'altele';
+        if (!x.model) { toast('Completează întâi modelul echipamentului (codul produsului)', 'warn'); return openCatalogModal(x); }
+        await stSave(null, { name: x.name, model: x.model, cat, qty: 0, unit: 'buc' }); const ns = ops.stock.find(s2 => s2.model === x.model); if (ns) openStockModal(ns); return; }
+      const st = ops.stock.find(s2 => s2.id === sq.closest('[data-stid]').dataset.stid); if (!st) return;
+      if (sq.hasAttribute('data-sedit')) return openStockModal(st);
+      const q = Math.max(0, st.qty + (+sq.dataset.sd)); if (q !== st.qty) await stSave(st.id, { ...st, qty: q });
+    } catch (err) { toast(err.message, 'err'); }
+    return; }
   const b = e.target.closest('[data-mv]'); if (!b) return openCatalogModal(L[i]);
   e.stopPropagation(); const j = i + (+b.dataset.mv); if (j < 0 || j >= L.length) return;
   [L[i], L[j]] = [L[j], L[i]];
