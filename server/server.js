@@ -1193,6 +1193,185 @@ function worksOnDone(u, w) {
     u.works.push(n); w.nextCreated = true;
   }
 }
+/* ═════════════ Facturi de la furnizor → stoc + echipamente ═════════════
+   POST /ops/purchase/parse (fișierul: PDF A2T, XML e-Factura sau ZIP din SPV) → produsele citite + ce există deja în stoc / echipamente + datele de pe a2t.ro
+   POST /ops/purchase/apply { token, lines:[…] } → adaugă în stoc, creează echipamentele noi (nevizibile pe site), păstrează factura. Istoric: ops.json → purchases */
+const PURCH_TMP = path.join(os.tmpdir(), 'yca-purchase');
+const PHOTO_BRANDS = ['Safer', 'Dahua'];   // pozele de pe A2T se folosesc doar la mărcile acestea (regula stabilită cu proprietarul)
+const BRANDS = ['HiLook', 'Hikvision', 'Dahua', 'Imou', 'Ezviz', 'Safer', 'TP-Link', 'Mercusys', 'Ubiquiti', 'Tenda', 'Uniview', 'Reolink', 'Ajax', 'Satel', 'Paradox', 'DSC', 'Teknim', 'Unipos', 'Fireclass', 'Optex', 'ZKTeco',
+  'Western Digital', 'WD', 'Seagate', 'Toshiba', 'Kingston', 'Eaton', 'APC', 'Mustek', 'Kassinakis', 'Gewiss', 'Schrack', 'Elan', 'Mekas', 'Braun', 'Gembird', 'Logilink', 'Milwaukee', 'Nice', 'Came', 'BFT', 'Motorline'];
+const numRo = s => { s = String(s || '').trim(); if (/,\d{1,2}$/.test(s) && !/\.\d{1,3}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.'); else s = s.replace(/,/g, ''); const n = parseFloat(s); return isFinite(n) ? n : 0; };
+function purchParsePdf(buf) {
+  const tmp = aiTmp('.pdf'); fs.writeFileSync(tmp, buf);
+  let t = ''; try { t = execFileSync('pdftotext', ['-layout', tmp, '-'], { timeout: 30000, maxBuffer: 20e6 }).toString('utf8'); } catch {} finally { try { fs.unlinkSync(tmp); } catch {} }
+  const head = t.slice(0, 3000);
+  const inv = { supplier: /ATU\s*TECH/i.test(head) ? 'ATU TECH SRL' : ((/^\s*([A-Z0-9][A-Z0-9 .&-]{2,40}(?:SRL|S\.R\.L\.|SA|S\.A\.))/m.exec(head) || [])[1] || '').trim(),
+    serie: ((/SERIE:?\s+([A-Z0-9]+)/i.exec(head) || [])[1] || ''), no: ((/NUMAR:?\s+([A-Z0-9-]+)/i.exec(head) || [])[1] || ((/Factura\s+(?:nr\.?|seria)\s*([A-Z0-9 -]+)/i.exec(head) || [])[1] || '').trim()),
+    date: ((/DATA:?\s+(\d{2}[./-]\d{2}[./-]\d{4})/i.exec(head) || [])[1] || ''), total: numRo((/Total\s+DE\s+PLATA\s+([\d.,]+)/i.exec(t) || [])[1]), lines: [] };
+  const lines = t.split('\n'); let cur = null;
+  const tail = /\s([A-Za-z.]{1,8})\s+(\d[\d.,]*)\s+(\d[\d.,]*)\s+(\d[\d.,]*)\s+(\d{1,2})\s*%\s+(\d[\d.,]*)\s*$/;
+  const flush = () => { if (cur && cur.qty) inv.lines.push(cur); cur = null; };
+  for (const l of lines) {
+    if (/Factura valabila|Total\s+VALOARE|Total\s+DE\s+PLATA|Semnatura|Pagina\s+\d/i.test(l)) { flush(); continue; }
+    const st = /^\s{0,6}(\d{1,3})\s{2,}(\S+)\s+(.*)$/.exec(l);
+    let rest = l;
+    if (st && !tail.test(l.slice(0, 12))) { flush(); cur = { sku: st[2], text: '', qty: 0, unit: '', price: 0, vat: 0 }; rest = st[3]; }
+    if (!cur) continue;
+    const m = tail.exec(rest);
+    if (m) { cur.unit = m[1].toLowerCase(); cur.qty = numRo(m[2]); cur.price = numRo(m[3]); cur.vat = +m[5]; rest = rest.slice(0, m.index); }
+    cur.text += ' ' + rest.trim();
+  }
+  flush();
+  for (const x of inv.lines) { x.name = x.text.replace(/\s+/g, ' ').replace(/\s-\s?(\d)/g, '-$1').trim(); if (x.name.startsWith(x.sku)) x.name = x.name.slice(x.sku.length).trim(); delete x.text; }
+  return inv;
+}
+function purchParseUbl(xml) {
+  const tag = (s, n) => { const m = new RegExp('<(?:\\w+:)?' + n + '\\b[^>]*>([\\s\\S]*?)</(?:\\w+:)?' + n + '>').exec(s); return m ? m[1].replace(/<!\[CDATA\[|\]\]>/g, '').trim() : ''; };
+  const ent = s => String(s || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+  const sup = tag(xml, 'AccountingSupplierParty');
+  const inv = { supplier: ent(tag(tag(sup, 'PartyLegalEntity'), 'RegistrationName') || tag(tag(sup, 'PartyName'), 'Name')), no: ent(tag(xml.replace(/<(?:\w+:)?InvoiceLine[\s\S]*$/, ''), 'ID')), serie: '',
+    date: (tag(xml, 'IssueDate') || '').split('-').reverse().join('.'), total: numRo(tag(tag(xml, 'LegalMonetaryTotal'), 'PayableAmount')), lines: [] };
+  for (const m of xml.matchAll(/<(?:\w+:)?(?:Invoice|CreditNote)Line\b[\s\S]*?<\/(?:\w+:)?(?:Invoice|CreditNote)Line>/g)) {
+    const L = m[0], item = tag(L, 'Item');
+    const qty = numRo(tag(L, 'InvoicedQuantity') || tag(L, 'CreditedQuantity')), unitCode = (/unitCode="([^"]+)"/.exec(L) || [])[1] || '';
+    const price = numRo(tag(tag(L, 'Price'), 'PriceAmount')), base = numRo(tag(tag(L, 'Price'), 'BaseQuantity')) || 1;
+    inv.lines.push({ sku: ent(tag(tag(item, 'SellersItemIdentification'), 'ID')), name: ent(tag(item, 'Name') || tag(item, 'Description')), qty, unit: ({ H87: 'buc', C62: 'buc', MTR: 'm', SET: 'set', KGM: 'kg' })[unitCode] || 'buc',
+      price: Math.round(price / base * 10000) / 10000, vat: numRo(tag(tag(item, 'ClassifiedTaxCategory'), 'Percent')) });
+  }
+  return inv;
+}
+function purchParse(buf, name) {
+  const head = buf.slice(0, 8).toString('latin1');
+  if (head.startsWith('%PDF-')) return purchParsePdf(buf);
+  if (head.startsWith('PK')) {   // arhiva din SPV: <id>.xml (factura) + semnatura_<id>.xml
+    const tmp = aiTmp('.zip'); fs.writeFileSync(tmp, buf);
+    try { const list = execFileSync('unzip', ['-Z1', tmp], { timeout: 15000 }).toString('utf8').split('\n').filter(f => /\.xml$/i.test(f) && !/semnatura/i.test(f));
+      for (const f of list) { const x = execFileSync('unzip', ['-p', tmp, f], { timeout: 15000, maxBuffer: 30e6 }).toString('utf8'); if (/<(\w+:)?(Invoice|CreditNote)\b/.test(x)) return purchParseUbl(x); }
+      const pdf = execFileSync('unzip', ['-Z1', tmp], { timeout: 15000 }).toString('utf8').split('\n').find(f => /\.pdf$/i.test(f));
+      if (pdf) return purchParsePdf(execFileSync('unzip', ['-p', tmp, pdf], { timeout: 15000, maxBuffer: 40e6 }));
+    } catch {} finally { try { fs.unlinkSync(tmp); } catch {} }
+    throw new Error('Arhiva nu conține o factură (XML sau PDF)');
+  }
+  const s = buf.toString('utf8');
+  if (/<(\w+:)?(Invoice|CreditNote)\b/.test(s)) return purchParseUbl(s);
+  if (/<Signature\b/.test(s)) throw new Error('Acesta e fișierul de semnătură ANAF (semnatura_…xml). Încarcă celălalt XML din arhivă — cel cu factura — sau toată arhiva ZIP descărcată din SPV');
+  throw new Error('Nu recunosc fișierul — încarcă factura PDF sau XML-ul e-Factura');
+}
+// detaliile unui produs de pe a2t.ro după cod
+function a2tBySku(skus) {
+  return new Promise(resolve => {
+    const body = JSON.stringify({ query: { bool: { filter: [{ terms: { sku: skus } }] } } });
+    const rq = https.request({ host: 'www.a2t.ro', path: `/api/catalog/vue_storefront_catalog_1/product/_search?size=${Math.min(100, skus.length + 5)}&_source_include=name,sku,image,url_path,short_description,category,final_price,price,tier_prices`, method: 'POST', timeout: 20000,
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), 'User-Agent': 'Mozilla/5.0 (compatible; YCA/1.0)', Accept: 'application/json' } }, r => {
+      const ch = []; r.on('data', d => ch.push(d));
+      r.on('end', () => { const out = {}; try { for (const h of (JSON.parse(Buffer.concat(ch).toString('utf8')).hits || {}).hits || []) { const s = h._source; out[String(s.sku).toUpperCase()] = s; } } catch {} resolve(out); });
+    });
+    rq.on('timeout', () => rq.destroy()); rq.on('error', () => resolve({})); rq.write(body); rq.end();
+  });
+}
+const htmlList = h => [...String(h || '').matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)].map(m => m[1].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim()).filter(Boolean);
+function guessBrand(name) { const n = ' ' + name + ' '; for (const b of BRANDS) if (new RegExp('[\\s(]' + b.replace(/[-.]/g, '\\$&') + '[\\s),]', 'i').test(n)) return b === 'WD' ? 'Western Digital' : b; return ''; }
+function guessCats(name, cats) {
+  const t = (name + ' ' + (cats || []).join(' ')).toLowerCase();
+  const stock = /hdd|hard ?dis|seagate|western digital|\bwd\d/.test(t) ? 'hdd' : /\bnvr\b|\bdvr\b|xvr|recorder|inregistrator/.test(t) ? 'nvr' : /switch/.test(t) ? 'switch'
+    : /camer/.test(t) ? 'camera' : /sursa|alimentator|\bups\b|acumulator|transformator/.test(t) ? 'sursa' : /cablu|mufa|conector|\brj45|tub|copex|doza|patch|fibra/.test(t) ? 'cablu' : 'altele';
+  const cat = stock === 'camera' ? (/lift/.test(t) ? 'lift' : /interior|dome|cube|wi-?fi/.test(t) && !/exterior/.test(t) ? 'interior' : 'exterior')
+    : stock === 'nvr' ? 'nvr' : stock === 'hdd' ? 'hdd' : /rack|cutie|carcas|suport/.test(t) ? 'rack' : ['switch', 'sursa', 'cablu'].includes(stock) || /router|retea|poe/.test(t) ? 'retea' : 'altele';
+  return { stock, cat };
+}
+function a2tImage(imgPath) {
+  return new Promise(resolve => {
+    if (!imgPath) return resolve(null);
+    const rq = https.get({ host: 'www.a2t.ro', path: '/media/catalog/product' + imgPath.split('/').map(encodeURIComponent).join('/'), timeout: 20000, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; YCA/1.0)' } }, r => {
+      if (r.statusCode !== 200) { r.resume(); return resolve(null); }
+      const ch = []; let n = 0; r.on('data', d => { n += d.length; if (n < 8e6) ch.push(d); }); r.on('end', () => resolve(Buffer.concat(ch)));
+    });
+    rq.on('timeout', () => rq.destroy()); rq.on('error', () => resolve(null));
+  });
+}
+const normSku = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+async function handlePurchase(req, res, pathname) {
+  const ctx = requireUser(req, res, 'works'); if (!ctx) return;
+  if (ctx.user.role === 'staff' && !userCan(ctx.user, 'works', true)) return sendJson(res, 403, { error: 'Ai doar drept de vizualizare la stoc' });
+  const all = loadOps(); const u = all[ctx.uname] = all[ctx.uname] || {}; for (const c of OPS_COLLS) if (!Array.isArray(u[c])) u[c] = [];
+  if (!Array.isArray(u.purchases)) u.purchases = [];
+  if (pathname === '/ops/purchase' && req.method === 'GET') return sendJson(res, 200, { purchases: u.purchases.slice(-200).reverse() });
+  if (pathname === '/ops/purchase/parse' && req.method === 'POST') {
+    let buf; try { buf = await readRaw(req, MAX_PDF); } catch { return sendJson(res, 413, { error: 'Fișierul e prea mare (maxim 20 MB)' }); }
+    const name = str(url.parse(req.url, true).query.name, 150);
+    let inv; try { inv = purchParse(buf, name); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    if (!inv.lines.length) return sendJson(res, 400, { error: 'Nu am găsit produse în factură. Trimite-mi factura ca să adaptez citirea.' });
+    const a2t = await a2tBySku(inv.lines.map(l => l.sku).filter(Boolean));
+    const lines = inv.lines.map(l => {
+      const ns = normSku(l.sku);
+      const st = ns ? u.stock.find(s => normSku(s.model) === ns) : null;
+      const ct = ns ? u.catalog.find(c => normSku(c.model) === ns) : null;
+      const p = a2t[String(l.sku).toUpperCase()] || null;
+      const nm = p ? p.name : l.name;
+      const g = guessCats(nm, p ? (p.category || []).map(c => c.name) : []);
+      const brand = guessBrand(nm);
+      return { ...l, name: nm, stockId: st ? st.id : '', stockName: st ? st.name : '', stockQty: st ? st.qty : 0, catalogId: ct ? ct.id : '',
+        stockCat: st ? st.cat : g.stock, catalogCat: g.cat, brand, specs: p ? htmlList(p.short_description).join('\n') : '', a2tUrl: p ? 'https://www.a2t.ro/' + p.url_path : '',
+        image: p && p.image ? p.image : '', photoOk: !!(p && p.image && PHOTO_BRANDS.includes(brand)), add: true, toCatalog: !ct && !!p && !['cablu'].includes(g.stock) };
+    });
+    const dup = u.purchases.find(x => x.supplier === inv.supplier && x.no && x.no === inv.no && (x.serie || '') === (inv.serie || ''));
+    fs.mkdirSync(PURCH_TMP, { recursive: true, mode: 0o700 });
+    const token = crypto.randomBytes(12).toString('hex');
+    fs.writeFileSync(path.join(PURCH_TMP, token), buf, { mode: 0o600 });
+    fs.writeFileSync(path.join(PURCH_TMP, token + '.json'), JSON.stringify({ name: name || 'factura', at: Date.now() }), { mode: 0o600 });
+    return sendJson(res, 200, { token, invoice: { supplier: inv.supplier, serie: inv.serie, no: inv.no, date: inv.date, total: inv.total }, lines, duplicate: dup ? { at: dup.at } : null });
+  }
+  if (pathname === '/ops/purchase/apply' && req.method === 'POST') {
+    const b = await readJson(req);
+    const token = /^[a-f0-9]{24}$/.test(String(b.token || '')) ? b.token : '';
+    let fileBuf = null, meta = {}; try { fileBuf = fs.readFileSync(path.join(PURCH_TMP, token)); meta = JSON.parse(fs.readFileSync(path.join(PURCH_TMP, token + '.json'), 'utf8')); } catch {}
+    if (!fileBuf) return sendJson(res, 400, { error: 'Încarcă din nou factura (a expirat)' });
+    const inv = b.invoice || {};
+    const supplier = str(inv.supplier, 200) || 'Furnizor', invNo = [str(inv.serie, 20), str(inv.no, 40)].filter(Boolean).join(' '), invDate = str(inv.date, 20);
+    const purchase = { id: newId(), supplier, serie: str(inv.serie, 20), no: str(inv.no, 40), date: invDate, total: num(inv.total), at: Date.now(), lines: [], file: null };
+    const dirP = path.join(OPS_DIR, ctx.uname.replace(/[^\w.-]/g, '_'), 'purchases', purchase.id);
+    fs.mkdirSync(dirP, { recursive: true, mode: 0o700 });
+    const ext = fileKind(fileBuf, meta.name) || (/^\s*</.test(fileBuf.slice(0, 50).toString()) ? 'xml' : 'bin');
+    fs.writeFileSync(path.join(dirP, 'factura.' + ext), fileBuf, { mode: 0o600 });
+    purchase.file = { name: meta.name || ('factura.' + ext), ext };
+    let added = 0, created = 0, cats = 0, photos = 0;
+    for (const l of (Array.isArray(b.lines) ? b.lines : []).slice(0, 200)) {
+      if (!l || !l.add) continue;
+      const qty = Math.max(0, Math.round(num(l.qty))); if (!qty) continue;
+      const price = Math.max(0, num(l.price)), sku = str(l.sku, 120), name = str(l.name, 200).trim() || sku;
+      let st = l.stockId ? u.stock.find(s => s.id === l.stockId) : (sku ? u.stock.find(s => normSku(s.model) === normSku(sku)) : null);
+      const note = `${invDate || new Date().toLocaleDateString('ro-RO')}: +${qty} ${str(l.unit, 20) || 'buc'} — factura ${invNo} (${supplier}), ${price.toFixed(2)} lei/buc fără TVA`;
+      if (st) { st.qty += qty; st.price = price || st.price; st.supplier = st.supplier || supplier; st.notes = (note + (st.notes ? '\n' + st.notes : '')).slice(0, 4000); st.updatedAt = Date.now(); added++; }
+      else { st = cleanOp('stock', { name, cat: l.stockCat, qty, minQty: 0, unit: str(l.unit, 20) || 'buc', model: sku, supplier, price, notes: note }, null); u.stock.push(st); created++; }
+      purchase.lines.push({ sku, name, qty, price, stockId: st.id });
+      if (l.toCatalog && !u.catalog.find(c => normSku(c.model) === normSku(sku))) {
+        const order = u.catalog.reduce((m, c) => Math.max(m, c.order || 0), 0) + 1;
+        const c = cleanOp('catalog', { name: name.replace(/,.*$/, '').slice(0, 160), brand: str(l.brand, 60), model: sku, cat: l.catalogCat, specs: str(l.specs, 3000), visible: false, order }, null);
+        u.catalog.push(c); cats++;
+        if (l.image && PHOTO_BRANDS.includes(str(l.brand, 60))) {
+          const img = await a2tImage(str(l.image, 300));
+          const ik = img ? fileKind(img, 'poza.jpg') : '';
+          if (img && ['jpg', 'png', 'webp'].includes(ik)) {
+            const cdir = path.join(OPS_DIR, ctx.uname.replace(/[^\w.-]/g, '_'), 'catalog', c.id); fs.mkdirSync(cdir, { recursive: true, mode: 0o700 });
+            const f = { id: newId(), ext: ik, name: (sku || 'poza') + '.' + ik, size: img.length, uploadedAt: Date.now() };
+            fs.writeFileSync(path.join(cdir, f.id + '.' + ik), img, { mode: 0o600 }); c.files = [f]; photos++;
+          }
+        }
+      }
+    }
+    u.purchases.push(purchase); saveOps(all);
+    try { fs.unlinkSync(path.join(PURCH_TMP, token)); fs.unlinkSync(path.join(PURCH_TMP, token + '.json')); } catch {}
+    return sendJson(res, 200, { ok: true, added, created, catalog: cats, photos, stock: u.stock, catalogList: u.catalog, purchase });
+  }
+  const m = /^\/ops\/purchase\/([\w-]+)\/file$/.exec(pathname);
+  if (m && req.method === 'GET') {
+    const p = u.purchases.find(x => x.id === m[1]); if (!p || !p.file) return sendJson(res, 404, { error: 'Factura nu există' });
+    let data; try { data = fs.readFileSync(path.join(OPS_DIR, ctx.uname.replace(/[^\w.-]/g, '_'), 'purchases', p.id, 'factura.' + p.file.ext)); } catch { return sendJson(res, 404, { error: 'Fișierul lipsește' }); }
+    res.writeHead(200, { 'Content-Type': CT[p.file.ext] || 'application/octet-stream', 'Content-Disposition': `inline; filename="factura-${p.no || p.id}.${p.file.ext}"`, 'Cache-Control': 'private, no-store', ...CORS });
+    return res.end(data);
+  }
+  return sendJson(res, 405, { error: 'Operație necunoscută' });
+}
 async function handleOps(req, res, pathname) {
   const coll0 = (/^\/ops\/(works|stock|gdpr|catalog)/.exec(pathname) || [])[1];
   const ctx = requireUser(req, res, coll0 ? ({ works: 'works', stock: 'works', gdpr: 'clients', catalog: 'catalog' })[coll0] : null); if (!ctx) return;
@@ -3139,9 +3318,10 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 8.4, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 8.5, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
+    if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
     if (pathname === '/ops' || pathname.startsWith('/ops/')) return await handleOps(req, res, pathname);
     if (pathname === '/analytics' || pathname === '/analytics/config') return await handleAnalytics(req, res, pathname, parsed);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
