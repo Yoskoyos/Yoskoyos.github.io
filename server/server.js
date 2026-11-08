@@ -1622,7 +1622,11 @@ function startNvrWeb() {
 const SEAP_FILE = path.join(BASE_DIR, 'seap.json');
 const SEAP_HOST = 'www.e-licitatie.ro';
 const SEAP_CPV = { 12489: '32323500-8', 13840: '35125300-2', 13836: '35125000-6', 13818: '35120000-1', 13819: '35121000-8', 12511: '32333200-8', 17635: '51314000-6',
-  17021: '45312000-7', 17023: '45312200-9', 17507: '50343000-1', 17557: '50610000-4', 19296: '92222000-3', 18834: '79711000-1', 12581: '32420000-3', 11982: '30231000-7' };
+  17021: '45312000-7', 17023: '45312200-9', 17507: '50343000-1', 17557: '50610000-4', 19296: '92222000-3', 18834: '79711000-1', 12581: '32420000-3', 11982: '30231000-7',
+  // calculatoare / laptopuri / echipament informatic
+  11953: '30200000-1', 11954: '30210000-4', 11963: '30213000-5', 11964: '30213100-6', 11965: '30213200-7', 11966: '30213300-8', 11969: '30214000-2', 11981: '30230000-0', 11997: '30233000-1', 12026: '30236000-2', 12039: '30237000-9',
+  // rețele și telecomunicații (echipament, cabluri, instalare, întreținere)
+  12567: '32400000-7', 12568: '32410000-0', 12570: '32412000-4', 12575: '32413100-2', 12582: '32421000-0', 12583: '32422000-7', 12585: '32424000-1', 12588: '32427000-2', 12589: '32428000-9', 12602: '32500000-8', 12604: '32520000-4', 12605: '32521000-1', 12606: '32522000-8', 12608: '32524000-2', 12623: '32550000-3', 12654: '32562000-0', 12658: '32570000-9', 12659: '32571000-6', 17033: '45314000-1', 17037: '45314300-4', 17038: '45314310-7', 17039: '45314320-0', 17455: '50312000-5', 17487: '50330000-7', 17630: '51300000-5', 17690: '51611100-9', 18503: '72700000-7', 18504: '72710000-0' };
 const SEAP_COUNTIES = ['B', 'IF', 'GR', 'PH', 'DB', 'TR', 'IL', 'CL'];
 const SEAP_EXP_MAX = 100000;
 const SEAP_RUN_AT = ['09:15'], SEAP_ALERT_AT = '10:00';
@@ -2899,7 +2903,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 8.1, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 8.2, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops' || pathname.startsWith('/ops/')) return await handleOps(req, res, pathname);
