@@ -594,6 +594,7 @@ body.sa-open{overflow:hidden}
 .sp-btn.ai.run{background:var(--bg-2);color:var(--fg-2);border-color:var(--border)}
 .sp-tag.v-yes{background:var(--ok-dim);color:var(--ok)}.sp-tag.v-maybe{background:var(--warn-dim);color:var(--warn)}.sp-tag.v-no{background:var(--err-dim);color:var(--err)}
 @media(max-width:600px){.sa-view{padding:0}.sa-box{border-radius:0;border:0}.sa-body{padding:12px 14px 40px}}
+@media(max-width:700px){#ct-list .cl-card{flex-wrap:wrap}#ct-list .cl-main{flex:1 1 calc(100% - 80px);min-width:0}#ct-list .ct-right{width:100%;justify-content:flex-end;flex-wrap:wrap}}
 .ct-stq{display:inline-flex;align-items:center;gap:4px}.ct-stq button[data-sd]{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--bg-1);font-size:16px;font-weight:700;cursor:pointer;color:var(--fg);line-height:1}
 button.ct-stk{border:0;cursor:pointer;font-family:var(--sans)}.ct-stk.add{background:transparent;border:1px dashed var(--border-2);color:var(--fg-2)}
 .ct-stk{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--bg-3);color:var(--fg-3);white-space:nowrap}.ct-stk.on{background:var(--blue-dim);color:var(--blue)}
@@ -5984,7 +5985,7 @@ function renderCatalog() {
     return `<div class="cl-card" role="button" tabindex="0" data-ctid="${escapeHtml(x.id)}" style="align-items:center">
       ${ph ? `<img data-authsrc="${escapeHtml(ph)}" alt="" style="width:56px;height:56px;object-fit:contain;border-radius:10px;background:#fff;border:1px solid var(--border);flex-shrink:0">` : '<div style="width:56px;height:56px;border-radius:10px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--fg-3);flex-shrink:0;text-align:center">fără poză</div>'}
       <div class="cl-main"><div class="cl-name"><span>${escapeHtml(x.name)}</span></div><div class="cl-sub">${[CT_CAT[x.cat], [x.brand, x.model].filter(Boolean).join(' ')].filter(Boolean).map(escapeHtml).join(' · ')}</div></div>
-      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+      <div class="ct-right" style="display:flex;align-items:center;gap:6px;flex-shrink:0">
         ${(() => { const q = stOf(x), sid = stId[skuN(x.model)]; return q === null ? `<button type="button" class="ct-stk add" data-stnew title="Pune echipamentul în stoc">+ Stoc</button>` : `<span class="ct-stq" data-stid="${escapeHtml(sid)}"><button type="button" data-sd="-1" aria-label="Scade stocul">−</button><button type="button" class="ct-stk ${q > 0 ? 'on' : ''}" data-sedit title="Modifică stocul">Stoc: ${q}</button><button type="button" data-sd="1" aria-label="Crește stocul">+</button></span>`; })()}        ${(x.files || []).some(f => f.ext === 'pdf') ? '<span class="qpill" style="white-space:nowrap" title="Are fișă tehnică">PDF</span>' : ''}<span class="qpill ${x.visible ? 'accepted' : ''}" style="white-space:nowrap">${x.visible ? 'Pe site' : 'Ascuns'}</span>
         <button type="button" class="btn" data-mv="-1" aria-label="Mută mai sus" ${i ? '' : 'disabled'} style="min-width:40px;min-height:40px;padding:6px">↑</button>
         <button type="button" class="btn" data-mv="1" aria-label="Mută mai jos" ${i < L.length - 1 ? '' : 'disabled'} style="min-width:40px;min-height:40px;padding:6px">↓</button>
