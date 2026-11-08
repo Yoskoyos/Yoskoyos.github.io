@@ -1629,6 +1629,9 @@ const SEAP_CPV = { 12489: '32323500-8', 13840: '35125300-2', 13836: '35125000-6'
   12567: '32400000-7', 12568: '32410000-0', 12570: '32412000-4', 12575: '32413100-2', 12582: '32421000-0', 12583: '32422000-7', 12585: '32424000-1', 12588: '32427000-2', 12589: '32428000-9', 12602: '32500000-8', 12604: '32520000-4', 12605: '32521000-1', 12606: '32522000-8', 12608: '32524000-2', 12623: '32550000-3', 12654: '32562000-0', 12658: '32570000-9', 12659: '32571000-6', 17033: '45314000-1', 17037: '45314300-4', 17038: '45314310-7', 17039: '45314320-0', 17455: '50312000-5', 17487: '50330000-7', 17630: '51300000-5', 17690: '51611100-9', 18503: '72700000-7', 18504: '72710000-0' };
 const SEAP_COUNTIES = ['B', 'IF', 'GR', 'PH', 'DB', 'TR', 'IL', 'CL'];
 const SEAP_EXP_MAX = 100000;
+// zona contează doar la servicii și lucrări (execuție); la furnizare se iau anunțurile din toată țara
+const seapIsSupply = kind => /furnizare/i.test(String(kind || ''));
+const seapAreaOk = it => seapIsSupply(it.kind) || SEAP_COUNTIES.includes(it.county);
 const SEAP_RUN_AT = ['09:15'], SEAP_ALERT_AT = '10:00';
 const COUNTY_CODE = { 'bucuresti': 'B', 'municipiul bucuresti': 'B', 'ilfov': 'IF', 'giurgiu': 'GR', 'prahova': 'PH', 'dambovita': 'DB', 'teleorman': 'TR', 'ialomita': 'IL', 'calarasi': 'CL', 'arges': 'AG', 'buzau': 'BZ' };
 const seapNorm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -1736,14 +1739,15 @@ async function seapRun(db, reason) {
     }
     let added = 0;
     for (const [k, x] of found) {
-      const old = st.items[k];
+      let old = st.items[k];
+      if (old && !old.inArea && seapIsSupply(x.kind || old.kind)) { delete st.items[k]; old = null; }   // furnizare din afara zonei, găsită înainte de regula nouă → o procesăm din nou
       if (old) { Object.assign(old, { title: x.title, value: x.value, deadline: x.deadline }); continue; }
       if (x.deadline && Date.parse(x.deadline) < now) continue;
       const it = { ...x, firstSeen: now, status: 'new', url: x.type === 'da' ? `https://www.e-licitatie.ro/pub/notices/adv-notices/view/${x.id}` : `https://www.e-licitatie.ro/pub/notices/simplified-notice/v1/view/${x.id}` };
       const { v, docs } = await seapDocs(it); it.docs = docs;
       if (x.type === 'da' && v && v.noticeEntityAddress) { const a = v.noticeEntityAddress; it.county = (a.county && a.county.localeKey) || COUNTY_CODE[seapNorm(a.county && a.county.text)] || ''; it.city = a.city || ''; }
       else { const c = await seapCaCounty(st, x.caFN); it.county = c.county; it.city = c.city; }
-      it.inArea = SEAP_COUNTIES.includes(it.county);
+      it.inArea = seapAreaOk(it);
       if (it.inArea) {
         let text = x.type === 'da' && v ? [v.contractDescription, v.participationConditions, v.contractRelatedConditions, v.additionalInformation].join('\n') : '';
         const pick = docs.filter(d => x.type === 'da' || /fisa|fișa|instructiuni|instrucțiuni|caiet|documentatie|documentație/i.test(d.name)).slice(0, 3);
@@ -2903,7 +2907,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 8.2, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 8.3, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops' || pathname.startsWith('/ops/')) return await handleOps(req, res, pathname);

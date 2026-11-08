@@ -1356,7 +1356,7 @@ html:not(.unlocked) .app{display:none}
         </div>
         <div class="cm-hint" id="sp-info" style="margin:4px 2px 10px"></div>
         <div class="cl-list" id="sp-list"><div class="cl-empty">Se încarcă…</div></div>
-        <div class="cm-hint" style="margin-top:12px">Aplicația caută singură anunțurile pe e-licitatie.ro în fiecare dimineață, filtrate pe codurile CPV ale firmei și pe zona București, Ilfov și județele la ~100 km (Giurgiu, Prahova, Dâmbovița, Teleorman, Ialomița, Călărași). Experiența similară e citită automat din fișa de date / caietul de sarcini — verifică-o mereu și tu în documentație. La 10:00 primești notificare pe telefon (și pe Telegram) cu anunțurile noi, iar tabul SEAP arată câte sunt noi. Butonul „Actualizează” e doar pentru o căutare în plus, când vrei tu.</div>
+        <div class="cm-hint" style="margin-top:12px">Aplicația caută singură anunțurile pe e-licitatie.ro în fiecare dimineață, filtrate pe codurile CPV ale firmei. Furnizarea se caută în toată țara; serviciile și lucrările doar în București, Ilfov și județele la ~100 km (Giurgiu, Prahova, Dâmbovița, Teleorman, Ialomița, Călărași). Experiența similară e citită automat din fișa de date / caietul de sarcini — verifică-o mereu și tu în documentație. La 10:00 primești notificare pe telefon (și pe Telegram) cu anunțurile noi, iar tabul SEAP arată câte sunt noi. Butonul „Actualizează” e doar pentru o căutare în plus, când vrei tu.</div>
       </div>
     </div>
 
@@ -6516,7 +6516,7 @@ function renderSeap() {
   const lr = seap.lastRun ? new Date(seap.lastRun).toLocaleString('ro-RO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'încă nu';
   qs('#sp-info').innerHTML = (seap.running ? '⏳ Se caută anunțuri noi pe SEAP… (durează câteva minute)' : `Ultima verificare: <b>${escapeHtml(lr)}</b>`) + (seap.lastErr ? ` · <span style="color:var(--warn)">${escapeHtml(seap.lastErr)}</span>` : '') + ` · ${(seap.cpv || []).length} coduri CPV`;
   const list = spFiltered();
-  if (!(seap.items || []).length) { qs('#sp-list').innerHTML = `<div class="cl-empty">${seap.lastRun ? 'Niciun anunț activ în zona ta pe codurile CPV ale firmei.' : 'Prima căutare pe SEAP nu a rulat încă.' + (myRole() === 'admin' ? '<br>Apasă „Actualizează” ca să caut acum.' : '')}</div>`; return; }
+  if (!(seap.items || []).length) { qs('#sp-list').innerHTML = `<div class="cl-empty">${seap.lastRun ? 'Niciun anunț activ pe codurile CPV ale firmei.' : 'Prima căutare pe SEAP nu a rulat încă.' + (myRole() === 'admin' ? '<br>Apasă „Actualizează” ca să caut acum.' : '')}</div>`; return; }
   if (!list.length) { qs('#sp-list').innerHTML = '<div class="cl-empty">Niciun anunț în această listă.</div>'; return; }
   const ed = myRole() !== 'staff' || roleLevel('seap') === 'edit';
   qs('#sp-list').innerHTML = list.map(it => {
