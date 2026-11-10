@@ -49,7 +49,7 @@ const body = [
 
   P([t('YCA SOLUTIONS S.R.L.', { bold: true }), t(', cu sediul în București, Str. Aviator Mircea Petre nr. 10, Camera 1, Sector 1, CUI 45211628, J40/19754/2021, reprezentată prin Dima Florin, în calitate de Administrator, denumită în continuare '), t('PRESTATOR', { bold: true }), t(',')], { alignment: AlignmentType.JUSTIFIED, spacing: { after: 120, line: 300 } }),
   P('și', { spacing: { after: 120, line: 300 } }),
-  P([t('ASOCIAȚIA DE PROPRIETARI ……………………', { bold: true }), t(', cu sediul în ……………………………, CIF ……………………, reprezentată prin ……………………………, în calitate de Președinte, împuternicit(ă) prin Hotărârea Adunării Generale a Asociației nr. ………… din ……………………, denumită în continuare '), t('BENEFICIAR', { bold: true }), t(',')], { alignment: AlignmentType.JUSTIFIED, spacing: { after: 240, line: 300 } }),
+  P([t('ASOCIAȚIA DE PROPRIETARI ……………………', { bold: true }), t(', cu sediul în ……………………………, CIF ……………………, reprezentată prin ……………………………, în calitate de Președinte, denumită în continuare '), t('BENEFICIAR', { bold: true }), t(',')], { alignment: AlignmentType.JUSTIFIED, spacing: { after: 240, line: 300 } }),
 
   P([t('confirmăm că la adresa ……………………………………………………………… (bloc / scară) a fost montat un sistem de supraveghere video format din:')], { alignment: AlignmentType.JUSTIFIED, spacing: { after: 200, line: 300 } }),
   table([6325, 3200], ['Echipament', 'Cantitate'], [
