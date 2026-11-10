@@ -1473,6 +1473,8 @@ html:not(.unlocked) .app{display:none}
 
     <!-- ── SEAP: achiziții directe + proceduri simplificate ── -->
     <div class="panel" id="panel-seap">
+      <div class="seg" role="tablist"><button type="button" class="on" data-spv="ann">Anunțuri</button><button type="button" data-spv="bids">Licitațiile noastre <span class="cnt" id="spb-badge" hidden></span></button></div>
+      <div id="sp-view-ann">
       <div class="section">
         <div class="section-hdr">
           <div class="section-title sec-t"><span class="intg-ic" style="background:#6366F1"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M4 10h16"/><path d="M12 3l9 5H3z"/><path d="M6 10v8M10 10v8M14 10v8M18 10v8"/></svg></span>Licitații SEAP</div>
@@ -1490,6 +1492,20 @@ html:not(.unlocked) .app{display:none}
         <div class="cm-hint" id="sp-info" style="margin:4px 2px 10px"></div>
         <div class="cl-list" id="sp-list"><div class="cl-empty">Se încarcă…</div></div>
         <div class="cm-hint" style="margin-top:12px">Aplicația caută singură anunțurile pe e-licitatie.ro în fiecare dimineață, filtrate pe codurile CPV ale firmei. Furnizarea se caută în toată țara; serviciile și lucrările doar în București, Ilfov și județele la ~100 km (Giurgiu, Prahova, Dâmbovița, Teleorman, Ialomița, Călărași). Experiența similară e citită automat din fișa de date / caietul de sarcini — verifică-o mereu și tu în documentație. La 10:00 primești notificare pe telefon (și pe Telegram) cu anunțurile noi, iar tabul SEAP arată câte sunt noi. Butonul „Actualizează” e doar pentru o căutare în plus, când vrei tu.</div>
+      </div>
+      </div>
+      <div id="sp-view-bids" hidden>
+      <div class="section">
+        <div class="section-hdr">
+          <div class="section-title sec-t"><span class="intg-ic" style="background:#16A34A"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span>Licitațiile noastre</div>
+          <div class="section-action" id="spb-add" style="margin-left:auto"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Adaugă licitație</div>
+        </div>
+        <div class="qt-stats" id="spb-stats"></div>
+        <div class="cl-tools"><input type="search" class="cl-search" id="spb-search" placeholder="Caută: autoritate, obiect, număr…" autocomplete="off"></div>
+        <div class="sp-chips" id="spb-res"><button class="sp-chip on" data-v="">Toate</button><button class="sp-chip" data-v="evaluare">În evaluare</button><button class="sp-chip" data-v="castigat">Câștigate</button><button class="sp-chip" data-v="pierdut">Pierdute</button><button class="sp-chip" data-v="anulat">Anulate / retrase</button></div>
+        <div class="cl-list" id="spb-list"><div class="cl-empty">Se încarcă…</div></div>
+        <div class="cm-hint" style="margin-top:12px">Aici apar licitațiile marcate „✔ Ofertat” în Anunțuri și cele adăugate de mână. Rămân salvate și după termen, cu prețul ofertat și rezultatul.</div>
+      </div>
       </div>
     </div>
 
@@ -2304,6 +2320,25 @@ html:not(.unlocked) .app{display:none}
       <button class="btn" id="pur-cancel" type="button">Anulează</button>
       <button class="btn primary" id="pur-save" type="button">Adaugă în stoc</button>
     </div>
+  </div>
+</div>
+<div class="overlay hidden" id="spb-modal" role="dialog" aria-modal="true" aria-labelledby="spb-title">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-hdr"><div class="modal-title" id="spb-title">Licitație</div><div class="modal-x" id="spb-x" role="button" aria-label="Închide">✕</div></div>
+    <div class="modal-body">
+      <div id="spb-man">
+        <div class="fg"><label for="spb-t">Obiectul licitației</label><input class="form-input" id="spb-t"></div>
+        <div class="fg"><label for="spb-ca">Autoritatea contractantă</label><input class="form-input" id="spb-ca"></div>
+        <div class="f2"><div class="fg"><label for="spb-no">Nr. anunț (ADV / SCN)</label><input class="form-input" id="spb-no"></div><div class="fg"><label for="spb-val">Valoare estimată (lei fără TVA)</label><input class="form-input" id="spb-val" inputmode="decimal"></div></div>
+        <div class="f2"><div class="fg"><label for="spb-dl">Termen de depunere</label><input class="form-input" id="spb-dl" type="date"></div><div class="fg"><label for="spb-url">Link SEAP</label><input class="form-input" id="spb-url" placeholder="https://www.e-licitatie.ro/…"></div></div>
+      </div>
+      <div class="cm-sec">Oferta noastră</div>
+      <div class="f2"><div class="fg"><label for="spb-price">Prețul ofertat (lei fără TVA)</label><input class="form-input" id="spb-price" inputmode="decimal"></div><div class="fg"><label for="spb-sub">Data depunerii</label><input class="form-input" id="spb-sub" type="date"></div></div>
+      <div class="fg"><label for="spb-res">Rezultat</label><select class="form-input" id="spb-result"><option value="evaluare">În evaluare</option><option value="castigat">Câștigată</option><option value="pierdut">Pierdută</option><option value="anulat">Anulată de autoritate</option><option value="retras">Retrasă de noi</option></select></div>
+      <div class="f2"><div class="fg"><label for="spb-win">Câștigător (dacă nu noi)</label><input class="form-input" id="spb-win"></div><div class="fg"><label for="spb-wp">Prețul câștigător (lei)</label><input class="form-input" id="spb-wp" inputmode="decimal"></div></div>
+      <div class="fg"><label for="spb-notes">Observații</label><textarea class="form-input" id="spb-notes" rows="3" placeholder="ex. clarificări trimise, furnizor, ce am învățat…"></textarea></div>
+    </div>
+    <div class="modal-foot"><button class="btn cm-del" id="spb-del" type="button">Scoate din listă</button><button class="btn" id="spb-cancel" type="button">Anulează</button><button class="btn primary" id="spb-save" type="button">Salvează</button></div>
   </div>
 </div>
 <div class="overlay hidden" id="client-modal" role="dialog" aria-modal="true" aria-labelledby="cm-title">
@@ -6842,7 +6877,7 @@ async function loadSeap(force) {
   if (seap && !force) return renderSeap();
   const list = qs('#sp-list');
   if (!seap) list.innerHTML = '<div class="cl-empty">Se încarcă…</div>';
-  try { seap = await clApi('/seap'); renderSeap(); spPollAn(); }
+  try { seap = await clApi('/seap'); renderSeap(); renderBids(); spPollAn(); }
   catch (e) { list.innerHTML = `<div class="cl-empty">${escapeHtml(/HTTP 40[45]|Operație|actualizează serverul/.test(e.message) ? 'Serverul nu are încă secțiunea SEAP — actualizează serverul' : e.message)}</div>`; }
   clearTimeout(spPoll); if (seap && seap.running) spPoll = setTimeout(() => loadSeap(true), 8000);
 }
@@ -6902,6 +6937,85 @@ async function spSetStatus(key, status) {
   try { const r = await clApi('/seap/' + encodeURIComponent(key), jsonOpt('PUT', { status: nv })); Object.assign(it, r.item || { status: nv }); renderSeap(); }
   catch (e) { toast(e.message, 'err'); }
 }
+/* ── Licitațiile noastre (ofertate) ── */
+const SPB_RES = { evaluare: ['În evaluare', 'unk'], castigat: ['Câștigată', 'ok'], pierdut: ['Pierdută', 'over'], anulat: ['Anulată', ''], retras: ['Retrasă', ''] };
+let spbFilter = '', spbCur = null;
+function showSpView(v) {
+  document.querySelectorAll('#panel-seap > .seg button').forEach(b => b.classList.toggle('on', b.dataset.spv === v));
+  qs('#sp-view-ann').hidden = v !== 'ann'; qs('#sp-view-bids').hidden = v !== 'bids';
+  try { localStorage.setItem('yca_sp_view', v); } catch {}
+  if (v === 'bids') renderBids();
+}
+document.querySelectorAll('#panel-seap > .seg button').forEach(b => b.addEventListener('click', () => showSpView(b.dataset.spv)));
+function renderBids() {
+  if (!seap) return;
+  const all = (seap.items || []).filter(x => x.status === 'applied');
+  const bb = qs('#spb-badge'); const nEv = all.filter(x => !x.bid || x.bid.result === 'evaluare').length; if (bb) { bb.hidden = !nEv; bb.textContent = nEv; }
+  const won = all.filter(x => x.bid && x.bid.result === 'castigat'), lost = all.filter(x => x.bid && x.bid.result === 'pierdut');
+  const sum = won.reduce((a, x) => a + (x.bid.price || 0), 0);
+  qs('#spb-stats').innerHTML = [[all.length, 'ofertate'], [nEv, 'în evaluare'], [won.length, 'câștigate'], [lost.length, 'pierdute'], [won.length + lost.length ? Math.round(won.length / (won.length + lost.length) * 100) + '%' : '—', 'rată de câștig'], [Math.round(sum).toLocaleString('ro-RO') + ' lei', 'valoare câștigată']]
+    .map(([n, l]) => `<div class="qt-stat"><b>${n}</b> ${l}</div>`).join('');
+  const q = qs('#spb-search').value.trim().toLowerCase();
+  const L = all.filter(x => (!spbFilter || ((x.bid && x.bid.result) || 'evaluare') === spbFilter || (spbFilter === 'anulat' && x.bid && x.bid.result === 'retras')) && (!q || [x.title, x.ca, x.no, x.city].join(' ').toLowerCase().includes(q)))
+    .sort((a, b) => String((b.bid && b.bid.submittedAt) || b.deadline || '').localeCompare(String((a.bid && a.bid.submittedAt) || a.deadline || '')));
+  if (!all.length) { qs('#spb-list').innerHTML = '<div class="cl-empty">Nicio licitație ofertată încă.<br>În Anunțuri apasă „✔ Ofertat” la licitațiile la care ai depus ofertă, sau „Adaugă licitație” pentru una găsită în altă parte.</div>'; return; }
+  if (!L.length) { qs('#spb-list').innerHTML = '<div class="cl-empty">Nicio licitație în această listă.</div>'; return; }
+  const lei = v => v ? Math.round(v).toLocaleString('ro-RO') + ' lei' : '—';
+  qs('#spb-list').innerHTML = L.map(x => { const b = x.bid || {}, r = SPB_RES[b.result || 'evaluare'] || SPB_RES.evaluare;
+    const dl = x.deadline ? new Date(x.deadline).toLocaleDateString('ro-RO') : '';
+    return `<div class="sp-card" data-k="${escapeHtml(x.key)}">
+      <div class="sp-top"><span class="sp-tag ${r[1]}">${r[0]}</span><span class="sp-tag ${x.type === 'da' ? 'da' : x.type === 'sp' ? 'sp' : ''}">${x.type === 'da' ? 'Achiziție directă' : x.type === 'sp' ? 'Procedură simplificată' : 'Adăugată de mână'}</span>${x.analysis && x.analysis.status === 'done' ? '<span class="sp-tag">🔍 cu analiză</span>' : ''}</div>
+      <div class="sp-title">${escapeHtml(x.title || '—')}</div>
+      <div class="sp-ca">${escapeHtml(x.ca || '')}${x.city ? ' · ' + escapeHtml(x.city) : ''}${x.no ? ' · ' + escapeHtml(x.no) : ''}</div>
+      <div class="sp-row"><span>Prețul nostru: <b>${lei(b.price)}</b></span><span>Valoare estimată: <b>${lei(x.value)}</b></span>${b.submittedAt ? `<span>Depusă: <b>${escapeHtml(new Date(b.submittedAt).toLocaleDateString('ro-RO'))}</b></span>` : dl ? `<span>Termen: <b>${escapeHtml(dl)}</b></span>` : ''}${b.result === 'pierdut' && (b.winner || b.winnerPrice) ? `<span>Câștigător: <b>${escapeHtml(b.winner || '—')}${b.winnerPrice ? ' · ' + lei(b.winnerPrice) : ''}</b></span>` : ''}</div>
+      ${b.notes ? `<div class="sp-exp">${escapeHtml(b.notes)}</div>` : ''}
+      <div class="sp-acts"><button class="sp-btn pri" data-spbe>Editează</button>${x.url ? `<a class="sp-btn" href="${escapeHtml(x.url)}" target="_blank" rel="noopener">Vezi în SEAP ↗</a>` : ''}${(x.docs || []).length ? '<button class="sp-btn" data-spzip>Documentație</button>' : ''}${x.analysis && x.analysis.status === 'done' ? '<button class="sp-btn ai" data-span="view">🔍 Analiza</button>' : ''}</div></div>`; }).join('');
+}
+function openBid(key) {
+  const x = key ? (seap.items || []).find(i => i.key === key) : null; spbCur = x;
+  const b = (x && x.bid) || {}; const man = !x || x.manual;
+  qs('#spb-title').textContent = x ? x.title : 'Licitație nouă';
+  qs('#spb-man').hidden = !man;
+  qs('#spb-t').value = x ? x.title || '' : ''; qs('#spb-ca').value = x ? x.ca || '' : ''; qs('#spb-no').value = x ? x.no || '' : ''; qs('#spb-val').value = x && x.value ? x.value : '';
+  qs('#spb-dl').value = x && x.deadline ? String(x.deadline).slice(0, 10) : ''; qs('#spb-url').value = x ? x.url || '' : '';
+  qs('#spb-price').value = b.price || ''; qs('#spb-sub').value = b.submittedAt || (x ? '' : new Date().toISOString().slice(0, 10));
+  qs('#spb-result').value = b.result || 'evaluare'; qs('#spb-win').value = b.winner || ''; qs('#spb-wp').value = b.winnerPrice || ''; qs('#spb-notes').value = b.notes || '';
+  qs('#spb-del').style.display = x ? '' : 'none';
+  qs('#spb-modal').classList.remove('hidden');
+}
+const closeBid = () => { qs('#spb-modal').classList.add('hidden'); spbCur = null; };
+qs('#spb-x').addEventListener('click', closeBid); qs('#spb-cancel').addEventListener('click', closeBid);
+qs('#spb-add').addEventListener('click', () => openBid(null));
+qs('#spb-search').addEventListener('input', renderBids);
+qs('#spb-res').addEventListener('click', e => { const b = e.target.closest('.sp-chip'); if (!b) return; qs('#spb-res').querySelectorAll('.sp-chip').forEach(x => x.classList.toggle('on', x === b)); spbFilter = b.dataset.v; renderBids(); });
+qs('#spb-save').addEventListener('click', async () => {
+  const bid = { price: qs('#spb-price').value.replace(/\s/g, ''), submittedAt: qs('#spb-sub').value, result: qs('#spb-result').value, winner: qs('#spb-win').value.trim(), winnerPrice: qs('#spb-wp').value.replace(/\s/g, ''), notes: qs('#spb-notes').value.trim() };
+  const man = { title: qs('#spb-t').value.trim(), ca: qs('#spb-ca').value.trim(), no: qs('#spb-no').value.trim(), value: qs('#spb-val').value.replace(/\s/g, ''), deadline: qs('#spb-dl').value, url: qs('#spb-url').value.trim() };
+  const btn = qs('#spb-save'); btn.disabled = true;
+  try {
+    let r;
+    if (!spbCur) { if (!man.title) { toast('Scrie obiectul licitației', 'warn'); return; } r = await clApi('/seap/manual', jsonOpt('POST', { ...man, bid })); seap.items.push(r.item); }
+    else { r = await clApi('/seap/' + encodeURIComponent(spbCur.key), jsonOpt('PUT', { status: 'applied', bid, ...(spbCur.manual ? man : {}) })); Object.assign(spbCur, r.item); }
+    closeBid(); renderSeap(); renderBids(); toast('Licitație salvată', 'ok');
+  } catch (e) { toast(/HTTP 40[45]|Operație/.test(e.message) ? 'Actualizează serverul (v8.8)' : e.message, 'err'); }
+  finally { btn.disabled = false; }
+});
+qs('#spb-del').addEventListener('click', async () => {
+  if (!spbCur) return;
+  if (!(await confirmDialog({ title: 'Scoți licitația din listă?', html: spbCur.manual ? 'Licitația adăugată de mână se șterge.' : 'Revine în Anunțuri ca neofertată.', okLabel: 'Scoate' }))) return;
+  try {
+    if (spbCur.manual) { await clApi('/seap/' + encodeURIComponent(spbCur.key), jsonOpt('PUT', { remove: true })); seap.items = seap.items.filter(x => x !== spbCur); }
+    else { const r = await clApi('/seap/' + encodeURIComponent(spbCur.key), jsonOpt('PUT', { status: 'interest' })); Object.assign(spbCur, r.item); }
+    closeBid(); renderSeap(); renderBids();
+  } catch (e) { toast(e.message, 'err'); }
+});
+qs('#spb-list').addEventListener('click', e => {
+  const card = e.target.closest('.sp-card'); if (!card) return;
+  if (e.target.closest('[data-spbe]')) return openBid(card.dataset.k);
+  const z = e.target.closest('[data-spzip]'); if (z) return spZip(card.dataset.k, z);
+  if (e.target.closest('[data-span]')) return spAnalysisOpen(card.dataset.k);
+});
+
 async function spZip(key, btn) {
   const a = getAuth(); if (!a) return;
   const url = `${getProxyBase()}/seap/${encodeURIComponent(key)}/zip?token=${encodeURIComponent(a.token)}`;
@@ -6917,7 +7031,7 @@ async function spZip(key, btn) {
 }
 qs('#sp-list').addEventListener('click', e => {
   const card = e.target.closest('.sp-card'); if (!card) return;
-  const s = e.target.closest('[data-sps]'); if (s) return spSetStatus(card.dataset.k, s.dataset.sps);
+  const s = e.target.closest('[data-sps]'); if (s) { if (s.dataset.sps === 'applied') { const it = (seap.items || []).find(x => x.key === card.dataset.k); if (it && it.status !== 'applied') return spSetStatus(card.dataset.k, 'applied').then(() => openBid(card.dataset.k)); } return spSetStatus(card.dataset.k, s.dataset.sps); }
   const z = e.target.closest('[data-spzip]'); if (z) return spZip(card.dataset.k, z);
   const an = e.target.closest('[data-span]'); if (an) return an.dataset.span === 'start' ? spAnalysisStart(card.dataset.k) : spAnalysisOpen(card.dataset.k);
 });
@@ -6931,7 +7045,7 @@ qs('#sp-refresh').addEventListener('click', async () => {
   try { await clApi('/seap/refresh', { method: 'POST' }); toast('Caut anunțuri noi pe SEAP… durează câteva minute', 'ok'); if (seap) seap.running = true; renderSeap(); clearTimeout(spPoll); spPoll = setTimeout(() => loadSeap(true), 6000); }
   catch (e) { toast(e.message, 'err'); }
 });
-document.querySelectorAll('.nav-tab[data-tab="seap"]').forEach(t => t.addEventListener('click', () => { loadSeap(true).then(() => setTimeout(spMarkSeen, 1500)); }));
+document.querySelectorAll('.nav-tab[data-tab="seap"]').forEach(t => t.addEventListener('click', () => { let v0 = 'ann'; try { v0 = localStorage.getItem('yca_sp_view') || 'ann'; } catch {} showSpView(v0 === 'bids' ? 'bids' : 'ann'); loadSeap(true).then(() => setTimeout(spMarkSeen, 1500)); }));
 
 
 /* ── Aspect pro: indicatorul animat din meniul lateral, data și contul din antet ── */

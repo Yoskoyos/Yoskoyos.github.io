@@ -1937,8 +1937,8 @@ async function seapRun(db, reason) {
       st.items[k] = it; added++;
       await sleep(300);
     }
-    for (const [k, it] of Object.entries(st.items)) if (it.deadline && Date.parse(it.deadline) < now - 7 * 864e5) delete st.items[k];   // păstrăm o săptămână după termen
-    { const cur = loadSeap(); for (const [k, x] of Object.entries(cur.items)) if (st.items[k]) { for (const f of ['analysis', 'status', 'note']) if (x[f] !== undefined) st.items[k][f] = x[f]; } }   // păstrăm ce s-a schimbat între timp (stare, analiză)
+    for (const [k, it] of Object.entries(st.items)) if (it.status !== 'applied' && it.deadline && Date.parse(it.deadline) < now - 7 * 864e5) delete st.items[k];   // cele ofertate de noi rămân pentru totdeauna   // păstrăm o săptămână după termen
+    { const cur = loadSeap(); for (const [k, x] of Object.entries(cur.items)) if (st.items[k]) { for (const f of ['analysis', 'status', 'note', 'bid']) if (x[f] !== undefined) st.items[k][f] = x[f]; } }   // păstrăm ce s-a schimbat între timp (stare, analiză)
     st.lastRun = now; st.lastErr = errs ? `${errs} căutări eșuate` : ''; st.lastReason = reason || '';
     saveSeap(st);
     return { added, total: Object.keys(st.items).length, errs };
@@ -2188,16 +2188,29 @@ async function seapAnalyze(db, key, owner) {
     set({ status: 'error', step: '', error: e.message, at: Date.now() });
   } finally { aiJobs.delete(key); }
 }
+// oferta noastră la o licitație: preț, data depunerii, rezultat
+function seapBid(b) {
+  return { price: Math.max(0, num(b.price)) || null, submittedAt: ymd(b.submittedAt), result: ['evaluare', 'castigat', 'pierdut', 'anulat', 'retras'].includes(b.result) ? b.result : 'evaluare',
+    winnerPrice: Math.max(0, num(b.winnerPrice)) || null, winner: str(b.winner, 200), notes: str(b.notes, 2000), updatedAt: Date.now() };
+}
 async function handleSeap(req, res, pathname, parsed) {
   const ctx = requireUser(req, res, 'seap'); if (!ctx) return;
   const parts = pathname.split('/').filter(Boolean);   // seap[/refresh | /<key>[/zip]]
   if (parts.length === 1 && req.method === 'GET') {
     const st = loadSeap();
-    const items = Object.values(st.items).filter(it => it.inArea && (!it.deadline || Date.parse(it.deadline) > Date.now() - 864e5)).sort((a, b) => b.firstSeen - a.firstSeen || Date.parse(a.deadline || 0) - Date.parse(b.deadline || 0));
+    const items = Object.values(st.items).filter(it => it.status === 'applied' || (it.inArea && (!it.deadline || Date.parse(it.deadline) > Date.now() - 864e5))).sort((a, b) => b.firstSeen - a.firstSeen || Date.parse(a.deadline || 0) - Date.parse(b.deadline || 0));
     const lite = items.map(it => { if (!it.analysis) return it; const an = it.analysis;
       const status = an.status === 'running' && !aiJobs.has(it.key) ? 'error' : an.status;
       return { ...it, analysis: { status, step: an.step || '', verdict: an.verdict || '', at: an.at || 0, error: status === 'error' ? (an.error || 'Analiza a fost întreruptă (serverul a repornit) — pornește-o din nou') : '' } }; });
     return sendJson(res, 200, { items: lite, ai: !!(loadAi() || {}).key, lastRun: st.lastRun || 0, lastErr: st.lastErr || '', running: !!seapBusy, cpv: Object.values(SEAP_CPV), counties: SEAP_COUNTIES, expMax: SEAP_EXP_MAX, alertAt: SEAP_ALERT_AT });
+  }
+  if (parts[1] === 'manual' && req.method === 'POST') {   // licitație ofertată adăugată de mână (găsită în afara aplicației)
+    const b = await readJson(req); const title = str(b.title, 300).trim(); if (!title) return sendJson(res, 400, { error: 'Scrie obiectul licitației' });
+    const st = loadSeap(); const id = newId();
+    const url0 = str(b.url, 500).trim();
+    const it = { key: 'man:' + id, type: b.type === 'sp' ? 'sp' : b.type === 'da' ? 'da' : 'man', id, no: str(b.no, 60), title, ca: str(b.ca, 300), city: str(b.city, 100), county: '', cpv: '', kind: str(b.kind, 40),
+      value: num(b.value) || null, deadline: str(b.deadline, 40), published: '', url: /^https?:\/\//.test(url0) ? url0 : '', docs: [], exp: { status: 'none' }, inArea: true, status: 'applied', firstSeen: Date.now(), manual: true, bid: seapBid(b.bid || {}) };
+    st.items[it.key] = it; saveSeap(st); return sendJson(res, 200, { item: it });
   }
   if (parts[1] === 'refresh' && req.method === 'POST') {
     if (ctx.user.role !== 'admin') return sendJson(res, 403, { error: 'Doar administratorul' });
@@ -2209,6 +2222,9 @@ async function handleSeap(req, res, pathname, parsed) {
   if (!it) return sendJson(res, 404, { error: 'Anunț inexistent' });
   if (parts.length === 2 && req.method === 'PUT') {
     const b = await readJson(req); if (['new', 'interest', 'ignored', 'applied'].includes(b.status)) it.status = b.status;
+    if (b.bid && typeof b.bid === 'object') it.bid = seapBid({ ...(it.bid || {}), ...b.bid });
+    if (it.manual) { for (const f of ['title', 'ca', 'no', 'url', 'deadline']) if (b[f] !== undefined) it[f] = str(b[f], f === 'url' ? 500 : 300); if (b.value !== undefined) it.value = num(b.value) || null; }
+    if (b.remove && it.manual) { delete st.items[key]; saveSeap(st); return sendJson(res, 200, { removed: true }); }
     if (b.note !== undefined) it.note = str(b.note, 1000);
     saveSeap(st); return sendJson(res, 200, { item: it });
   }
@@ -3319,7 +3335,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 8.7, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 8.8, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
