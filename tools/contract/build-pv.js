@@ -8,21 +8,21 @@ const P = (runs, o = {}) => new Paragraph({ children: Array.isArray(runs) ? runs
 const H = text => new Paragraph({ keepNext: true, spacing: { before: 170, after: 90 },
   border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: ORANGE, space: 2 } },
   children: [t(text, { bold: true, size: 22, color: NAVY })] });
-const line = '……………………………………………';
+const line = '…………………………………………';
 const NONE = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
 const grid = { style: BorderStyle.SINGLE, size: 4, color: 'B8C2CE' };
 const gb = { top: grid, bottom: grid, left: grid, right: grid };
 function cell(content, w, o = {}) {
-  const kids = (Array.isArray(content) ? content : [content]).map(c => typeof c === 'string' ? new Paragraph({ alignment: o.align || AlignmentType.LEFT, children: [t(c, { bold: !!o.head, size: 19, color: o.head ? 'FFFFFF' : undefined })] }) : c);
+  const kids = (Array.isArray(content) ? content : [content]).map(c => typeof c === 'string' ? new Paragraph({ alignment: o.align || AlignmentType.LEFT, children: [t(c, { bold: !!o.head, size: 21, color: o.head ? 'FFFFFF' : undefined })] }) : c);
   return new TableCell({ borders: o.borders || gb, width: { size: w, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
-    margins: { top: 40, bottom: 40, left: 110, right: 110 },
+    margins: { top: 90, bottom: 90, left: 140, right: 140 },
     shading: o.head ? { fill: NAVY, type: ShadingType.CLEAR, color: 'auto' } : (o.fill ? { fill: o.fill, type: ShadingType.CLEAR, color: 'auto' } : undefined), children: kids });
 }
 function table(widths, head, rows, o = {}) {
   const total = widths.reduce((a, b) => a + b, 0);
   return new Table({ width: { size: total, type: WidthType.DXA }, columnWidths: widths,
     rows: [new TableRow({ tableHeader: true, children: head.map((h, i) => cell(h, widths[i], { head: true, align: o.align && o.align[i] })) }),
-      ...rows.map((r, k) => new TableRow({ children: r.map((c, i) => cell(c, widths[i], { fill: k % 2 ? 'F4F6F9' : undefined, align: o.align && o.align[i] })) }))] });
+      ...rows.map((r, k) => new TableRow({ children: r.map((c, i) => cell(c, widths[i], { size: 22, fill: k % 2 ? 'F4F6F9' : undefined, align: o.align && o.align[i] })) }))] });
 }
 
 const LOGO = fs.readFileSync(__dirname + '/logo-antet.png');
@@ -43,60 +43,37 @@ const header = new Header({ children: [
     ] })] }),
 ] });
 
-const CB = '☐ DA    ☐ NU';
 const body = [
-  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 60, after: 40 }, children: [t('PROCES-VERBAL DE RECEPȚIE', { bold: true, size: 32, color: NAVY })] }),
-  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 40 }, children: [t('ȘI PUNERE ÎN FUNCȚIUNE A SISTEMULUI DE SUPRAVEGHERE VIDEO', { bold: true, size: 22, color: NAVY })] }),
-  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 160 }, children: [t('Nr. ……………  din  ……… / ……… / ……………', { color: '52606F' })] }),
+  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 60 }, children: [t('PROCES-VERBAL DE RECEPȚIE', { bold: true, size: 32, color: NAVY })] }),
+  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 360 }, children: [t('Nr. ……………  din  ……… / ……… / ……………', { color: '52606F' })] }),
 
-  H('1. PĂRȚILE'),
-  P([t('Prestator: ', { bold: true }), t('YCA SOLUTIONS S.R.L. (SUPRAVEGHERE24h), CUI 45211628, J40/19754/2021, licență IGPR nr. 6310/T, reprezentată prin Dima Florin, administrator.')]),
-  P([t('Beneficiar: ', { bold: true }), t(`${line}${line}, CUI/CIF ……………………………, reprezentat prin ……………………………………………, în calitate de ……………………………….`)]),
-  P([t('Locul montării: ', { bold: true }), t(`${line}${line}${line}`)]),
-  P('Astăzi, la data de mai sus, părțile au procedat la recepția și punerea în funcțiune a sistemului de supraveghere video montat de Prestator la adresa de mai sus.', { spacing: { after: 60, line: 270 } }),
+  P([t('Beneficiar: ', { bold: true }), t(`${line}${line}`)], { spacing: { after: 160, line: 300 } }),
+  P([t('Adresa montajului: ', { bold: true }), t(`${line}${line}`)], { spacing: { after: 300, line: 300 } }),
 
-  H('2. ECHIPAMENTE MONTATE'),
-  table([3300, 2600, 2225, 1400], ['Echipament', 'Marcă / model', 'Serie', 'Cantitate'], [
-    ['Recorder video (NVR), ……… canale', '', '', '1 buc'],
-    ['Camere IP de exterior', '', '', '……… buc'],
-    ['Camere IP de interior', '', '', '……… buc'],
-    ['Hard disk, capacitate ……… TB', '', '', '……… buc'],
-    ['Switch PoE / sursă de alimentare', '', '', '……… buc'],
-    ['Monitor / rack / alte accesorii', '', '', '……… buc'],
-  ], { align: [null, null, null, AlignmentType.CENTER] }),
-  P([t('Total camere montate și conectate la NVR: ', { bold: true }), t('……………… bucăți.', { bold: true })], { spacing: { before: 100, after: 60 } }),
-
-  H('3. VERIFICĂRI LA PUNEREA ÎN FUNCȚIUNE'),
-  P('În prezența reprezentantului Beneficiarului s-au verificat următoarele:', { spacing: { after: 80 } }),
-  table([7325, 2200], ['Verificare', 'Rezultat'], [
-    ['Toate cele ……… camere sunt conectate la NVR și transmit imagine', CB],
-    [[new Paragraph({ children: [t('Camerele înregistrează: ', { bold: true, size: 19 }), t('pentru fiecare canal s-a redat o înregistrare din ultimele ……… ore', { size: 19 })] })], CB],
-    ['Modul de înregistrare:   ☐ continuu    ☐ la detecție de mișcare', '—'],
-    [[new Paragraph({ children: [t('Hard diskul înregistrează: ', { bold: true, size: 19 }), t('este detectat de NVR, formatat, cu starea „Normal”', { size: 19 })] })], CB],
-    ['Capacitate hard disk: ……… TB · păstrarea înregistrărilor: aproximativ ……… zile', '—'],
-    ['Data și ora NVR-ului sunt corecte (fus orar România)', CB],
-    ['Accesul de la distanță din aplicația de pe telefon funcționează', CB],
-    ['Imaginea este clară ziua și noaptea (infraroșu / lumină albă)', CB],
+  P([t('Subsemnații, reprezentanții '), t('YCA SOLUTIONS S.R.L.', { bold: true }), t(' și ai beneficiarului, confirmăm că la adresa de mai sus a fost montat un sistem de supraveghere video format din:')], { alignment: AlignmentType.JUSTIFIED, spacing: { after: 200, line: 300 } }),
+  table([6325, 3200], ['Echipament', 'Cantitate'], [
+    ['Camere de supraveghere', '……………… buc.'],
+    ['NVR (recorder video)', '……………… buc.'],
+    ['Hard disk de ……… TB', '……………… buc.'],
   ], { align: [null, AlignmentType.CENTER] }),
-  P([t('Observații: ', { bold: true }), t(`${line}${line}${line}`)], { spacing: { before: 120, after: 60 } }),
 
-  H('4. PREDARE ȘI GARANȚIE'),
-  P('Sistemul a fost predat Beneficiarului în stare de funcționare, cu toate camerele și hard diskul înregistrând. Beneficiarul a primit datele de acces și instruirea pentru vizualizarea imaginilor.'),
-  P('Garanția echipamentelor este de ……… luni de la data prezentului proces-verbal, conform contractului nr. ……… din ……… / ……… / ……………. Prezentul proces-verbal a fost încheiat în 2 (două) exemplare, câte unul pentru fiecare parte.'),
+  P('La predare s-a verificat, în prezența ambelor părți, că:', { spacing: { before: 300, after: 120, line: 300 } }),
+  P([t('✔  ', { bold: true, color: ORANGE }), t('toate camerele funcționează și ', { size: 22 }), t('înregistrează', { bold: true, size: 22 }), t(';', { size: 22 })], { spacing: { after: 100, line: 300 }, indent: { left: 360 } }),
+  P([t('✔  ', { bold: true, color: ORANGE }), t('hard diskul este instalat în NVR și ', { size: 22 }), t('înregistrează', { bold: true, size: 22 }), t('.', { size: 22 })], { spacing: { after: 300, line: 300 }, indent: { left: 360 } }),
+
+  P('Sistemul a fost predat beneficiarului în stare de funcționare. Prezentul proces-verbal s-a încheiat în 2 exemplare, câte unul pentru fiecare parte.', { alignment: AlignmentType.JUSTIFIED, spacing: { after: 200, line: 300 } }),
 
   new Table({ width: { size: 9525, type: WidthType.DXA }, columnWidths: [4762, 4763], borders: { top: NONE, bottom: NONE, left: NONE, right: NONE, insideHorizontal: NONE, insideVertical: NONE },
     rows: [new TableRow({ cantSplit: true, children: [
-      new TableCell({ width: { size: 4762, type: WidthType.DXA }, borders: { top: NONE, bottom: NONE, left: NONE, right: NONE }, margins: { top: 120 }, children: [
+      new TableCell({ width: { size: 4762, type: WidthType.DXA }, borders: { top: NONE, bottom: NONE, left: NONE, right: NONE }, margins: { top: 300 }, children: [
         new Paragraph({ children: [t('PRESTATOR', { bold: true, color: NAVY })] }),
         new Paragraph({ children: [t('YCA SOLUTIONS S.R.L.')] }),
-        new Paragraph({ children: [t('Dima Florin, administrator')] }),
-        new Paragraph({ spacing: { before: 160 }, children: [t('Semnătura și ștampila:', { color: '52606F', size: 19 })] }),
+        new Paragraph({ spacing: { before: 500 }, children: [t('Semnătura: ……………………………')] }),
       ] }),
-      new TableCell({ width: { size: 4763, type: WidthType.DXA }, borders: { top: NONE, bottom: NONE, left: NONE, right: NONE }, margins: { top: 120 }, children: [
+      new TableCell({ width: { size: 4763, type: WidthType.DXA }, borders: { top: NONE, bottom: NONE, left: NONE, right: NONE }, margins: { top: 300 }, children: [
         new Paragraph({ children: [t('BENEFICIAR', { bold: true, color: NAVY })] }),
-        new Paragraph({ children: [t('……………………………………………………')] }),
-        new Paragraph({ children: [t('Nume: ………………………………………………')] }),
-        new Paragraph({ spacing: { before: 160 }, children: [t('Semnătura și ștampila:', { color: '52606F', size: 19 })] }),
+        new Paragraph({ children: [t('Nume: ……………………………………')] }),
+        new Paragraph({ spacing: { before: 500 }, children: [t('Semnătura: ……………………………')] }),
       ] }),
     ] })] }),
 ];
