@@ -47,10 +47,11 @@ const body = [
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 60 }, children: [t('PROCES-VERBAL DE RECEPȚIE', { bold: true, size: 32, color: NAVY })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 360 }, children: [t('Nr. ……………  din  ……… / ……… / ……………', { color: '52606F' })] }),
 
-  P([t('Beneficiar: ', { bold: true }), t(`${line}${line}`)], { spacing: { after: 160, line: 300 } }),
-  P([t('Adresa montajului: ', { bold: true }), t(`${line}${line}`)], { spacing: { after: 300, line: 300 } }),
+  P([t('YCA SOLUTIONS S.R.L.', { bold: true }), t(', cu sediul în București, Str. Aviator Mircea Petre nr. 10, Camera 1, Sector 1, CUI 45211628, J40/19754/2021, reprezentată prin Dima Florin, în calitate de Administrator, denumită în continuare '), t('PRESTATOR', { bold: true }), t(',')], { alignment: AlignmentType.JUSTIFIED, spacing: { after: 120, line: 300 } }),
+  P('și', { spacing: { after: 120, line: 300 } }),
+  P([t('ASOCIAȚIA DE PROPRIETARI ……………………', { bold: true }), t(', cu sediul în ……………………………, CIF ……………………, reprezentată prin ……………………………, în calitate de Președinte, împuternicit(ă) prin Hotărârea Adunării Generale a Asociației nr. ………… din ……………………, denumită în continuare '), t('BENEFICIAR', { bold: true }), t(',')], { alignment: AlignmentType.JUSTIFIED, spacing: { after: 240, line: 300 } }),
 
-  P([t('Subsemnații, reprezentanții '), t('YCA SOLUTIONS S.R.L.', { bold: true }), t(' și ai beneficiarului, confirmăm că la adresa de mai sus a fost montat un sistem de supraveghere video format din:')], { alignment: AlignmentType.JUSTIFIED, spacing: { after: 200, line: 300 } }),
+  P([t('confirmăm că la adresa ……………………………………………………………… (bloc / scară) a fost montat un sistem de supraveghere video format din:')], { alignment: AlignmentType.JUSTIFIED, spacing: { after: 200, line: 300 } }),
   table([6325, 3200], ['Echipament', 'Cantitate'], [
     ['Camere de supraveghere', '……………… buc.'],
     ['NVR (recorder video)', '……………… buc.'],
@@ -61,19 +62,21 @@ const body = [
   P([t('✔  ', { bold: true, color: ORANGE }), t('toate camerele funcționează și ', { size: 22 }), t('înregistrează', { bold: true, size: 22 }), t(';', { size: 22 })], { spacing: { after: 100, line: 300 }, indent: { left: 360 } }),
   P([t('✔  ', { bold: true, color: ORANGE }), t('hard diskul este instalat în NVR și ', { size: 22 }), t('înregistrează', { bold: true, size: 22 }), t('.', { size: 22 })], { spacing: { after: 300, line: 300 }, indent: { left: 360 } }),
 
-  P('Sistemul a fost predat beneficiarului în stare de funcționare. Prezentul proces-verbal s-a încheiat în 2 exemplare, câte unul pentru fiecare parte.', { alignment: AlignmentType.JUSTIFIED, spacing: { after: 200, line: 300 } }),
+  P('Sistemul a fost predat Beneficiarului în stare de funcționare. Prezentul proces-verbal s-a încheiat în 2 exemplare, câte unul pentru fiecare parte.', { alignment: AlignmentType.JUSTIFIED, spacing: { after: 200, line: 300 } }),
 
   new Table({ width: { size: 9525, type: WidthType.DXA }, columnWidths: [4762, 4763], borders: { top: NONE, bottom: NONE, left: NONE, right: NONE, insideHorizontal: NONE, insideVertical: NONE },
     rows: [new TableRow({ cantSplit: true, children: [
       new TableCell({ width: { size: 4762, type: WidthType.DXA }, borders: { top: NONE, bottom: NONE, left: NONE, right: NONE }, margins: { top: 300 }, children: [
         new Paragraph({ children: [t('PRESTATOR', { bold: true, color: NAVY })] }),
         new Paragraph({ children: [t('YCA SOLUTIONS S.R.L.')] }),
-        new Paragraph({ spacing: { before: 500 }, children: [t('Semnătura: ……………………………')] }),
+        new Paragraph({ children: [t('Administrator: Dima Florin')] }),
+        new Paragraph({ spacing: { before: 400 }, children: [t('Semnătura și ștampila: ………………………')] }),
       ] }),
       new TableCell({ width: { size: 4763, type: WidthType.DXA }, borders: { top: NONE, bottom: NONE, left: NONE, right: NONE }, margins: { top: 300 }, children: [
         new Paragraph({ children: [t('BENEFICIAR', { bold: true, color: NAVY })] }),
-        new Paragraph({ children: [t('Nume: ……………………………………')] }),
-        new Paragraph({ spacing: { before: 500 }, children: [t('Semnătura: ……………………………')] }),
+        new Paragraph({ children: [t('Asociația de Proprietari ……………………')] }),
+        new Paragraph({ children: [t('Președinte: ………………………………')] }),
+        new Paragraph({ spacing: { before: 400 }, children: [t('Semnătura și ștampila: ………………………')] }),
       ] }),
     ] })] }),
 ];
