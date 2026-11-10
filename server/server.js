@@ -1004,12 +1004,13 @@ async function handleClients(req, res, pathname) {
       let buf;
       try { buf = await readRaw(req, MAX_PDF); } catch { return sendJson(res, 413, { error: 'Fișierul e prea mare (maxim 20 MB)' }); }
       const q = url.parse(req.url, true).query;
-      const kind = q.kind === 'garantie' ? 'garantie' : 'contract';
+      const kind = q.kind === 'garantie' ? 'garantie' : q.kind === 'pv' ? 'pv' : 'contract';
       const head = buf.slice(0, 8);
       const ext = head.slice(0, 5).toString('latin1') === '%PDF-' ? 'pdf'
+                : (kind === 'pv' && head[0] === 0x50 && head[1] === 0x4B) ? 'docx'
                 : (kind === 'garantie' && head[0] === 0xFF && head[1] === 0xD8 && head[2] === 0xFF) ? 'jpg'
                 : (kind === 'garantie' && head.slice(0, 4).toString('hex') === '89504e47') ? 'png' : null;
-      if (!ext) return sendJson(res, 400, { error: kind === 'garantie' ? 'Fișierul trebuie să fie PDF, JPG sau PNG' : 'Fișierul nu e PDF' });
+      if (!ext) return sendJson(res, 400, { error: kind === 'garantie' ? 'Fișierul trebuie să fie PDF, JPG sau PNG' : kind === 'pv' ? 'Fișierul trebuie să fie PDF sau Word (.docx)' : 'Fișierul nu e PDF' });
       const f = { id: newId(), kind, ext, name: (str(q.name, 150).replace(/[\\/:*?"<>|\r\n]/g, '_').trim() || (kind + '.' + ext)),
                   size: buf.length, uploadedAt: Date.now(), signedAt: ymd(q.signedAt), validUntil: ymd(q.validUntil) };
       if (!new RegExp('\\.' + (ext === 'jpg' ? 'jpe?g' : ext) + '$', 'i').test(f.name)) f.name += '.' + ext;
@@ -1027,7 +1028,7 @@ async function handleClients(req, res, pathname) {
       if (req.method === 'GET') {
         let data; try { data = fs.readFileSync(fp); } catch { return sendJson(res, 404, { error: 'Fișierul lipsește de pe server' }); }
         const ascii = f.name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '');
-        res.writeHead(200, { 'Content-Type': fext === 'jpg' ? 'image/jpeg' : fext === 'png' ? 'image/png' : 'application/pdf', 'Content-Length': data.length, 'Cache-Control': 'private, no-store',
+        res.writeHead(200, { 'Content-Type': fext === 'jpg' ? 'image/jpeg' : fext === 'png' ? 'image/png' : fext === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf', 'Content-Length': data.length, 'Cache-Control': 'private, no-store',
           'Content-Disposition': `${url.parse(req.url, true).query.dl ? 'attachment' : 'inline'}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(f.name)}`, ...CORS });
         return res.end(data);
       }
@@ -3318,7 +3319,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 8.6, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 8.7, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
