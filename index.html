@@ -1376,7 +1376,7 @@ html:not(.unlocked) .app{display:none}
     <!-- ── Alerte ── -->
     <!-- ── Clienți ── -->
     <div class="panel" id="panel-clients">
-      <div class="seg" role="tablist"><button type="button" class="on" data-v="clients">Clienți</button><button type="button" data-v="pay">Încasări <span class="cnt" id="pay-badge" hidden></span></button><button type="button" data-v="gdpr">Cereri imagini</button></div>
+      <div class="seg" role="tablist" hidden><button type="button" class="on" data-v="clients">Clienți</button><button type="button" data-v="pay">Încasări <span class="cnt" id="pay-badge" hidden></span></button><button type="button" data-v="gdpr">Cereri imagini</button></div>
       <div id="cl-view-clients">
       <div class="section">
         <div class="section-hdr">
@@ -4728,7 +4728,7 @@ qs('#qset-modal').addEventListener('click', e => { if (e.target.id === 'qset-mod
 qs('#qs-save').addEventListener('click', saveQuoteSettings);
 qs('#qs-copy').addEventListener('click', () => { const t = qs('#qs-embed').textContent; navigator.clipboard.writeText(t).then(() => toast('Cod copiat', 'ok'), () => toast('Selectează codul și copiază-l manual', 'warn')); });
 
-document.querySelectorAll('.nav-tab[data-tab="clients"]').forEach(t => t.addEventListener('click', () => { let v = 'clients'; try { v = localStorage.getItem('yca_cl_view') || 'clients'; } catch {} showClView(['pay', 'gdpr'].includes(v) ? v : 'clients'); }));
+document.querySelectorAll('.nav-tab[data-tab="clients"]').forEach(t => t.addEventListener('click', () => { showClView('clients'); }));
 document.querySelectorAll('.nav-tab[data-tab="quotes"]').forEach(t => t.addEventListener('click', () => loadQuotes(true)));
 
 /* ═══════════════════════════════════════
@@ -6988,7 +6988,7 @@ async function openFromLink(href) {
   if (qid) {
     goTab('quotes'); await loadQuotes(true);
     const q = (quotes || []).find(x => x.id === qid); if (q) openQuote(q); else toast('Oferta nu mai există', 'warn');
-  } else if (tab) { if (tab === 'clients' && v === 'docs') { goTab('docs'); return; } if (tab === 'works' || tab === 'stock') { goTab('catalog'); showCtView('stock'); return; } goTab(tab); if (tab === 'clients' && v) showClView(v); }
+  } else if (tab) { if (tab === 'clients' && v === 'docs') { goTab('docs'); return; } if (tab === 'works' || tab === 'stock') { goTab('catalog'); showCtView('stock'); return; } goTab(tab); }
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.type === 'open') openFromLink(e.data.url); });
 (function waitUnlock() {
