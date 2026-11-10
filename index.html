@@ -7077,46 +7077,67 @@ async function genContract() {
 }
 qs('#cm-gen').addEventListener('click', () => openCtrModal());
 /* ═══ Proces-verbal de recepție (Word) — completat din fișa clientului și din NVR-ul legat, verificat pe loc ═══ */
+// NVR-urile clientului pentru PV: cel legat în fișă, altfel le alegi (pot fi mai multe, ex. câte unul pe scară)
+async function pvPickNvrs(c) {
+  const key = 'yca_pv_nvrs_' + c.id;
+  const saved = (lsGet(key, '') || '').split(',').filter(Boolean);
+  const linked = c.equip && c.equip.nvrId ? [String(c.equip.nvrId)] : [];
+  const norm = x => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const stop = new Set(['asociatia', 'proprietari', 'proprietarilor', 'de', 'bloc', 'bl', 'str', 'strada', 'nr', 'sector', 'municipiul', 'bucuresti', 'bld', 'bd', 'sc', 'scara', 'ap', 'judetul', 'ilfov']);
+  const toks = [...new Set(norm(c.name + ' ' + c.address).split(/[^a-z0-9]+/).filter(w => w.length >= 2 && !stop.has(w)))];
+  const score = n => { const nn = norm(n.name); return toks.filter(t => new RegExp('(^|[^a-z0-9])' + t + '($|[^a-z0-9])').test(nn)).length; };
+  const pre = saved.length ? saved : linked.length ? linked : nvrs.filter(n => score(n) >= 2).map(n => String(n.id));
+  if (linked.length && !saved.length) return nvrs.filter(n => linked.includes(String(n.id)));
+  const list = nvrs.slice().sort((a, b) => (pre.includes(String(b.id)) - pre.includes(String(a.id))) || a.name.localeCompare(b.name, 'ro'))
+    .map(n => `<label style="display:flex;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--border);cursor:pointer;text-align:left"><input type="checkbox" name="pv-nvr" value="${escapeHtml(String(n.id))}" ${pre.includes(String(n.id)) ? 'checked' : ''} style="width:18px;height:18px;accent-color:var(--accent)"><span>${escapeHtml(n.name)}</span></label>`).join('');
+  const ok = await confirmDialog({ title: 'Ce NVR-uri are ' + c.name + '?', tone: 'watch', okLabel: 'Continuă', cancelLabel: 'Fără NVR',
+    html: `Bifează NVR-ul (sau NVR-urile, dacă blocul are câte unul pe scară) montat la acest client. Îl țin minte pentru data viitoare.<div style="margin-top:10px;max-height:46vh;overflow:auto">${list}</div>` });
+  const pick = ok ? [...document.querySelectorAll('#confirm-text input[name="pv-nvr"]:checked')].map(x => x.value) : [];
+  lsSet(key, pick.join(','));
+  if (pick.length && !linked.length) {   // legăm primul NVR de client în fișă
+    try { const body = { ...c, equip: { ...(c.equip || {}), nvrId: pick[0] } }; const r = await clApi('/clients/' + encodeURIComponent(c.id), jsonOpt('PUT', body));
+      if (r.client) { cmDraft.equip = r.client.equip; const k = clients.findIndex(x => x.id === r.client.id); if (k >= 0) clients[k] = r.client; } } catch {}
+  }
+  return nvrs.filter(n => pick.includes(String(n.id)));
+}
 async function genPV() {
   const c = cmDraft; if (!c || !c.id) return;
-  const btn = qs('#cm-pv'), old = btn.textContent; btn.disabled = true; btn.textContent = 'Verific NVR-ul…';
+  const btn = qs('#cm-pv'), old = btn.textContent; btn.disabled = true;
   try {
-    const n = c.equip && c.equip.nvrId ? nvrs.find(x => String(x.id) === String(c.equip.nvrId)) : null;
-    let live = null, mon = null;
-    if (n) {
-      try { live = await checkNvr(n); } catch {}
-      try { const m = await clApi('/monitor'); mon = (m.nvrs || []).find(x => String(x.id) === String(n.id)) || null; } catch {}
+    const sel = await pvPickNvrs(c);
+    btn.textContent = 'Verific NVR-ul…';
+    let mon = []; try { mon = (await clApi('/monitor')).nvrs || []; } catch {}
+    const L = []; let qCam = 0, camOn = 0, hddN = 0, tbAll = 0, bad = false, recAll = 0, recBadAll = [];
+    for (const n of sel) {
+      let live = null; try { live = await checkNvr(n); } catch {}
+      const src = live && live.online ? live : (n.cams && n.cams.length ? { cams: n.cams, hdds: n.hdds || [], cached: true } : null);
+      if (!src) { L.push(`⚠️ <b>${escapeHtml(n.name)}</b> nu răspunde acum — nu am putut citi camerele și hard diskul.`); bad = true; continue; }
+      const cams = src.cams.filter(x => x !== 'free'), on = cams.filter(x => x === 'ok').length;
+      const hd = (src.hdds || []), hdOk = hd.length && hd.every(h => ['ok', 'idle', 'normal'].includes(h.status));
+      const tb = Math.round(hd.reduce((a, h) => a + (h.capacity || 0), 0) * 1048576 / 1e12);
+      qCam += cams.length; camOn += on; hddN += hd.length; tbAll += tb;
+      const m = mon.find(x => String(x.id) === String(n.id)); const rb = m ? (m.recBad || []) : []; recAll += m ? m.recChecked || 0 : 0; recBadAll.push(...rb.map(x => n.name + ' CH' + x.ch));
+      if (on < cams.length || !hdOk || rb.length) bad = true;
+      L.push(`${on === cams.length && hdOk && !rb.length ? '✅' : '⚠️'} <b>${escapeHtml(n.name)}</b>${src.cached ? ' (date de la ultima verificare)' : ''}: ${cams.length} camere, ${on} online · HDD ${hd.length ? hd.length + ' × ' + (Math.round(tb / hd.length) || '?') + ' TB, ' + escapeHtml(hd.map(h => h.status).join(', ')) : 'negăsit'}${rb.length ? ' · <b>nu înregistrează: ' + rb.map(x => 'CH' + x.ch).join(', ') + '</b>' : ''}`);
     }
-    const cams = live && live.online ? live.cams.filter(x => x !== 'free') : [];
-    const camOn = cams.filter(x => x === 'ok').length;
-    const hdds = live && live.online ? (live.hdds || []) : [];
-    const hddOk = hdds.length && hdds.every(h => ['ok', 'idle', 'normal'].includes(h.status));
-    const tb = hdds.length ? Math.round(hdds.reduce((a, h) => a + (h.capacity || 0), 0) * 1048576 / 1e12) : 0;
-    const recBad = mon ? (mon.recBad || []) : null, recChk = mon ? mon.recChecked || 0 : 0;
-    const qCam = cams.length || (c.equip && +c.equip.cams) || '';
-    const L = [];
-    if (!n) L.push('⚠️ Clientul nu are un NVR legat în fișă — cantitățile le completezi de mână.');
-    else if (!live || !live.online) L.push(`⚠️ NVR-ul <b>${escapeHtml(n.name)}</b> nu răspunde acum — nu am putut verifica camerele și hard diskul.`);
-    else {
-      L.push(`${camOn === cams.length ? '✅' : '⚠️'} Camere: <b>${cams.length}</b> conectate, <b>${camOn}</b> online.`);
-      L.push(`${hddOk ? '✅' : '⚠️'} Hard disk: ${hdds.length ? `<b>${hdds.length}</b> × ${tb ? Math.round(tb / hdds.length) + ' TB' : '?'}, stare <b>${escapeHtml(hdds.map(h => h.status).join(', '))}</b>` : '<b>nu a fost găsit</b>'}.`);
-      L.push(recBad && recChk ? (recBad.length ? `⚠️ Nu înregistrează: <b>${recBad.map(x => 'CH' + x.ch).join(', ')}</b>.` : `✅ Înregistrare verificată de server: toate cele ${recChk} canale înregistrează.`) : 'ℹ️ Serverul nu a verificat încă înregistrările — verifică-le pe loc, din NVR.');
-    }
-    const bad = L.some(x => x.startsWith('⚠️'));
-    const ok = await confirmDialog({ title: 'Proces-verbal — ' + c.name, tone: bad ? 'danger' : 'watch', okLabel: 'Generează procesul-verbal',
+    if (!sel.length) L.push('⚠️ Niciun NVR ales — cantitățile le completezi de mână.');
+    else if (!recAll) L.push('ℹ️ Serverul nu a verificat încă înregistrările — verifică-le pe loc, din NVR.');
+    else if (!recBadAll.length) L.push(`✅ Înregistrare verificată de server: toate cele ${recAll} canale înregistrează.`);
+    const ok = await confirmDialog({ title: 'Proces-verbal — ' + c.name, tone: bad || !sel.length ? 'danger' : 'watch', okLabel: 'Generează procesul-verbal',
       html: L.join('<br>') + (bad ? '<br><br>Procesul-verbal confirmă că toate camerele și hard diskul înregistrează. Rezolvă problemele înainte să-l semnați.' : '') });
     if (!ok) return;
     btn.textContent = 'Se generează…';
     const d = new Date(), dd = String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
     const nr = lsGet('yca_pv_next', '1');
     const val = { NR: nr, DATA: dd, ASOC: String(c.name || '').replace(/^asocia[tț]ia\s+de\s+proprietari\s*/i, ''), SEDIU: c.address || '', CIF: c.code || '',
-      PRES: String(c.contact || '').split(/\s+[—-]\s+/)[0], IMOBIL: c.address || '', Q_CAM: qCam ? String(qCam) : '', Q_NVR: n ? '1' : '', HDD_TB: tb && hdds.length ? String(Math.round(tb / hdds.length)) : '', Q_HDD: hdds.length ? String(hdds.length) : '' };
+      PRES: String(c.contact || '').split(/\s+[—-]\s+/)[0], IMOBIL: c.address || '', Q_CAM: qCam ? String(qCam) : (c.equip && +c.equip.cams ? String(c.equip.cams) : ''),
+      Q_NVR: sel.length ? String(sel.length) : '', HDD_TB: hddN && tbAll ? String(Math.round(tbAll / hddN)) : '', Q_HDD: hddN ? String(hddN) : '' };
     const r = await fetch('pv-template.docx?v=1', { cache: 'no-store' }); if (!r.ok) throw new Error('Nu găsesc șablonul de proces-verbal');
     const blob = await docxFill(await r.arrayBuffer(), val, await ctrStamp(), { Q_CAM: '………', Q_NVR: '………', Q_HDD: '………', HDD_TB: '………' });
     const name = ('Proces-verbal ' + nr + ' - ' + (val.ASOC || c.name)).replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() + '.docx';
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
     lsSet('yca_pv_next', String((+nr || 0) + 1));
-    try {   // îl păstrăm și în fișa clientului
+    try {
       const up = await clApi(`/clients/${encodeURIComponent(c.id)}/contracts?kind=pv&name=${encodeURIComponent(name)}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: blob });
       cmDraft.contracts = up.client.contracts; const i = clients.findIndex(x => x.id === up.client.id); if (i >= 0) clients[i].contracts = up.client.contracts; renderCmFiles();
       toast('Proces-verbal generat și salvat în fișa clientului', 'ok');
