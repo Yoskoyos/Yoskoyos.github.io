@@ -656,6 +656,9 @@ html:not([data-role="admin"]) .ro-admin{display:none!important}
 .spb-evs{margin:8px 0 2px;border-left:2px solid var(--border);padding-left:10px;display:flex;flex-direction:column;gap:6px}
 .spb-ev{font-size:12.5px;line-height:1.45}.spb-ev span{display:block;font-size:10.5px;color:var(--text-3,#888);font-weight:600}
 .spb-ev.castigat{color:var(--ok)}.spb-ev.pierdut,.spb-ev.anulat{color:var(--err)}.spb-ev.comanda,.spb-ev.suspendat,.spb-ev.contestatie{color:var(--warn)}.spb-ev.modificat{color:var(--accent,#3b82f6)}
+.spf{margin:10px 0 4px;border:1px dashed var(--border);border-radius:10px;padding:8px 10px}.spf-h{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;font-weight:600;margin-bottom:4px}.spf-h .sp-btn{padding:4px 10px;font-size:12px}
+.spf-row{display:flex;align-items:center;gap:10px;font-size:12.5px;padding:4px 0;border-top:1px solid var(--border)}.spf-row a{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:inherit;text-decoration:none}.spf-row a:hover{text-decoration:underline}.spf-row span{font-size:11px;color:var(--text-3,#888);white-space:nowrap}
+.spf-del{border:0;background:none;color:var(--text-3,#888);cursor:pointer;font-size:13px;padding:2px 4px}.spf-del:hover{color:var(--err)}.spf-empty{font-size:11.5px;color:var(--text-3,#888)}.sp-card.spf-drop{outline:2px dashed var(--accent,#3b82f6);outline-offset:2px}
 .spb-trk{font-size:11px;color:var(--text-3,#888);margin-top:6px}
 .cm-months{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px}
 .cm-month{border:1px solid var(--border);background:var(--bg-2);border-radius:8px;padding:7px 6px;font-size:11px;font-weight:700;cursor:pointer;text-align:center;font-family:var(--sans);color:var(--fg-2);line-height:1.3}
@@ -1508,6 +1511,7 @@ html:not(.unlocked) .app{display:none}
         <div class="cm-hint" id="spb-trk" style="margin:-4px 0 10px"></div>
         <div class="cl-tools"><input type="search" class="cl-search" id="spb-search" placeholder="Caută: autoritate, obiect, număr…" autocomplete="off"></div>
         <div class="sp-chips" id="spb-res"><button class="sp-chip on" data-v="">Toate</button><button class="sp-chip" data-v="evaluare">În evaluare</button><button class="sp-chip" data-v="castigat">Câștigate</button><button class="sp-chip" data-v="pierdut">Pierdute</button><button class="sp-chip" data-v="anulat">Anulate / retrase</button></div>
+        <input type="file" id="spb-fin" multiple hidden accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.zip,.rar,.7z,.p7s,.p7m,.xml,.jpg,.jpeg,.png,.txt,.eml,.msg">
         <div class="cl-list" id="spb-list"><div class="cl-empty">Se încarcă…</div></div>
         <div class="cm-hint" style="margin-top:12px">Aici apar licitațiile marcate „✔ Ofertat” în Anunțuri și cele adăugate de mână. Rămân salvate și după termen, cu prețul ofertat și rezultatul. Serverul verifică singur în SEAP cele aflate „În evaluare” (din oră în oră cât e termenul deschis, apoi la ~3 ore, 08–21) și îți trimite alertă pe telefon și Telegram la orice modificare făcută de autoritate (termen, valoare, erată, texte, documente noi — ex. răspunsuri la clarificări) și când licitația e anulată, suspendată, contestată, atribuită (cu câștigătorul și prețul) sau când primești comanda directă de acceptat. Respingerea ofertei din raportul procedurii nu e publică — aceea vine pe e-mail / în SEAP.</div>
       </div>
@@ -6959,9 +6963,42 @@ function renderBids() {
       <div class="sp-ca">${escapeHtml(x.ca || '')}${x.city ? ' · ' + escapeHtml(x.city) : ''}${x.no ? ' · ' + escapeHtml(x.no) : ''}</div>
       <div class="sp-row"><span>Prețul nostru: <b>${lei(b.price)}</b></span><span>Valoare estimată: <b>${lei(x.value)}</b></span>${b.submittedAt ? `<span>Depusă: <b>${escapeHtml(new Date(b.submittedAt).toLocaleDateString('ro-RO'))}</b></span>` : dl ? `<span>Termen: <b>${escapeHtml(dl)}</b></span>` : ''}${b.result === 'pierdut' && (b.winner || b.winnerPrice) ? `<span>Câștigător: <b>${escapeHtml(b.winner || '—')}${b.winnerPrice ? ' · ' + lei(b.winnerPrice) : ''}</b></span>` : ''}</div>
       ${b.notes ? `<div class="sp-exp">${escapeHtml(b.notes)}</div>` : ''}
+      ${spbFilesHtml(x)}
       ${spbTrackHtml(x)}
       <div class="sp-acts"><button class="sp-btn pri" data-spbe>Editează</button>${x.url ? `<a class="sp-btn" href="${escapeHtml(x.url)}" target="_blank" rel="noopener">Vezi în SEAP ↗</a>` : ''}${(x.docs || []).length ? '<button class="sp-btn" data-spzip>Documentație</button>' : ''}${x.analysis && x.analysis.status === 'done' ? '<button class="sp-btn ai" data-span="view">🔍 Analiza</button>' : ''}</div></div>`; }).join('');
 }
+/* ── Dosarul cu documentele depuse de noi (pe server, seap-files/) ── */
+let spbUpKey = null;
+const spbSize = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+const spbIcon = e => /^(pdf)$/.test(e) ? '📕' : /^(docx?|odt)$/.test(e) ? '📘' : /^(xlsx?|ods)$/.test(e) ? '📗' : /^(zip|rar|7z)$/.test(e) ? '🗜' : /^(p7s|p7m)$/.test(e) ? '🔏' : /^(jpe?g|png)$/.test(e) ? '🖼' : '📄';
+function spbFilesHtml(x) {
+  const fs = (x.files || []).slice().sort((a, b) => a.name.localeCompare(b.name, 'ro', { numeric: true }));
+  const a = getAuth(), base = getProxyBase(), k = encodeURIComponent(x.key);
+  const rows = fs.map(f => `<div class="spf-row"><a href="${base}/seap/${k}/files/${encodeURIComponent(f.id)}?token=${encodeURIComponent(a ? a.token : '')}" target="_blank" rel="noopener">${spbIcon(f.ext)} ${escapeHtml(f.name)}</a><span>${spbSize(f.size)} · ${new Date(f.uploadedAt).toLocaleDateString('ro-RO')}</span><button type="button" class="spf-del" data-spfdel="${escapeHtml(f.id)}" title="Șterge">✕</button></div>`).join('');
+  return `<div class="spf"><div class="spf-h"><span>📁 Documentația depusă${fs.length ? ` <b>(${fs.length})</b>` : ''}</span><button type="button" class="sp-btn" data-spfup>⬆ Adaugă documente</button></div>${rows || '<div class="spf-empty">Niciun document încă — pune aici oferta tehnică, financiară, DUAE, declarațiile, e-mailul de trimitere etc.</div>'}</div>`;
+}
+async function spbUpload(key, files) {
+  const it = (seap.items || []).find(i => i.key === key); if (!it || !files.length) return;
+  let ok = 0;
+  for (const f of files) {
+    if (f.size > 60 * 1048576) { toast(`${f.name}: prea mare (maxim 60 MB)`, 'warn'); continue; }
+    toast(`Se încarcă ${f.name}…`, 'info');
+    try { const r = await clApi(`/seap/${encodeURIComponent(key)}/files?name=${encodeURIComponent(f.name)}`, { method: 'POST', headers: { 'Content-Type': f.type || 'application/octet-stream' }, body: f }); it.files = r.files; ok++; }
+    catch (e) { toast(`${f.name}: ${/HTTP 40[45]|Operație/.test(e.message) ? 'actualizează serverul (v9.1)' : e.message}`, 'err'); }
+  }
+  renderBids(); if (ok) toast(ok === 1 ? 'Document adăugat' : `${ok} documente adăugate`, 'ok');
+}
+async function spbFileDel(key, fid) {
+  const it = (seap.items || []).find(i => i.key === key); const f = it && (it.files || []).find(x => x.id === fid); if (!f) return;
+  if (!(await confirmDialog({ title: 'Ștergi documentul?', html: `<b>${escapeHtml(f.name)}</b> se șterge definitiv de pe server.`, okLabel: 'Șterge' }))) return;
+  try { const r = await clApi(`/seap/${encodeURIComponent(key)}/files/${encodeURIComponent(fid)}`, { method: 'DELETE' }); it.files = r.files; renderBids(); }
+  catch (e) { toast(e.message, 'err'); }
+}
+qs('#spb-fin').addEventListener('change', e => { const fl = [...e.target.files]; e.target.value = ''; if (spbUpKey) spbUpload(spbUpKey, fl); });
+// trage fișierele direct peste card
+qs('#spb-list').addEventListener('dragover', e => { const c = e.target.closest('.sp-card'); if (c) { e.preventDefault(); c.classList.add('spf-drop'); } });
+qs('#spb-list').addEventListener('dragleave', e => { const c = e.target.closest('.sp-card'); if (c && !c.contains(e.relatedTarget)) c.classList.remove('spf-drop'); });
+qs('#spb-list').addEventListener('drop', e => { const c = e.target.closest('.sp-card'); if (!c) return; e.preventDefault(); c.classList.remove('spf-drop'); spbUpload(c.dataset.k, [...e.dataTransfer.files]); });
 function spbTrackHtml(x) {
   const t = x.track || {}, ev = (t.events || []).slice().sort((a, b) => b.t - a.t);
   const when = ms => new Date(ms).toLocaleString('ro-RO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -7021,6 +7058,8 @@ qs('#spb-list').addEventListener('click', e => {
   if (e.target.closest('[data-spbe]')) return openBid(card.dataset.k);
   const z = e.target.closest('[data-spzip]'); if (z) return spZip(card.dataset.k, z);
   if (e.target.closest('[data-span]')) return spAnalysisOpen(card.dataset.k);
+  if (e.target.closest('[data-spfup]')) { spbUpKey = card.dataset.k; return qs('#spb-fin').click(); }
+  const fd = e.target.closest('[data-spfdel]'); if (fd) return spbFileDel(card.dataset.k, fd.dataset.spfdel);
 });
 
 async function spZip(key, btn) {

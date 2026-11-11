@@ -200,7 +200,7 @@ function getAuth(req) {
   if (!tok) {   // <img src> nu poate trimite antete → tokenul poate veni și în ?token= (doar pentru /snap)
     try {
       const q = url.parse(req.url, true);
-      const tokOk = q.pathname === '/snap' || (req.method === 'GET' && (q.pathname === '/clients-backup' || /^\/clients\/[\w-]+\/contracts\/[\w-]+$/.test(q.pathname || '') || /^\/company-docs\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/ops\/(works|stock|gdpr|catalog)\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/seap\/[\w:%-]+\/zip$/.test(q.pathname || '')));
+      const tokOk = q.pathname === '/snap' || (req.method === 'GET' && (q.pathname === '/clients-backup' || /^\/clients\/[\w-]+\/contracts\/[\w-]+$/.test(q.pathname || '') || /^\/company-docs\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/ops\/(works|stock|gdpr|catalog)\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/seap\/[\w:%-]+\/zip$/.test(q.pathname || '') || /^\/seap\/[\w:%-]+\/files\/[\w-]+$/.test(q.pathname || '')));
       if (tokOk && q.query.token) tok = String(q.query.token);
     } catch {}
   }
@@ -1938,7 +1938,7 @@ async function seapRun(db, reason) {
       await sleep(300);
     }
     for (const [k, it] of Object.entries(st.items)) if (it.status !== 'applied' && it.deadline && Date.parse(it.deadline) < now - 7 * 864e5) delete st.items[k];   // cele ofertate de noi rămân pentru totdeauna   // păstrăm o săptămână după termen
-    { const cur = loadSeap(); for (const [k, x] of Object.entries(cur.items)) if (st.items[k]) { for (const f of ['analysis', 'status', 'note', 'bid', 'track']) if (x[f] !== undefined) st.items[k][f] = x[f]; } }   // păstrăm ce s-a schimbat între timp (stare, analiză)
+    { const cur = loadSeap(); for (const [k, x] of Object.entries(cur.items)) if (st.items[k]) { for (const f of ['analysis', 'status', 'note', 'bid', 'track', 'files']) if (x[f] !== undefined) st.items[k][f] = x[f]; } }   // păstrăm ce s-a schimbat între timp (stare, analiză)
     st.lastRun = now; st.lastErr = errs ? `${errs} căutări eșuate` : ''; st.lastReason = reason || '';
     saveSeap(st);
     return { added, total: Object.keys(st.items).length, errs };
@@ -2368,6 +2368,12 @@ async function seapTrack(db, opt = {}) {
   })().finally(() => { seapTrackBusy = null; });
   return seapTrackBusy;
 }
+// documentele depuse de noi la o licitație: seap-files/<cheie>/<id>.<ext> (doar pe server)
+const SEAP_FILES_DIR = path.join(BASE_DIR, 'seap-files');
+const SEAP_FILE_EXT = { pdf: 'application/pdf', doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', odt: 'application/vnd.oasis.opendocument.text', ods: 'application/vnd.oasis.opendocument.spreadsheet', zip: 'application/zip', rar: 'application/vnd.rar', '7z': 'application/x-7z-compressed',
+  p7s: 'application/pkcs7-signature', p7m: 'application/pkcs7-mime', xml: 'application/xml', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', txt: 'text/plain; charset=utf-8', eml: 'message/rfc822', msg: 'application/vnd.ms-outlook' };
+const seapFileDir = key => path.join(SEAP_FILES_DIR, String(key).replace(/[^\w-]/g, '_'));
 async function handleSeap(req, res, pathname, parsed) {
   const ctx = requireUser(req, res, 'seap'); if (!ctx) return;
   const parts = pathname.split('/').filter(Boolean);   // seap[/refresh | /<key>[/zip]]
@@ -2404,7 +2410,7 @@ async function handleSeap(req, res, pathname, parsed) {
     const b = await readJson(req); if (['new', 'interest', 'ignored', 'applied'].includes(b.status)) it.status = b.status;
     if (b.bid && typeof b.bid === 'object') it.bid = seapBid({ ...(it.bid || {}), ...b.bid });
     if (it.manual) { for (const f of ['title', 'ca', 'no', 'url', 'deadline']) if (b[f] !== undefined) it[f] = str(b[f], f === 'url' ? 500 : 300); if (b.value !== undefined) it.value = num(b.value) || null; }
-    if (b.remove && it.manual) { delete st.items[key]; saveSeap(st); return sendJson(res, 200, { removed: true }); }
+    if (b.remove && it.manual) { delete st.items[key]; saveSeap(st); try { fs.rmSync(seapFileDir(key), { recursive: true, force: true }); } catch {} return sendJson(res, 200, { removed: true }); }
     if (b.note !== undefined) it.note = str(b.note, 1000);
     saveSeap(st); return sendJson(res, 200, { item: it });
   }
@@ -2418,6 +2424,37 @@ async function handleSeap(req, res, pathname, parsed) {
       if (aiJobs.size >= 2) return sendJson(res, 429, { error: 'Rulează deja 2 analize — așteaptă să se termine' });
       seapAnalyze(ctx.db, key, ctx.uname).catch(e => console.error('[seap-ai]', e.message));
       return sendJson(res, 200, { ok: true, running: true });
+    }
+  }
+  if (parts[2] === 'files') {   // dosarul cu documentele depuse de noi
+    const dir = seapFileDir(key); it.files = it.files || [];
+    if (parts.length === 3 && req.method === 'POST') {
+      const q = url.parse(req.url, true).query;
+      const name = (str(q.name, 180).replace(/[\\/:*?"<>|\r\n]/g, '_').trim() || 'document');
+      const ext = ((/\.([a-z0-9]{1,5})$/i.exec(name) || [])[1] || '').toLowerCase();
+      if (!SEAP_FILE_EXT[ext]) return sendJson(res, 400, { error: 'Tip de fișier neacceptat (PDF, Word, Excel, ZIP, P7S, XML, imagini)' });
+      let buf; try { buf = await readRaw(req, 60 * 1048576); } catch { return sendJson(res, 413, { error: 'Fișierul e prea mare (maxim 60 MB)' }); }
+      if (!buf.length) return sendJson(res, 400, { error: 'Fișier gol' });
+      const f = { id: newId(), name, ext, size: buf.length, uploadedAt: Date.now(), by: ctx.uname };
+      fs.mkdirSync(dir, { recursive: true, mode: 0o700 }); fs.writeFileSync(path.join(dir, f.id + '.' + ext), buf, { mode: 0o600 });
+      const cur = loadSeap(); const ci = cur.items[key]; if (!ci) return sendJson(res, 404, { error: 'Anunț inexistent' });
+      ci.files = (ci.files || []).concat(f); saveSeap(cur); return sendJson(res, 200, { file: f, files: ci.files });
+    }
+    const fid = parts[3]; if (!/^[\w-]+$/.test(fid || '')) return sendJson(res, 400, { error: 'ID invalid' });
+    const f = it.files.find(x => x.id === fid); if (!f) return sendJson(res, 404, { error: 'Document inexistent' });
+    const fp = path.join(dir, f.id + '.' + f.ext);
+    if (req.method === 'GET') {
+      let data; try { data = fs.readFileSync(fp); } catch { return sendJson(res, 404, { error: 'Fișierul lipsește de pe server' }); }
+      const ascii = f.name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '');
+      const inline = /^(pdf|jpg|jpeg|png|txt)$/.test(f.ext) && !url.parse(req.url, true).query.dl;
+      res.writeHead(200, { 'Content-Type': SEAP_FILE_EXT[f.ext] || 'application/octet-stream', 'Content-Length': data.length, 'Cache-Control': 'private, no-store',
+        'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(f.name)}`, ...CORS });
+      return res.end(data);
+    }
+    if (req.method === 'DELETE') {
+      try { fs.unlinkSync(fp); } catch {}
+      const cur = loadSeap(); const ci = cur.items[key]; if (ci) { ci.files = (ci.files || []).filter(x => x.id !== fid); saveSeap(cur); }
+      return sendJson(res, 200, { ok: true, files: ci ? ci.files : [] });
     }
   }
   if (parts[2] === 'zip' && req.method === 'GET') {
@@ -3515,7 +3552,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 9.0, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 9.1, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
