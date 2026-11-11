@@ -1279,9 +1279,17 @@ const A2T_EVERY = 7 * 864e5;
 async function a2tPriceSync(u) {
   const cfg = u.offerCfg = u.offerCfg || {}; const a = cfg.a2t = { on: true, markup: 50, skus: {}, ...(cfg.a2t || {}) };
   const map = { ...A2T_MAP }; for (const [k, v] of Object.entries(a.skus || {})) { if (v === '') delete map[k]; else if (v) map[k] = String(v).trim(); }
-  const got = await a2tBySku([...new Set(Object.values(map))]);
-  if (!Object.keys(got).length) { a.err = 'A2T nu a răspuns — încerc din nou mâine'; a.tryAt = Date.now(); return { ok: 0, missing: Object.keys(map).length }; }
-  const items = {}; let ok = 0; const missing = [];
+  // poziții legate de stocul meu (stock:<id>): preț = costul din stoc (fără TVA) + adaos; stocul = cantitatea mea
+  const items = {}; let ok = 0;
+  for (const [key, v] of Object.entries(map)) { if (!/^stock:/.test(v)) continue; delete map[key];
+    const it = (u.stock || []).find(x => x.id === v.slice(6)); const [k, vv] = key.split('.');
+    if (!it) { items[key] = { sku: v, stock: true, missing: true }; continue; }
+    const cost = +it.price || 0;
+    if (cost) { const price = Math.round(cost * (1 + (+a.markup || 0) / 100)); cfg[k] = cfg[k] || {}; if (vv) { cfg[k].p = cfg[k].p || {}; cfg[k].p[vv] = price; } else cfg[k].price = price; }
+    items[key] = { sku: v, stock: true, stockId: it.id, name: it.name, qty: +it.qty || 0, cost, inStock: (+it.qty || 0) > 0 }; ok++; }
+  const got = Object.keys(map).length ? await a2tBySku([...new Set(Object.values(map))]) : { _: 1 };
+  if (!Object.keys(got).length) { a.err = 'A2T nu a răspuns — încerc din nou mâine'; a.tryAt = Date.now(); a.items = { ...(a.items || {}), ...items }; return { ok, missing: Object.keys(map).length }; }
+  const missing = [];
   for (const [key, sku] of Object.entries(map)) {
     const s = got[sku.toUpperCase()]; const site = s ? +(s.final_price || s.price) : 0;
     if (!site) { missing.push(sku); items[key] = { sku, missing: true }; continue; }
@@ -3621,7 +3629,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 9.5, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 9.6, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);

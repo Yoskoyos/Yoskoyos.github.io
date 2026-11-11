@@ -1161,7 +1161,7 @@ html:not(.unlocked) .app{display:none}
 .of-int{font-size:12.5px;color:var(--fg-3)}.of-sm{width:62px!important;padding:4px 6px!important;font-size:12px!important;display:inline-block}
 .ofc-g{border-bottom:1px solid var(--border);padding:10px 0;display:flex;flex-direction:column;gap:6px}.ofc-g>b{font-size:13px}
 .ofc-p{display:flex;flex-wrap:wrap;gap:8px}.ofc-r{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--fg-3)}.ofc-r .form-input{width:86px}.ofc-n{width:100%!important;font-size:12px!important}
-.ofc-r{flex-wrap:wrap}.ofc-sku{width:150px!important;font-size:11px!important;padding:4px 6px!important;color:var(--fg-3)}.ofc-r small{font-size:11px;color:var(--fg-3)}.ofc-r small.bad,.ofc-a2t .bad{color:var(--err)}
+.ofc-r{flex-wrap:wrap}.ofc-src{width:190px!important;font-size:11px!important;padding:4px 6px!important}.ofc-sku{width:150px!important;font-size:11px!important;padding:4px 6px!important;color:var(--fg-3)}.ofc-r small{font-size:11px;color:var(--fg-3)}.ofc-r small.bad,.ofc-a2t .bad{color:var(--err)}
 .ofc-a2t{border:1px solid var(--accent);background:var(--accent-dim);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
 .ofc-a2t-h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;font-size:13px}.ofc-a2t-h label{display:flex;gap:6px;align-items:center}
 .ofc-a2t-s{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12.5px}.ofc-a2t-s .btn{padding:5px 10px;font-size:12px;flex:0 0 auto;width:auto}
@@ -7378,8 +7378,19 @@ const OF_DEF = {
 let ofCfg = null, offers = null, ofDraft = null;
 const ofSkuFor = key => { const s = ofCfg && ofCfg.a2t && ofCfg.a2t.skus; return (s && s[key] !== undefined ? s[key] : OF_A2T[key]) || ''; };
 const ofCableSku = () => ofSkuFor('cable');
+// sursa unei poziții din „Prețurile mele”: cod A2T sau un produs din stocul meu (stock:<id>)
+function ofSrcLine(key) {
+  const v = key ? ofSkuFor(key) : ''; if (!/^stock:/.test(v)) return { sku: v };
+  const it = ((typeof ops !== 'undefined' && ops && ops.stock) || []).find(x => x.id === v.slice(6));
+  return { sku: '', stockId: v.slice(6), cost: it && +it.price ? +it.price : 0 };
+}
 /* ── stocul la A2T, live, pentru codurile din ofertă ── */
 const ofStock = {}; let ofStockT = null;
+function ofLineBadge(l) {
+  if (l && l.stockId && !l.sku) { const it = ((typeof ops !== 'undefined' && ops && ops.stock) || []).find(x => x.id === l.stockId);
+    return it ? `<span class="of-stk ${it.qty >= (+l.qty || 0) ? 'ok' : it.qty > 0 ? 'warn' : 'bad'}">📦 ${it.qty} ${escapeHtml(it.unit || 'buc')} în stocul tău</span>` : '<span class="of-stk bad">produs șters din stoc</span>'; }
+  return ofStockBadge(l && l.sku);
+}
 function ofStockBadge(sku) {
   if (!sku) return ''; const x = ofStock[sku.toUpperCase()];
   if (x === undefined) return '<span class="of-stk wait">verific stocul…</span>';
@@ -7392,7 +7403,7 @@ function ofStockRefresh(force) {
     if (!need.length) return;
     try { const r = await clApi('/ops/a2t-stock?skus=' + encodeURIComponent(need.join(','))); for (const [k, v] of Object.entries(r.items || {})) ofStock[k.toUpperCase()] = v; }
     catch { for (const k of need) ofStock[k.toUpperCase()] = ofStock[k.toUpperCase()] ?? null; }
-    document.querySelectorAll('#of-lines .of-row[data-i]').forEach(row => { const l = ofDraft.lines[+row.dataset.i]; const b = row.querySelector('.of-stkw'); if (l && b) b.innerHTML = ofStockBadge(l.sku); });
+    document.querySelectorAll('#of-lines .of-row[data-i]').forEach(row => { const l = ofDraft.lines[+row.dataset.i]; const b = row.querySelector('.of-stkw'); if (l && b) b.innerHTML = ofLineBadge(l); });
     if (!qs('#ofo-modal').classList.contains('hidden')) ofOrderRender();
   }, force ? 0 : 450);
 }
@@ -7473,7 +7484,7 @@ function ofRenderLines() {
   qs('#of-lines').classList.toggle('cost', showCost);
   qs('#of-lines').innerHTML = (ls.length ? `<div class="of-row of-hd"><div>#</div><div>Denumire</div><div>Tip</div><div>UM</div><div class="r">Cant.</div><div class="r">Preț unitar</div>${showCost ? '<div class="r">Cost unitar</div>' : ''}<div class="r">Valoare</div><div></div></div>` : '<div class="cl-empty" style="padding:18px">Lista e goală — folosește configuratorul rapid de mai sus sau butoanele de mai jos.</div>')
     + ls.map((l, i) => `<div class="of-row" data-i="${i}"><div class="of-i">${i + 1}<span class="of-mv"><button type="button" data-mv="-1" title="Sus">▲</button><button type="button" data-mv="1" title="Jos">▼</button></span></div>
-      <div><input class="form-input" data-f="name" value="${escapeHtml(l.name)}" placeholder="Denumire"><div class="of-sub"><input class="form-input of-desc" data-f="desc" value="${escapeHtml(l.desc || '')}" placeholder="detalii (opțional)"><input class="form-input of-sku" data-f="sku" value="${escapeHtml(l.sku || '')}" placeholder="cod A2T" title="Codul produsului de pe a2t.ro — intern, nu apare în PDF"></div><div class="of-stkw">${ofStockBadge(l.sku)}</div></div>
+      <div><input class="form-input" data-f="name" value="${escapeHtml(l.name)}" placeholder="Denumire"><div class="of-sub"><input class="form-input of-desc" data-f="desc" value="${escapeHtml(l.desc || '')}" placeholder="detalii (opțional)"><input class="form-input of-sku" data-f="sku" value="${escapeHtml(l.sku || '')}" placeholder="cod A2T" title="Codul produsului de pe a2t.ro — intern, nu apare în PDF"></div><div class="of-stkw">${ofLineBadge(l)}</div></div>
       <div><select class="form-input" data-f="kind">${Object.entries(OF_KIND).map(([k, v]) => `<option value="${k}"${l.kind === k ? ' selected' : ''}>${v}</option>`).join('')}</select></div>
       <div><input class="form-input" data-f="unit" value="${escapeHtml(l.unit || 'buc')}"></div>
       <div><input class="form-input r" data-f="qty" inputmode="decimal" value="${l.qty}"></div>
@@ -7495,7 +7506,7 @@ qs('#of-showcost').addEventListener('change', ofRenderLines);
 qs('#of-lines').addEventListener('input', e => {
   const row = e.target.closest('.of-row'), f = e.target.dataset.f; if (!row || !f) return;
   const l = ofDraft.lines[+row.dataset.i]; l[f] = ['qty', 'price', 'cost'].includes(f) ? ofN(e.target.value) : e.target.value;
-  if (f === 'sku') { l.sku = e.target.value.trim(); row.querySelector('.of-stkw').innerHTML = ofStockBadge(l.sku); ofStockRefresh(); }
+  if (f === 'sku') { l.sku = e.target.value.trim(); row.querySelector('.of-stkw').innerHTML = ofLineBadge(l); ofStockRefresh(); }
   if (f === 'qty' || f === 'price') row.querySelector('.of-val').textContent = ofL((+l.qty || 0) * (+l.price || 0));
   ofRenderTot();
 });
@@ -7528,8 +7539,9 @@ function ofPick() {
 }
 qs('#of-pick-q').addEventListener('input', ofPick);
 qs('#of-pick-res').addEventListener('click', e => { const b = e.target.closest('.of-pi'); if (!b) return; const x = qs('#of-pick-res').__items[+b.dataset.pi];
-  const price = x.price || (x.cost ? Math.round(x.cost / 1.21 * 1.3) : 0);   // din stoc: cost (cu TVA, din factură) → preț fără TVA + 30% adaos
-  ofDraft.lines.push({ name: x.name, desc: '', unit: x.unit, qty: 1, price, cost: x.cost ? Math.round(x.cost / 1.21 * 100) / 100 : 0, kind: x.kind, stockId: x.stockId || '' });
+  const mk = ofCfg && ofCfg.a2t && ofCfg.a2t.markup != null ? +ofCfg.a2t.markup : 50;
+  const price = x.price || (x.cost ? Math.round(x.cost * (1 + mk / 100)) : 0);   // din stoc: costul (fără TVA, din factură) + adaosul meu
+  ofDraft.lines.push({ name: x.name, desc: '', unit: x.unit, qty: 1, price, cost: x.cost || 0, kind: x.kind, stockId: x.stockId || '' });
   ofRenderLines(); toast('Adăugat: ' + x.name.slice(0, 40), 'ok'); });
 
 /* ── configuratorul rapid ── */
@@ -7553,7 +7565,7 @@ qs('#of-quick').addEventListener('click', e => {
 qs('#oq-go').addEventListener('click', async () => {
   const k = ofQuickCalc(), C = k.C; if (!k.n) return toast('Pune numărul de camere', 'warn');
   if (ofDraft.lines.length && !(await confirmDialog({ title: 'Înlocuiești lista?', html: 'Lista actuală de produse se înlocuiește cu cea generată.', okLabel: 'Înlocuiește', tone: 'watch' }))) return;
-  const L = [], add = (d, qty, extra, key) => { if (qty > 0) L.push({ name: (d.name || '').replace('{r}', k.r + ' MP').replace('{c}', k.ch).replace('{pp}', k.pp).replace('{t}', k.tb), desc: '', unit: d.unit, qty, price: +(extra != null ? extra : d.price) || 0, cost: 0, kind: d.kind || 'echipament', sku: key ? ofSkuFor(key) : '' }); };
+  const L = [], add = (d, qty, extra, key) => { if (qty > 0) L.push({ name: (d.name || '').replace('{r}', k.r + ' MP').replace('{c}', k.ch).replace('{pp}', k.pp).replace('{t}', k.tb), desc: '', unit: d.unit, qty, price: +(extra != null ? extra : d.price) || 0, cost: 0, kind: d.kind || 'echipament', ...ofSrcLine(key) }); };
   add(C.cam_ext, k.ext, C.cam_ext.p[k.r], 'cam_ext.' + k.r); add(C.cam_int, k.int, C.cam_int.p[k.r], 'cam_int.' + k.r);
   add(C.nvr, 1, C.nvr.p[k.ch], 'nvr.' + k.ch);
   if (k.n > 16) { const ex = k.n - 16, n16 = Math.floor(ex / 16) + (ex % 16 > 8 ? 1 : 0), n8 = ex % 16 > 0 && ex % 16 <= 8 ? 1 : 0;   // camerele peste cele 16 porturi PoE ale NVR-ului
@@ -7730,7 +7742,10 @@ ${grp(['echipament', 'material'], 'Echipamente și materiale', '📦')}${grp(['m
 function ofcRender() {
   const C = ofCfgGet(), A = (ofCfg && ofCfg.a2t) || {}, items = A.items || {}, skus = A.skus || {};
   const row = (k, sub, lbl, val) => { const key = sub === 'price' ? k : k + '.' + sub, sku = skus[key] !== undefined ? skus[key] : (OF_A2T[key] || ''), it = items[key];
-    const hint = !OF_A2T[key] && !skus[key] ? '' : `<input class="form-input ofc-sku" data-sku="${escapeHtml(key)}" value="${escapeHtml(sku)}" placeholder="cod A2T" title="Codul produsului de pe a2t.ro (gol = nu se actualizează)">${it && !it.missing ? `<small title="${escapeHtml(it.name || '')}">site ${ofL(it.site)}${it.qty != null ? (it.inStock ? ` · <span class="okc">stoc ${it.qty}</span>` : ' · <span class="bad">fără stoc</span>') : ''}</small>` : it && it.missing ? '<small class="bad">negăsit</small>' : ''}`;
+    const stk = ((typeof ops !== 'undefined' && ops && ops.stock) || []).slice().sort((a, b) => a.name.localeCompare(b.name, 'ro')), isSt = /^stock:/.test(sku), sid = isSt ? sku.slice(6) : '';
+    const sel = `<select class="form-input ofc-src" data-src="${escapeHtml(key)}" title="De unde iau prețul și stocul"><option value="">A2T (cod)</option>${stk.map(x => `<option value="${escapeHtml(x.id)}"${x.id === sid ? ' selected' : ''}>📦 ${escapeHtml(x.name.slice(0, 60))} (${x.qty})</option>`).join('')}</select>`;
+    const hint = !OF_A2T[key] && !skus[key] ? '' : isSt ? sel + (it && it.stock ? `<small>stocul meu: <span class="${it.qty > 0 ? 'okc' : 'bad'}">${it.qty} buc</span>${it.cost ? ' · cost ' + ofL(it.cost) : ''}</small>` : '<small>se calculează la salvare</small>')
+      : sel + `<input class="form-input ofc-sku" data-sku="${escapeHtml(key)}" value="${escapeHtml(sku)}" placeholder="cod A2T" title="Codul produsului de pe a2t.ro (gol = nu se actualizează)">${it && !it.missing && !it.stock ? `<small title="${escapeHtml(it.name || '')}">site ${ofL(it.site)}${it.qty != null ? (it.inStock ? ` · <span class="okc">stoc ${it.qty}</span>` : ' · <span class="bad">fără stoc</span>') : ''}</small>` : it && it.missing ? '<small class="bad">negăsit</small>' : ''}`;
     return `<div class="ofc-r"><span>${escapeHtml(lbl)}</span><input class="form-input r" data-k="${k}" data-s="${sub}" inputmode="decimal" value="${val}">${hint}</div>`; };
   const when = A.at ? new Date(A.at).toLocaleString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'încă nu';
   let h = `<div class="ofc-a2t"><div class="ofc-a2t-h"><label><input type="checkbox" id="ofc-a2t-on"${A.on === false ? '' : ' checked'}> <b>Prețuri din A2T, actualizate automat o dată la 7 zile</b></label>
@@ -7744,8 +7759,13 @@ function ofcRender() {
   h += `<div class="ofc-g"><b>Condiții implicite în ofertă</b><textarea class="form-input" id="ofc-notes" rows="4">${escapeHtml(C.notes)}</textarea><b>Text de început implicit</b><textarea class="form-input" id="ofc-intro" rows="2">${escapeHtml(C.intro)}</textarea></div>`;
   qs('#ofc-body').innerHTML = h;
 }
-qs('#of-cfg-btn').addEventListener('click', async () => { if (!ofCfg) { try { ofCfg = (await clApi('/ops/offer-cfg')).cfg; } catch {} } ofcRender(); qs('#ofc-modal').classList.remove('hidden'); });
+qs('#of-cfg-btn').addEventListener('click', async () => { try { const r = await clApi('/ops'); ops = r; ofCfg = r.offerCfg || ofCfg; } catch {} ofcRender(); qs('#ofc-modal').classList.remove('hidden'); });
 const ofcClose = () => qs('#ofc-modal').classList.add('hidden');
+qs('#ofc-body').addEventListener('change', async e => {
+  const s = e.target.closest('[data-src]'); if (!s) return;
+  try { await ofcSaveCfg(); const r = await clApi('/ops/offer-cfg/a2t', { method: 'POST' }); ofCfg = r.cfg; ofcRender(); toast(s.value ? 'Prețul și stocul se iau acum din stocul tău' : 'Revenit la prețul din A2T', 'ok'); }
+  catch (err) { toast(/HTTP 40[45]|necunoscut/i.test(err.message) ? 'Actualizează serverul (v9.6)' : err.message, 'err'); }
+});
 qs('#ofc-body').addEventListener('click', async e => {
   const b = e.target.closest('#ofc-a2t-now'); if (!b) return;
   b.disabled = true; b.textContent = 'Se citesc prețurile de pe a2t.ro…';
@@ -7761,6 +7781,7 @@ async function ofcSaveCfg() {
     if (s === 'name') cfg[k].name = i.value.trim(); else if (s === 'price') cfg[k].price = ofN(i.value); else { cfg[k].p = cfg[k].p || {}; cfg[k].p[s] = ofN(i.value); } });
   cfg.notes = qs('#ofc-notes').value; cfg.intro = qs('#ofc-intro').value;
   const sk = {}; qs('#ofc-body').querySelectorAll('[data-sku]').forEach(i => { const v = i.value.trim(), d = OF_A2T[i.dataset.sku] || ''; if (v !== d) sk[i.dataset.sku] = v; });
+  qs('#ofc-body').querySelectorAll('[data-src]').forEach(s => { const k = s.dataset.src; if (s.value) sk[k] = 'stock:' + s.value; else if (/^stock:/.test(((ofCfg && ofCfg.a2t && ofCfg.a2t.skus) || {})[k] || '') && sk[k] === undefined) sk[k] = OF_A2T[k] || ''; });
   cfg.a2t = { on: qs('#ofc-a2t-on').checked, markup: ofN(qs('#ofc-mk').value), skus: sk };
   const r = await clApi('/ops/offer-cfg', jsonOpt('PUT', { cfg })); ofCfg = r.cfg; return r.cfg;
 }
