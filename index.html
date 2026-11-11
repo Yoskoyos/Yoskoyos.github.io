@@ -2474,7 +2474,7 @@ html:not(.unlocked) .app{display:none}
       <div class="cm-sec">Produse și servicii <span class="of-tog"><label><input type="checkbox" id="of-showcost"> arată costul meu (intern, nu apare în PDF)</label></span></div>
       <div class="of-tbl" id="of-lines"></div>
       <div class="of-add"><button type="button" class="btn" data-ofadd="echipament">+ Echipament</button><button type="button" class="btn" data-ofadd="material">+ Material</button><button type="button" class="btn" data-ofadd="manopera">+ Manoperă</button><button type="button" class="btn" id="of-fromstock">+ Din stoc / lista mea</button></div>
-      <div class="of-pick" id="of-pick" hidden><input class="form-input" id="of-pick-q" placeholder="Caută în stoc și în lista de prețuri…" autocomplete="off"><div id="of-pick-res"></div></div>
+      <div class="of-pick" id="of-pick" hidden><input class="form-input" id="of-pick-q" placeholder="Caută în stoc și în lista de prețuri…" autocomplete="off"><div id="of-pick-res" data-noi18n></div></div>
       <div class="of-bottom">
         <div class="of-texts">
           <div class="fg"><label for="of-intro">Text de început (apare sub titlu)</label><textarea class="form-input" id="of-intro" rows="2"></textarea></div>
@@ -7423,7 +7423,7 @@ function renderOffers() {
     .map(([n, l]) => `<div class="qt-stat"><b>${n}</b> ${l}</div>`).join('');
   const L = offers.filter(o => !q || [o.clientName, o.title, 'OF-' + o.no, o.clientAddress, o.clientPhone].join(' ').toLowerCase().includes(q)).sort((a, b) => b.no - a.no);
   qs('#of-list').innerHTML = L.length ? L.map(o => { const t = ofTotals(o), st = OF_ST[o.status] || OF_ST.draft;
-    return `<div class="of-card" role="button" tabindex="0" data-oid="${escapeHtml(o.id)}"><div class="of-no">OF-${o.no}<small>${fmtDate(o.date)}</small></div>
+    return `<div class="of-card" data-noi18n role="button" tabindex="0" data-oid="${escapeHtml(o.id)}"><div class="of-no">OF-${o.no}<small>${fmtDate(o.date)}</small></div>
       <div class="of-mid"><b>${escapeHtml(o.clientName)}</b><span>${escapeHtml(o.title || (o.lines || []).length + ' poziții')}${o.clientAddress ? ' · ' + escapeHtml(o.clientAddress) : ''}</span></div>
       <span class="sp-tag ${st[1]}">${st[0]}</span><div class="of-sum">${ofL(t.total)} lei<small>${o.vat ? 'cu TVA' : 'fără TVA'}</small></div></div>`; }).join('')
     : `<div class="cl-empty">${offers.length ? 'Nicio ofertă găsită.' : 'Nicio ofertă încă.<br>Apasă <b>Ofertă nouă</b>, completează câteva date și generează lista.'}</div>`;
@@ -7628,7 +7628,7 @@ function ofOrderRender() {
     const stock = st === undefined ? '<span class="of-stk wait">…</span>' : st === null ? '<span class="of-stk bad">negăsit</span>' : st.inStock ? `<span class="of-stk ${st.qty >= x.qty ? 'ok' : 'warn'}">${st.qty >= x.qty ? '✓' : '⚠'} ${st.qty} buc</span>` : '<span class="of-stk bad">✗ fără stoc</span>';
     return `<tr><td><b>${escapeHtml(x.sku)}</b></td><td>${st && st.url ? `<a href="${escapeHtml(st.url)}" target="_blank" rel="noopener">${escapeHtml(st.name || x.name)} ↗</a>` : escapeHtml(x.name)}${x.per > 1 ? `<div class="cm-hint">${x.need} m → ${x.qty} ${x.qty === 1 ? 'rolă' : 'role'} de ${x.per} m</div>` : ''}</td><td class="r">${x.qty}</td><td>${stock}</td><td class="r">${site ? ofL(site) : '—'}</td><td class="r">${site ? ofL(site * x.qty) : '—'}</td></tr>`; }).join('');
   qs('#ofo-body').innerHTML = L.length ? `${miss ? `<div class="ofo-warn">⚠ ${miss} ${miss === 1 ? 'produs nu e' : 'produse nu sunt'} în stoc suficient la A2T — alege o alternativă sau întreabă agentul.</div>` : '<div class="ofo-ok">✓ Toate produsele sunt în stoc la A2T.</div>'}
-    <table class="ofo-t"><thead><tr><th>Cod A2T</th><th>Produs</th><th class="r">Cant.</th><th>Stoc A2T</th><th class="r">Preț site</th><th class="r">Total site</th></tr></thead><tbody>${rows}</tbody>
+    <table class="ofo-t" data-noi18n><thead><tr><th>Cod A2T</th><th>Produs</th><th class="r">Cant.</th><th>Stoc A2T</th><th class="r">Preț site</th><th class="r">Total site</th></tr></thead><tbody>${rows}</tbody>
     <tfoot><tr><td colspan="5">Total estimativ la prețul de pe site (cu TVA; prețul tău de instalator e mai mic)</td><td class="r"><b>${ofL(tot)}</b></td></tr></tfoot></table>
     <div class="cm-hint">Montajul, consumabilele și liniile fără cod A2T nu intră în listă.</div>${ofBmHtml()}`
     : '<div class="cl-empty">Nicio linie cu cod A2T. Liniile generate de configurator au codul pus automat; la celelalte îl poți scrie sub denumire.</div>';
