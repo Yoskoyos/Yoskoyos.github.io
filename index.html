@@ -1118,7 +1118,11 @@ html:not(.unlocked) .app{display:none}
 .of-tbl.cost .of-row{grid-template-columns:38px minmax(0,1fr) 112px 62px 70px 96px 90px 96px 28px}
 .of-row .form-input,.of-tot .form-input,.ofc-g .form-input,#of-modal .form-input{font-family:var(--sans)}.of-row .form-input{width:100%;padding:7px 8px;font-size:13px}.of-row .r,.of-row input.r{text-align:right}
 .of-hd{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--fg-3);padding-bottom:4px}
-.of-desc{margin-top:4px;font-size:12px!important;color:var(--fg-3)}
+.of-sub{display:flex;gap:6px;margin-top:4px}.of-desc{flex:1;min-width:0;font-size:12px!important;color:var(--fg-3)}.of-sku{width:150px!important;flex:0 0 150px;font-size:11.5px!important;color:var(--fg-3)}
+.of-stkw{margin-top:3px;min-height:0}.of-stk{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px}.of-stk.ok{color:var(--ok);background:rgba(34,197,94,.1)}.of-stk.bad{color:var(--err);background:rgba(239,68,68,.1)}.of-stk.warn{color:var(--warn);background:rgba(245,158,11,.12)}.of-stk.wait{color:var(--fg-3)}
+.ofo-t{width:100%;border-collapse:collapse;font-size:13px}.ofo-t th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--fg-3);padding:6px;border-bottom:1px solid var(--border)}.ofo-t td{padding:8px 6px;border-bottom:1px solid var(--border);vertical-align:top}.ofo-t .r{text-align:right;white-space:nowrap}.ofo-t a{color:inherit}.ofo-t tfoot td{font-size:12px;color:var(--fg-3);border:0}
+.ofo-warn{background:rgba(245,158,11,.12);color:var(--warn);border-radius:10px;padding:9px 12px;font-weight:600;font-size:13px}.ofo-ok{background:rgba(34,197,94,.1);color:var(--ok);border-radius:10px;padding:9px 12px;font-weight:600;font-size:13px}
+.okc{color:var(--ok)}#ofo-open{text-decoration:none}
 .of-i{font-size:12px;color:var(--fg-3);padding-top:8px;display:flex;flex-direction:column;align-items:center;gap:2px}.of-mv{display:flex;flex-direction:column;opacity:0;transition:opacity .15s}.of-row:hover .of-mv{opacity:1}
 .of-mv button{border:0;background:none;color:var(--fg-3);font-size:9px;cursor:pointer;line-height:1;padding:1px}
 .of-val{padding-top:8px;font-weight:700;font-variant-numeric:tabular-nums}.of-x{border:0;background:none;color:var(--fg-3);cursor:pointer;padding-top:8px}.of-x:hover{color:var(--err)}
@@ -2452,7 +2456,14 @@ html:not(.unlocked) .app{display:none}
         <div class="of-tot" id="of-tot"></div>
       </div>
     </div>
-    <div class="modal-foot"><button class="btn cm-del" id="of-del" type="button">Șterge</button><button class="btn" id="of-dup" type="button">Duplică</button><button class="btn" id="of-client" type="button" hidden>➕ În Clienți</button><span style="flex:1"></span><button class="btn" id="of-pdf" type="button">📄 PDF</button><button class="btn primary" id="of-save" type="button">Salvează</button></div>
+    <div class="modal-foot"><button class="btn cm-del" id="of-del" type="button">Șterge</button><button class="btn" id="of-dup" type="button">Duplică</button><button class="btn" id="of-client" type="button" hidden>➕ În Clienți</button><span style="flex:1"></span><button class="btn" id="of-order" type="button">🛒 Comandă A2T</button><button class="btn" id="of-pdf" type="button">📄 PDF</button><button class="btn primary" id="of-save" type="button">Salvează</button></div>
+  </div>
+</div>
+<div class="overlay hidden" id="ofo-modal" role="dialog" aria-modal="true" aria-labelledby="ofo-title">
+  <div class="modal" style="max-width:860px">
+    <div class="modal-hdr"><div class="modal-title" id="ofo-title">Comandă la A2T</div><div class="modal-x" id="ofo-x" role="button" aria-label="Închide">✕</div></div>
+    <div class="modal-body"><div id="ofo-body"></div></div>
+    <div class="modal-foot"><button class="btn" id="ofo-refresh" type="button">🔄 Verifică stocul acum</button><span style="flex:1"></span><button class="btn" id="ofo-copy" type="button">📋 Copiază lista</button><a class="btn primary" id="ofo-open" href="https://www.a2t.ro/" target="_blank" rel="noopener">Deschide a2t.ro ↗</a></div>
   </div>
 </div>
 <div class="overlay hidden" id="ofc-modal" role="dialog" aria-modal="true" aria-labelledby="ofc-title">
@@ -7337,6 +7348,26 @@ const OF_DEF = {
   intro: 'Vă transmitem mai jos oferta noastră pentru furnizarea și montajul sistemului de supraveghere video.'
 };
 let ofCfg = null, offers = null, ofDraft = null;
+const ofSkuFor = key => { const s = ofCfg && ofCfg.a2t && ofCfg.a2t.skus; return (s && s[key] !== undefined ? s[key] : OF_A2T[key]) || ''; };
+const ofCableSku = () => ofSkuFor('cable');
+/* ── stocul la A2T, live, pentru codurile din ofertă ── */
+const ofStock = {}; let ofStockT = null;
+function ofStockBadge(sku) {
+  if (!sku) return ''; const x = ofStock[sku.toUpperCase()];
+  if (x === undefined) return '<span class="of-stk wait">verific stocul…</span>';
+  if (x === null) return '<span class="of-stk bad">cod negăsit pe A2T</span>';
+  return x.inStock ? `<span class="of-stk ok" title="${escapeHtml(x.name)}">✓ ${x.qty} în stoc A2T · ${ofL(x.site)} lei</span>` : `<span class="of-stk bad" title="${escapeHtml(x.name)}">✗ fără stoc A2T</span>`;
+}
+function ofStockRefresh(force) {
+  clearTimeout(ofStockT); ofStockT = setTimeout(async () => {
+    if (!ofDraft) return; const need = [...new Set(ofDraft.lines.map(l => String(l.sku || '').trim()).filter(Boolean))].filter(k => force || ofStock[k.toUpperCase()] === undefined);
+    if (!need.length) return;
+    try { const r = await clApi('/ops/a2t-stock?skus=' + encodeURIComponent(need.join(','))); for (const [k, v] of Object.entries(r.items || {})) ofStock[k.toUpperCase()] = v; }
+    catch { for (const k of need) ofStock[k.toUpperCase()] = ofStock[k.toUpperCase()] ?? null; }
+    document.querySelectorAll('#of-lines .of-row[data-i]').forEach(row => { const l = ofDraft.lines[+row.dataset.i]; const b = row.querySelector('.of-stkw'); if (l && b) b.innerHTML = ofStockBadge(l.sku); });
+    if (!qs('#ofo-modal').classList.contains('hidden')) ofOrderRender();
+  }, force ? 0 : 450);
+}
 const OF_A2T = { 'cam_ext.2': 'IPC-B120HA-LU', 'cam_ext.4': 'IPC-B140HA-LU', 'cam_ext.8': 'IPC-B180HA-LU', 'cam_int.2': 'IPC-D120HA-LU', 'cam_int.4': 'IPC-D140HA-LU', 'cam_int.8': 'IPC-D180HA-LU',
   'nvr.4': 'NVR-104MH-C/4P(E)', 'nvr.8': 'NVR-108MH-C/8P(E)', 'nvr.16': 'NVR-216MH-K/16P', 'nvr.32': 'NVR-232MH-K/16P', 'hdd.1': 'WD11PURZ', 'hdd.2': 'ST2000VX017', 'hdd.4': 'ST4000VX016', 'hdd.6': 'ST6000VX009', 'hdd.8': 'ST8000VX010', 'hdd.10': 'ST10000VE001',
   'switch': 'NS-0518P-125(B)', 'cable': 'SAF-FTP5S305-CU', 'doza': 'DS-1280ZJ-XS', 'ups': 'UPCSBLS665TRECG01B', 'rack': 'ASY-6U-6060W', 'mon': 'DH-LM22-A200Y' };
@@ -7414,14 +7445,14 @@ function ofRenderLines() {
   qs('#of-lines').classList.toggle('cost', showCost);
   qs('#of-lines').innerHTML = (ls.length ? `<div class="of-row of-hd"><div>#</div><div>Denumire</div><div>Tip</div><div>UM</div><div class="r">Cant.</div><div class="r">Preț unitar</div>${showCost ? '<div class="r">Cost unitar</div>' : ''}<div class="r">Valoare</div><div></div></div>` : '<div class="cl-empty" style="padding:18px">Lista e goală — folosește configuratorul rapid de mai sus sau butoanele de mai jos.</div>')
     + ls.map((l, i) => `<div class="of-row" data-i="${i}"><div class="of-i">${i + 1}<span class="of-mv"><button type="button" data-mv="-1" title="Sus">▲</button><button type="button" data-mv="1" title="Jos">▼</button></span></div>
-      <div><input class="form-input" data-f="name" value="${escapeHtml(l.name)}" placeholder="Denumire"><input class="form-input of-desc" data-f="desc" value="${escapeHtml(l.desc || '')}" placeholder="detalii (opțional)"></div>
+      <div><input class="form-input" data-f="name" value="${escapeHtml(l.name)}" placeholder="Denumire"><div class="of-sub"><input class="form-input of-desc" data-f="desc" value="${escapeHtml(l.desc || '')}" placeholder="detalii (opțional)"><input class="form-input of-sku" data-f="sku" value="${escapeHtml(l.sku || '')}" placeholder="cod A2T" title="Codul produsului de pe a2t.ro — intern, nu apare în PDF"></div><div class="of-stkw">${ofStockBadge(l.sku)}</div></div>
       <div><select class="form-input" data-f="kind">${Object.entries(OF_KIND).map(([k, v]) => `<option value="${k}"${l.kind === k ? ' selected' : ''}>${v}</option>`).join('')}</select></div>
       <div><input class="form-input" data-f="unit" value="${escapeHtml(l.unit || 'buc')}"></div>
       <div><input class="form-input r" data-f="qty" inputmode="decimal" value="${l.qty}"></div>
       <div><input class="form-input r" data-f="price" inputmode="decimal" value="${l.price}"></div>
       ${showCost ? `<div><input class="form-input r" data-f="cost" inputmode="decimal" value="${l.cost || ''}" placeholder="—"></div>` : ''}
       <div class="r of-val">${ofL((+l.qty || 0) * (+l.price || 0))}</div><div><button type="button" class="of-x" data-del title="Șterge linia">✕</button></div></div>`).join('');
-  ofRenderTot();
+  ofRenderTot(); ofStockRefresh();
 }
 function ofRenderTot() {
   const t = ofTotals(ofDraft), showCost = qs('#of-showcost').checked;
@@ -7436,6 +7467,7 @@ qs('#of-showcost').addEventListener('change', ofRenderLines);
 qs('#of-lines').addEventListener('input', e => {
   const row = e.target.closest('.of-row'), f = e.target.dataset.f; if (!row || !f) return;
   const l = ofDraft.lines[+row.dataset.i]; l[f] = ['qty', 'price', 'cost'].includes(f) ? ofN(e.target.value) : e.target.value;
+  if (f === 'sku') { l.sku = e.target.value.trim(); row.querySelector('.of-stkw').innerHTML = ofStockBadge(l.sku); ofStockRefresh(); }
   if (f === 'qty' || f === 'price') row.querySelector('.of-val').textContent = ofL((+l.qty || 0) * (+l.price || 0));
   ofRenderTot();
 });
@@ -7489,14 +7521,14 @@ function ofQuickInfo() {
 qs('#oq-go').addEventListener('click', async () => {
   const k = ofQuickCalc(), C = k.C; if (!k.n) return toast('Pune numărul de camere', 'warn');
   if (ofDraft.lines.length && !(await confirmDialog({ title: 'Înlocuiești lista?', html: 'Lista actuală de produse se înlocuiește cu cea generată.', okLabel: 'Înlocuiește', tone: 'watch' }))) return;
-  const L = [], add = (d, qty, extra) => { if (qty > 0) L.push({ name: (d.name || '').replace('{r}', k.r + ' MP').replace('{c}', k.ch).replace('{pp}', k.pp).replace('{t}', k.tb), desc: '', unit: d.unit, qty, price: +(extra != null ? extra : d.price) || 0, cost: 0, kind: d.kind || 'echipament' }); };
-  add(C.cam_ext, k.ext, C.cam_ext.p[k.r]); add(C.cam_int, k.int, C.cam_int.p[k.r]);
-  add(C.nvr, 1, C.nvr.p[k.ch]); if (k.n > 16) add(C.switch, Math.ceil((k.n - 16) / 16));
-  add(C.hdd, k.disks, C.hdd.p[k.tb]);
-  if (qs('#oq-ups').checked) add(C.ups, 1); if (qs('#oq-rack').checked) add(C.rack, 1); if (qs('#oq-mon').checked) add(C.mon, 1);
+  const L = [], add = (d, qty, extra, key) => { if (qty > 0) L.push({ name: (d.name || '').replace('{r}', k.r + ' MP').replace('{c}', k.ch).replace('{pp}', k.pp).replace('{t}', k.tb), desc: '', unit: d.unit, qty, price: +(extra != null ? extra : d.price) || 0, cost: 0, kind: d.kind || 'echipament', sku: key ? ofSkuFor(key) : '' }); };
+  add(C.cam_ext, k.ext, C.cam_ext.p[k.r], 'cam_ext.' + k.r); add(C.cam_int, k.int, C.cam_int.p[k.r], 'cam_int.' + k.r);
+  add(C.nvr, 1, C.nvr.p[k.ch], 'nvr.' + k.ch); if (k.n > 16) add(C.switch, Math.ceil((k.n - 16) / 16), null, 'switch');
+  add(C.hdd, k.disks, C.hdd.p[k.tb], 'hdd.' + k.tb);
+  if (qs('#oq-ups').checked) add(C.ups, 1, null, 'ups'); if (qs('#oq-rack').checked) add(C.rack, 1, null, 'rack'); if (qs('#oq-mon').checked) add(C.mon, 1, null, 'mon');
   const meters = Math.ceil(k.n * k.m / 5) * 5;
   const mat = d => ({ ...d, kind: 'material' });
-  add(mat(C.cable), meters); if (qs('#oq-doz').checked) add(mat(C.doza), k.n); add(mat(C.cons), k.n);
+  add(mat(C.cable), meters, null, 'cable'); if (qs('#oq-doz').checked) add(mat(C.doza), k.n, null, 'doza'); add(mat(C.cons), k.n);
   add(C.lab_cam, k.n);
   ofDraft.lines = L;
   if (!qs('#of-t').value.trim()) qs('#of-t').value = `Sistem supraveghere video – ${k.n} ${k.n === 1 ? 'cameră' : 'camere'} ${k.r} MP`;
@@ -7538,6 +7570,33 @@ qs('#of-client').addEventListener('click', async () => {
   catch (e) { toast(e.message, 'err'); }
 });
 
+/* ── Lista de comandă la A2T (din liniile cu cod A2T) ── */
+function ofOrderList() {
+  const m = new Map(), cs = ofCableSku().toUpperCase();
+  for (const l of (ofDraft ? ofDraft.lines : [])) { const sku = String(l.sku || '').trim(); if (!sku || !(+l.qty > 0)) continue; const K = sku.toUpperCase();
+    const per = K === cs && /^m/i.test(l.unit || '') ? 305 : 1; const qty = per > 1 ? Math.ceil(l.qty / per) : Math.ceil(+l.qty);
+    const x = m.get(K) || { sku, name: l.name, qty: 0, per, need: 0 }; x.qty += qty; x.need += +l.qty; m.set(K, x); }
+  return [...m.values()];
+}
+function ofOrderRender() {
+  const L = ofOrderList(); let tot = 0, miss = 0;
+  const rows = L.map(x => { const st = ofStock[x.sku.toUpperCase()], site = st ? st.site : 0; tot += site * x.qty; if (st && (!st.inStock || st.qty < x.qty)) miss++;
+    const stock = st === undefined ? '<span class="of-stk wait">…</span>' : st === null ? '<span class="of-stk bad">negăsit</span>' : st.inStock ? `<span class="of-stk ${st.qty >= x.qty ? 'ok' : 'warn'}">${st.qty >= x.qty ? '✓' : '⚠'} ${st.qty} buc</span>` : '<span class="of-stk bad">✗ fără stoc</span>';
+    return `<tr><td><b>${escapeHtml(x.sku)}</b></td><td>${st && st.url ? `<a href="${escapeHtml(st.url)}" target="_blank" rel="noopener">${escapeHtml(st.name || x.name)} ↗</a>` : escapeHtml(x.name)}${x.per > 1 ? `<div class="cm-hint">${x.need} m → ${x.qty} ${x.qty === 1 ? 'rolă' : 'role'} de ${x.per} m</div>` : ''}</td><td class="r">${x.qty}</td><td>${stock}</td><td class="r">${site ? ofL(site) : '—'}</td><td class="r">${site ? ofL(site * x.qty) : '—'}</td></tr>`; }).join('');
+  qs('#ofo-body').innerHTML = L.length ? `${miss ? `<div class="ofo-warn">⚠ ${miss} ${miss === 1 ? 'produs nu e' : 'produse nu sunt'} în stoc suficient la A2T — alege o alternativă sau întreabă agentul.</div>` : '<div class="ofo-ok">✓ Toate produsele sunt în stoc la A2T.</div>'}
+    <table class="ofo-t"><thead><tr><th>Cod A2T</th><th>Produs</th><th class="r">Cant.</th><th>Stoc A2T</th><th class="r">Preț site</th><th class="r">Total site</th></tr></thead><tbody>${rows}</tbody>
+    <tfoot><tr><td colspan="5">Total estimativ la prețul de pe site (cu TVA; prețul tău de instalator e mai mic)</td><td class="r"><b>${ofL(tot)}</b></td></tr></tfoot></table>
+    <div class="cm-hint">Montajul, consumabilele și liniile fără cod A2T nu intră în listă. Apasă pe un produs ca să-l deschizi pe a2t.ro și să-l pui în coș, sau copiază lista și trimite-o agentului tău.</div>`
+    : '<div class="cl-empty">Nicio linie cu cod A2T. Liniile generate de configurator au codul pus automat; la celelalte îl poți scrie sub denumire.</div>';
+}
+qs('#of-order').addEventListener('click', () => { qs('#ofo-modal').classList.remove('hidden'); ofOrderRender(); ofStockRefresh(true); });
+qs('#ofo-x').addEventListener('click', () => qs('#ofo-modal').classList.add('hidden'));
+qs('#ofo-refresh').addEventListener('click', () => { ofOrderList().forEach(x => { delete ofStock[x.sku.toUpperCase()]; }); ofOrderRender(); ofStockRefresh(true); });
+qs('#ofo-copy').addEventListener('click', async () => {
+  const L = ofOrderList(), t = `Comandă A2T – ${ofDraft.title || 'ofertă'} (${qs('#of-cn').value || ''})\n` + L.map(x => `${x.sku} × ${x.qty}${x.per > 1 ? ' (role de ' + x.per + ' m)' : ' buc'} – ${(ofStock[x.sku.toUpperCase()] || {}).name || x.name}`).join('\n');
+  try { await navigator.clipboard.writeText(t); toast('Lista a fost copiată', 'ok'); } catch { prompt('Copiază lista:', t); }
+});
+
 /* ── PDF (tipărire cu antet) ── */
 qs('#of-pdf').addEventListener('click', async () => {
   const o = await ofSave(true); if (!o) return;
@@ -7574,7 +7633,7 @@ ${o.notes ? `<div class="cond"><b>Condiții</b>${esc(o.notes)}</div>` : ''}
 function ofcRender() {
   const C = ofCfgGet(), A = (ofCfg && ofCfg.a2t) || {}, items = A.items || {}, skus = A.skus || {};
   const row = (k, sub, lbl, val) => { const key = sub === 'price' ? k : k + '.' + sub, sku = skus[key] !== undefined ? skus[key] : (OF_A2T[key] || ''), it = items[key];
-    const hint = !OF_A2T[key] && !skus[key] ? '' : `<input class="form-input ofc-sku" data-sku="${escapeHtml(key)}" value="${escapeHtml(sku)}" placeholder="cod A2T" title="Codul produsului de pe a2t.ro (gol = nu se actualizează)">${it && !it.missing ? `<small title="${escapeHtml(it.name || '')}">site ${ofL(it.site)}</small>` : it && it.missing ? '<small class="bad">negăsit</small>' : ''}`;
+    const hint = !OF_A2T[key] && !skus[key] ? '' : `<input class="form-input ofc-sku" data-sku="${escapeHtml(key)}" value="${escapeHtml(sku)}" placeholder="cod A2T" title="Codul produsului de pe a2t.ro (gol = nu se actualizează)">${it && !it.missing ? `<small title="${escapeHtml(it.name || '')}">site ${ofL(it.site)}${it.qty != null ? (it.inStock ? ` · <span class="okc">stoc ${it.qty}</span>` : ' · <span class="bad">fără stoc</span>') : ''}</small>` : it && it.missing ? '<small class="bad">negăsit</small>' : ''}`;
     return `<div class="ofc-r"><span>${escapeHtml(lbl)}</span><input class="form-input r" data-k="${k}" data-s="${sub}" inputmode="decimal" value="${val}">${hint}</div>`; };
   const when = A.at ? new Date(A.at).toLocaleString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'încă nu';
   let h = `<div class="ofc-a2t"><div class="ofc-a2t-h"><label><input type="checkbox" id="ofc-a2t-on"${A.on === false ? '' : ' checked'}> <b>Prețuri din A2T, actualizate automat o dată la 7 zile</b></label>

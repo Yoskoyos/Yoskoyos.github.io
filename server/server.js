@@ -1166,7 +1166,7 @@ function cleanOp(coll, b, prev) {
   }
   if (coll === 'offers') {   // oferte făcute de mână (calculator) — pentru orice client, cu prețurile mele
     const lines = (Array.isArray(b.lines) ? b.lines : []).slice(0, 120).map(x => ({ name: str(x && x.name, 300).trim(), desc: str(x && x.desc, 600), unit: str(x && x.unit, 12) || 'buc',
-      qty: Math.max(0, num(x && x.qty)), price: Math.max(0, num(x && x.price)), cost: Math.max(0, num(x && x.cost)), kind: pick(x && x.kind, ['echipament', 'material', 'manopera'], 'echipament'), stockId: str(x && x.stockId, 40) })).filter(x => x.name);
+      qty: Math.max(0, num(x && x.qty)), price: Math.max(0, num(x && x.price)), cost: Math.max(0, num(x && x.cost)), kind: pick(x && x.kind, ['echipament', 'material', 'manopera'], 'echipament'), stockId: str(x && x.stockId, 40), sku: str(x && x.sku, 60).trim() })).filter(x => x.name);
     return { ...base, no: prev ? prev.no : 0, date: ymd(b.date) || new Date().toISOString().slice(0, 10), validDays: Math.min(365, Math.max(1, Math.round(num(b.validDays)) || 15)),
       title: str(b.title, 200), clientId: str(b.clientId, 40), clientName: str(b.clientName, 200).trim(), clientCui: str(b.clientCui, 40), clientContact: str(b.clientContact, 200),
       clientPhone: str(b.clientPhone, 60), clientEmail: str(b.clientEmail, 200), clientAddress: str(b.clientAddress, 300), lines,
@@ -1288,7 +1288,7 @@ async function a2tPriceSync(u) {
     const [k, v] = key.split('.'); const per = A2T_PER[k] || 1;
     let price = site / 1.21 * (1 + (+a.markup || 0) / 100) / per; price = per > 1 ? Math.round(price * 10) / 10 : Math.round(price);
     cfg[k] = cfg[k] || {}; if (v) { cfg[k].p = cfg[k].p || {}; cfg[k].p[v] = price; } else cfg[k].price = price;
-    items[key] = { sku, name: String(s.name || '').slice(0, 160), site: Math.round(site * 100) / 100, price }; ok++;
+    items[key] = { sku, name: String(s.name || '').slice(0, 160), site: Math.round(site * 100) / 100, price, qty: s.stock ? +s.stock.qty || 0 : null, inStock: !!(s.stock && s.stock.is_in_stock && s.stock.qty > 0), url: s.url_path ? 'https://www.a2t.ro/' + s.url_path : '' }; ok++;
   }
   Object.assign(a, { at: Date.now(), tryAt: Date.now(), items, err: missing.length ? 'Nu am găsit pe A2T: ' + missing.join(', ') : '' });
   return { ok, missing: missing.length };
@@ -1312,7 +1312,7 @@ async function a2tTick(db) {
 function a2tBySku(skus) {
   return new Promise(resolve => {
     const body = JSON.stringify({ query: { bool: { filter: [{ terms: { sku: skus } }] } } });
-    const rq = https.request({ host: 'www.a2t.ro', path: `/api/catalog/vue_storefront_catalog_1/product/_search?size=${Math.min(100, skus.length + 5)}&_source_include=name,sku,image,url_path,short_description,category,final_price,price,tier_prices`, method: 'POST', timeout: 20000,
+    const rq = https.request({ host: 'www.a2t.ro', path: `/api/catalog/vue_storefront_catalog_1/product/_search?size=${Math.min(100, skus.length + 5)}&_source_include=name,sku,image,url_path,short_description,category,final_price,price,tier_prices,stock.is_in_stock,stock.qty`, method: 'POST', timeout: 20000,
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), 'User-Agent': 'Mozilla/5.0 (compatible; YCA/1.0)', Accept: 'application/json' } }, r => {
       const ch = []; r.on('data', d => ch.push(d));
       r.on('end', () => { const out = {}; try { for (const h of (JSON.parse(Buffer.concat(ch).toString('utf8')).hits || {}).hits || []) { const s = h._source; out[String(s.sku).toUpperCase()] = s; } } catch {} resolve(out); });
@@ -1424,8 +1424,8 @@ async function handlePurchase(req, res, pathname) {
   return sendJson(res, 405, { error: 'Operație necunoscută' });
 }
 async function handleOps(req, res, pathname) {
-  const coll0 = (/^\/ops\/(works|stock|gdpr|catalog|offers|offer-cfg)/.exec(pathname) || [])[1];
-  const ctx = requireUser(req, res, coll0 ? ({ works: 'works', stock: 'works', gdpr: 'clients', catalog: 'catalog', offers: 'quotes', 'offer-cfg': 'quotes' })[coll0] : null); if (!ctx) return;
+  const coll0 = (/^\/ops\/(works|stock|gdpr|catalog|offers|offer-cfg|a2t-stock)/.exec(pathname) || [])[1];
+  const ctx = requireUser(req, res, coll0 ? ({ works: 'works', stock: 'works', gdpr: 'clients', catalog: 'catalog', offers: 'quotes', 'offer-cfg': 'quotes', 'a2t-stock': 'quotes' })[coll0] : null); if (!ctx) return;
   if (!coll0 && ctx.user.role === 'client') return sendJson(res, 403, { error: 'Nu ai acces la această secțiune' });
   const uname = ctx.uname;
   const all = loadOps(); const u = all[uname] = all[uname] || {}; for (const c of OPS_COLLS) if (!Array.isArray(u[c])) u[c] = [];
@@ -1434,6 +1434,13 @@ async function handleOps(req, res, pathname) {
   const OPS_PERM = { works: 'works', stock: 'works', gdpr: 'clients', catalog: 'catalog', offers: 'quotes' };
   const view = () => { const o = {}; for (const c of OPS_COLLS) o[c] = userCan(ctx.user, OPS_PERM[c]) ? u[c] : []; return o; };   // angajatul vede doar secțiunile lui
   if (parts.length === 1 && req.method === 'GET') return sendJson(res, 200, { ...view(), offerCfg: userCan(ctx.user, 'quotes') ? (u.offerCfg || null) : null });
+  if (coll === 'a2t-stock' && req.method === 'GET') {   // stoc + preț live la A2T pentru codurile din ofertă
+    if (!userCan(ctx.user, 'quotes')) return sendJson(res, 403, { error: 'Nu ai acces' });
+    const skus = String(url.parse(req.url, true).query.skus || '').split(',').map(x => x.trim()).filter(Boolean).slice(0, 80);
+    const got = skus.length ? await a2tBySku(skus) : {}; const out = {};
+    for (const k of skus) { const x = got[k.toUpperCase()]; out[k] = x ? { name: String(x.name || '').slice(0, 160), site: +(x.final_price || x.price) || 0, qty: x.stock ? +x.stock.qty || 0 : 0, inStock: !!(x.stock && x.stock.is_in_stock && x.stock.qty > 0), url: x.url_path ? 'https://www.a2t.ro/' + x.url_path : '' } : null; }
+    return sendJson(res, 200, { items: out, at: Date.now() });
+  }
   if (coll === 'offer-cfg') {   // lista mea de prețuri pentru calculatorul de oferte
     if (req.method === 'GET') return sendJson(res, 200, { cfg: u.offerCfg || null });
     if (req.method === 'PUT') { const b = await readJson(req); const raw = JSON.stringify(b && b.cfg || {}); if (raw.length > 60000) return sendJson(res, 413, { error: 'Prea mult conținut' });
@@ -3614,7 +3621,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 9.3, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 9.4, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
