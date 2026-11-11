@@ -1,4 +1,4 @@
-// YCA CCTV Monitor — NVR proxy + autentificare
+// Supraveghere ERP — NVR proxy + autentificare
 // Rulează pe VPS în /opt/nvr-proxy, ca serviciul systemd "nvr-proxy" (port 3000, în spatele nginx).
 // v3 (28.10.2026): /auth/login, /auth/me, /auth/change-password, roluri, secret JWT în fișier,
 //                  limitare încercări login, PUT cu body către NVR (sincronizare oră).
@@ -717,7 +717,7 @@ async function handlePush(req, res, pathname) {
     return sendJson(res, 200, { ok: true, devices: all[user].length });
   }
   if (pathname === '/push/test') {
-    const n = await pushSend(user, '🔔 Test CCTV Monitor', 'Notificările merg. Vei primi aici alertele NVR, cererile de ofertă și mesajele de pe site, 24/7.', { tag: 'yca-test' });
+    const n = await pushSend(user, '🔔 Test Supraveghere ERP', 'Notificările merg. Vei primi aici alertele NVR, cererile de ofertă și mesajele de pe site, 24/7.', { tag: 'yca-test' });
     return n ? sendJson(res, 200, { ok: true, sent: n }) : sendJson(res, 400, { error: 'Nu am putut trimite notificarea pe niciun dispozitiv' });
   }
   return sendJson(res, 404, { error: 'Necunoscut' });
@@ -757,7 +757,7 @@ async function monitorRun() {
 
     for (const [user, { ucfg, blocks }] of Object.entries(out)) {
       const anyCrit = blocks.some(b => b.lines.some(l => l.kind === 'crit'));
-      const text = `${anyCrit ? '🚨' : '✅'} <b>YCA CCTV Monitor</b>\n\n` +
+      const text = `${anyCrit ? '🚨' : '✅'} <b>Supraveghere ERP</b>\n\n` +
         blocks.map(b => `<b>${escHtml(b.nvr.name)}</b>\n` + b.lines.map(l => escHtml(l.text)).join('\n')).join('\n\n') +
         `\n\n🕐 ${bucNow()}`;
       for (const b of blocks) for (const l of b.lines) console.log(`[monitor] ${user} · ${b.nvr.name}: ${l.text}`);
@@ -784,7 +784,7 @@ async function monitorRun() {
         return `${icon} ${escHtml(n.name)} — ${(st.status || 'necunoscut').toUpperCase()}${st.camsTotal ? ` · ${st.camsOk}/${st.camsTotal} cam` : ''}`;
       });
       const on = conf.nvrs.filter(n => ['online', 'warning'].includes((monState.nvr[user + ':' + n.id] || {}).status)).length;
-      await tgSend(ucfg, `📊 <b>Raport zilnic — YCA CCTV Monitor</b>\n🕐 ${bucNow()}\n\n✅ NVR online: <b>${on}/${conf.nvrs.length}</b>\n\n${rows.join('\n')}`);
+      await tgSend(ucfg, `📊 <b>Raport zilnic — Supraveghere ERP</b>\n🕐 ${bucNow()}\n\n✅ NVR online: <b>${on}/${conf.nvrs.length}</b>\n\n${rows.join('\n')}`);
     }
 
     try { await cdocReminders(db); } catch (e) { console.error('[acte] remindere:', e.message); }
@@ -2440,7 +2440,7 @@ function handleClientsBackup(req, res) {
   const ops = loadOps()[uname];
   if (ops) z.add(root + 'organizare/lucrari-stoc-gdpr.json', Buffer.from(JSON.stringify(ops, null, 2), 'utf8'));
   z.add(root + 'CITESTE-MA.txt', Buffer.from(
-    `Copie de siguranță — evidența clienților YCA CCTV Monitor\r\nCreată: ${new Date().toLocaleString('ro-RO')}\r\n` +
+    `Copie de siguranță — evidența clienților Supraveghere ERP\r\nCreată: ${new Date().toLocaleString('ro-RO')}\r\n` +
     `Clienți: ${list.length}\r\n\r\nclienti.csv  — se deschide în Excel (date de bază, echipamente, abonament)\r\n` +
     `clienti.json — toate datele, pentru restaurare\r\n<Client>/contracte, <Client>/garantii — documentele încărcate\r\nacte-firma/ — actele firmei (CUI, licențe, avize etc.)\r\n` +
     (missing ? `\r\nATENȚIE: ${missing} fișiere lipseau de pe server.\r\n` : ''), 'utf8'));
@@ -3278,8 +3278,8 @@ async function handleForgot(req, res) {
   const cfg = loadMailCfg() || {};
   const appUrl = String(cfg.appUrl || DEFAULT_APP_URL);
   const link = appUrl + (appUrl.includes('?') ? '&' : '?') + 'reset=' + token;
-  const subject = 'Resetare parolă — CCTV Monitor';
-  const text = `Salut, ${u.username}!\n\nAi cerut resetarea parolei pentru CCTV Monitor (Supraveghere24h).\n` +
+  const subject = 'Resetare parolă — Supraveghere ERP';
+  const text = `Salut, ${u.username}!\n\nAi cerut resetarea parolei pentru Supraveghere ERP (Supraveghere24h).\n` +
     `Deschide linkul de mai jos în 30 de minute ca să-ți setezi o parolă nouă:\n\n${link}\n\n` +
     `Dacă nu tu ai cerut asta, ignoră mesajul — parola ta rămâne neschimbată.`;
   const html = `<div style="font-family:Arial,sans-serif;font-size:15px;color:#0f1422;max-width:480px">

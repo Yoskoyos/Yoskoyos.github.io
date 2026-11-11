@@ -1,7 +1,7 @@
-// CCTV Monitor — service worker
+// Supraveghere ERP — service worker
 // Pagina se ia MEREU de pe internet, ocolind memoria browserului (GitHub Pages permite păstrarea ei 10 min),
 // iar ultima versiune rămâne salvată doar pentru folosire fără internet.
-const CACHE = 'yca-cctv-v3';
+const CACHE = 'yca-erp-v4';
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -45,8 +45,8 @@ self.addEventListener('fetch', e => {
 // Notificări push trimise de server (alerte NVR, cereri de ofertă, mesaje de pe site)
 self.addEventListener('push', e => {
   let d = {};
-  try { d = e.data ? e.data.json() : {}; } catch { d = { title: 'CCTV Monitor', body: e.data ? e.data.text() : '' }; }
-  e.waitUntil(self.registration.showNotification(d.title || 'CCTV Monitor', {
+  try { d = e.data ? e.data.json() : {}; } catch { d = { title: 'Supraveghere ERP', body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Supraveghere ERP', {
     body: d.body || '', tag: d.tag || 'yca', renotify: true,
     icon: '/icon-192.png', badge: '/icon-192.png', data: { url: d.url || '/' }
   }));

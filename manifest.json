@@ -1,21 +1,21 @@
 {
-  "name": "Supraveghere24h Monitor",
-  "short_name": "CCTV Monitor",
-  "description": "Monitorizare NVR-uri Hikvision",
+  "name": "Supraveghere ERP",
+  "short_name": "Supraveghere ERP",
+  "description": "SUPRAVEGHERE24h — monitorizare NVR, clienți, oferte, SEAP",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0b0d",
+  "background_color": "#ffffff",
   "theme_color": "#0a0b0d",
   "orientation": "any",
   "icons": [
     {
-      "src": "icon-192.png?v=2",
+      "src": "icon-192.png?v=3",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-512.png?v=2",
+      "src": "icon-512.png?v=3",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
