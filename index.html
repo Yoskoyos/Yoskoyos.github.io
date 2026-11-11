@@ -1100,6 +1100,24 @@ html:not(.unlocked) .app{display:none}
 .an-legend div{display:flex;align-items:center;gap:8px;font-size:13.5px}
 .an-legend s{width:10px;height:10px;border-radius:3px;flex-shrink:0}
 .an-legend b{margin-left:auto;font-variant-numeric:tabular-nums}
+.an-in{animation:anIn .55s cubic-bezier(.22,1,.36,1) both}
+@keyframes anIn{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:none}}
+.an-sumrow{display:flex;align-items:flex-end;gap:22px;flex-wrap:wrap;margin:-2px 0 12px}
+.an-big b{display:block;font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}.an-big span{font-size:12px;color:var(--fg-3)}
+.an-mini{display:flex;flex-direction:column;min-width:70px}.an-mini span{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-3);font-weight:700}.an-mini b{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums}.an-mini small{font-size:11px;color:var(--fg-3)}
+.an-sw{position:relative;display:inline-flex;background:var(--bg-2);border-radius:999px;padding:3px;margin-right:auto;margin-left:12px;text-transform:none;letter-spacing:0}
+.an-sw button{position:relative;z-index:1;border:0;background:none;font:inherit;font-size:12px;font-weight:700;color:var(--fg-3);padding:4px 12px;border-radius:999px;cursor:pointer;transition:color .25s}
+.an-sw button.on{color:#fff}.an-sw i{position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:999px;background:var(--accent);transition:transform .35s cubic-bezier(.22,1,.36,1)}
+.an-sw button.on~i{transform:translateX(0)}.an-sw button[data-m=views].on~i{transform:translateX(100%)}
+.an-stem{transform-box:fill-box;transform-origin:50% 100%}.an-head{transform-box:fill-box;transform-origin:50% 50%}
+.an-play .an-stem{animation:anGrow .7s cubic-bezier(.22,1,.36,1) var(--d) both}
+.an-play .an-head{animation:anPop .45s cubic-bezier(.34,1.56,.64,1) calc(var(--d) + .45s) both}
+.an-play .an-avg{animation:anFade .6s ease 1s both}
+@keyframes anGrow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes anPop{from{transform:scale(0)}to{transform:scale(1)}}
+@keyframes anFade{from{opacity:0}}
+.an-pop{transition:opacity .2s}.an-chartwrap svg:hover .an-pop:not(.hov){opacity:.55}.an-pop.hov .an-head{transform:scale(1.35)}.an-pop .an-head{transition:transform .2s}
+@media (prefers-reduced-motion:reduce){.an-in,.an-play .an-stem,.an-play .an-head,.an-play .an-avg{animation:none}}
 .an-foot{font-size:11.5px;color:var(--fg-3);margin-top:10px}
 @media(max-width:900px){.an-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.an-grid3{grid-template-columns:1fr}}
 @media(max-width:600px){.an-grid{grid-template-columns:1fr}.an-kpi-v{font-size:26px}.an-step{padding:9px 10px}.an-step b{font-size:19px}.an-step span{font-size:11.5px}}
@@ -6325,6 +6343,58 @@ const AN_PAGES = { '/': 'Prima pagină', '/index.html': 'Prima pagină', '/calcu
 const anPage = p => AN_PAGES[p] || (/supraveghere-video-bloc-(.+)\.html$/.test(p) ? 'Zona ' + p.match(/bloc-(.+)\.html$/)[1].replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : p);
 const AN_DEV = { mobile: '📱 Telefon', desktop: '💻 Calculator', tablet: '📟 Tabletă' };
 let anBusy = false;
+const anReduce = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
+// numere care „urcă” de la 0 (ușor, ease-out) — păstrează formatul (separator de mii, zecimale cu virgulă)
+function anCount(el, dur) {
+  const raw = el.dataset.v != null ? el.dataset.v : el.textContent; const dec = /,\d/.test(raw) ? (raw.split(',')[1] || '').replace(/\D/g, '').length : 0;
+  const target = parseFloat(String(raw).replace(/\./g, '').replace(',', '.')) || 0; if (!target || anReduce()) return;
+  const fmt = v => dec ? v.toFixed(dec).replace('.', ',') : Math.round(v).toLocaleString('ro-RO');
+  const t0 = performance.now(), d = dur || 900; el.textContent = fmt(0);
+  const tick = t => { const p = Math.min(1, (t - t0) / d), e = 1 - Math.pow(1 - p, 3); el.textContent = fmt(target * e); if (p < 1) requestAnimationFrame(tick); else el.textContent = raw; };
+  requestAnimationFrame(tick);
+}
+// intrarea paginii: carduri în cascadă, cifre care urcă, bare care se umplu
+function anAnimate(body) {
+  if (anReduce()) return;
+  body.querySelectorAll('.an-kpi, .an-card').forEach((c, i) => { c.classList.add('an-in'); c.style.animationDelay = (i * 60) + 'ms'; });
+  body.querySelectorAll('.an-kpi-v, .an-step b').forEach((el, i) => setTimeout(() => anCount(el, 1000), 120 + i * 50));
+  body.querySelectorAll('.an-li .tr i, .an-seg i').forEach((b, i) => { const w = b.style.width; b.style.width = '0'; b.style.transition = 'none';
+    requestAnimationFrame(() => requestAnimationFrame(() => { b.style.transition = `width .9s cubic-bezier(.22,1,.36,1) ${300 + i * 45}ms`; b.style.width = w; })); });
+  body.querySelectorAll('.an-legend b').forEach((el, i) => { el.style.opacity = 0; setTimeout(() => { el.style.transition = 'opacity .4s'; el.style.opacity = 1; }, 500 + i * 80); });
+}
+function anChart(body, D, m) {
+  const cw = body.querySelector('#an-cw'), sum = body.querySelector('#an-sum'); if (!cw) return;
+  const N = n => Number(n || 0).toLocaleString('ro-RO'), val = d => d[m] || 0, tot = D.reduce((t, d) => t + val(d), 0);
+  const best = D.reduce((b, d) => val(d) > val(b) ? d : b, D[0]), avg = tot / D.length;
+  const lbl = m === 'views' ? ['pagini văzute', 'pagini'] : ['vizite', 'vizite'];
+  sum.innerHTML = `<div class="an-big"><b data-v="${N(tot)}">${N(tot)}</b><span>${lbl[0]} în perioadă</span></div>
+    <div class="an-mini"><span>Ziua record</span><b>${N(val(best))}</b><small>${fmtDate(best.date).slice(0, 5)}</small></div>
+    <div class="an-mini"><span>Medie / zi</span><b>${avg.toFixed(1).replace('.', ',')}</b><small>${lbl[1]}</small></div>
+    <div class="an-mini"><span>Azi</span><b>${N(val(D[D.length - 1]))}</b><small>${lbl[1]}</small></div>`;
+  const W = Math.round(Math.max(300, Math.min(1100, (body.clientWidth || 640) - 34))), H = W < 500 ? 180 : 220, L = 30, R = 12, T = 14, B = 24;
+  const max = Math.max(4, ...D.map(val)), step = Math.ceil(max / 4), top = step * 4;
+  const gap = (W - L - R) / D.length, x = i => L + gap * (i + .5), y = v => T + (H - T - B) * (1 - v / top), y0 = y(0);
+  const grid = [0, 1, 2, 3, 4].map(k => `<line x1="${L}" x2="${W - R}" y1="${y(k * step)}" y2="${y(k * step)}" stroke="var(--border)" stroke-width="1" ${k ? 'stroke-dasharray="2 4"' : ''}/><text x="${L - 6}" y="${y(k * step) + 4}" text-anchor="end" font-size="10.5" fill="var(--fg-3)">${k * step}</text>`).join('');
+  const every = Math.ceil(D.length / (W < 500 ? 5 : 10));
+  const xl = D.map((d, i) => i % every && i !== D.length - 1 ? '' : `<text x="${x(i)}" y="${H - 6}" text-anchor="middle" font-size="10.5" fill="var(--fg-3)">${fmtDate(d.date).slice(0, 5)}</text>`).join('');
+  const sw = Math.max(2, Math.min(4, gap * .14)), rr = Math.max(3.2, Math.min(5.5, gap * .2)), del = Math.min(55, 900 / D.length);
+  const pops = D.map((d, i) => { const v = val(d), hi = d === best || i === D.length - 1, c = hi ? 'var(--accent)' : 'var(--fg-3)';
+    return `<g class="an-pop${hi ? ' hi' : ''}" style="--d:${Math.round(i * del)}ms" data-i="${i}">
+      <rect class="an-stem" x="${x(i) - sw / 2}" y="${y(v)}" width="${sw}" height="${Math.max(0, y0 - y(v))}" rx="${sw / 2}" fill="${hi ? 'url(#an-g)' : c}" opacity="${hi ? 1 : .45}"/>
+      <circle class="an-head" cx="${x(i)}" cy="${y(v)}" r="${rr}" fill="${v ? c : 'var(--bg-1)'}" stroke="${c}" stroke-width="${v ? 0 : 1.5}"/></g>`; }).join('');
+  cw.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${lbl[0]} pe zile"><defs><linearGradient id="an-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)"/><stop offset="1" stop-color="var(--accent)" stop-opacity=".25"/></linearGradient></defs>
+    ${grid}${xl}<line x1="${L}" x2="${W - R}" y1="${y(avg)}" y2="${y(avg)}" class="an-avg" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 4" opacity=".55"/>
+    ${pops}<rect x="${L}" y="0" width="${W - L - R}" height="${H}" fill="transparent" id="an-hit"/></svg><div class="an-tip" id="an-tip"></div>`;
+  if (!anReduce()) { const svg = cw.querySelector('svg'); svg.classList.add('an-play'); sum.querySelectorAll('.an-big b, .an-mini b').forEach((el, i) => setTimeout(() => anCount(el, 900), i * 80)); }
+  const svg = cw.querySelector('svg'), hit = cw.querySelector('#an-hit'), tip = cw.querySelector('#an-tip'); let cur = -1;
+  const move = ev => { const r = svg.getBoundingClientRect(), px = ((ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left) / r.width * W;
+    const i = Math.max(0, Math.min(D.length - 1, Math.floor((px - L) / gap))), d = D[i], sx = r.width / W;
+    if (i !== cur) { svg.querySelectorAll('.an-pop').forEach(g => g.classList.toggle('hov', +g.dataset.i === i)); cur = i; }
+    tip.innerHTML = `${fmtDate(d.date)}<br><b>${N(d.visits)}</b> vizite · ${N(d.views)} pagini`; tip.style.left = x(i) * sx + 'px'; tip.style.top = y(val(d)) * sx - 6 + 'px'; tip.style.opacity = 1; };
+  const out = () => { tip.style.opacity = 0; svg.querySelectorAll('.an-pop.hov').forEach(g => g.classList.remove('hov')); cur = -1; };
+  hit.addEventListener('mousemove', move); hit.addEventListener('touchmove', move, { passive: true }); hit.addEventListener('touchstart', move, { passive: true });
+  hit.addEventListener('mouseleave', out); hit.addEventListener('touchend', () => setTimeout(out, 1500));
+}
 async function loadAnalytics() {
   const body = qs('#an-body'); if (!body || anBusy || !getAuth()) return; anBusy = true;
   const days = +qs('#an-days').value;
@@ -6345,36 +6415,11 @@ async function loadAnalytics() {
       <div class="an-kpi"><div class="an-kpi-l">${ic('eye')}Pagini văzute</div><div class="an-kpi-v">${N(a.views)}</div><div class="an-kpi-s">în total</div></div>
       <div class="an-kpi"><div class="an-kpi-l">${ic('layers')}Pagini / vizită</div><div class="an-kpi-v">${ppv.toFixed(1).replace('.', ',')}</div><div class="an-kpi-s">cât de mult citesc</div></div>
       <div class="an-kpi"><div class="an-kpi-l">${ic('inbox')}Cereri primite</div><div class="an-kpi-v">${N(leads)}</div><div class="an-kpi-s">${offers} ${offers === 1 ? 'ofertă' : 'oferte'} · ${msgs} ${msgs === 1 ? 'mesaj' : 'mesaje'} · ${conv.toFixed(1).replace('.', ',')}% din vizite</div></div></div>`;
-    // grafic: vizite pe zile (linie + suprafață, o singură serie)
+    // grafic: „lollipop” pe zile (ca în exemplul video) — tije care cresc din bază, una după alta; comutator Vizite / Pagini
     let chart;
     const D = a.daily || [];
     if (D.length < 2) chart = `<div class="an-empty">Graficul pe zile apare de mâine,<br>după prima zi întreagă de date.</div>`;
-    else {
-      const W = Math.round(Math.max(300, Math.min(1100, (body.clientWidth || 640) - 34))), H = W < 500 ? 170 : 210, L = 30, R = 10, T = 10, B = 24, max = Math.max(4, ...D.map(d => d.visits)), step = Math.ceil(max / 4), top = step * 4;
-      const x = i => L + i * (W - L - R) / (D.length - 1), y = v => T + (H - T - B) * (1 - v / top);
-      const pts = D.map((d, i) => `${x(i).toFixed(1)},${y(d.visits).toFixed(1)}`).join(' ');
-      const grid = [0, 1, 2, 3, 4].map(k => `<line x1="${L}" x2="${W - R}" y1="${y(k * step)}" y2="${y(k * step)}" stroke="var(--border)" stroke-width="1"/><text x="${L - 6}" y="${y(k * step) + 4}" text-anchor="end" font-size="10.5" fill="var(--fg-3)">${k * step}</text>`).join('');
-      const every = Math.ceil(D.length / (W < 500 ? 4 : 8));
-      const xl = D.map((d, i) => i % every && i !== D.length - 1 ? '' : `<text x="${x(i)}" y="${H - 6}" text-anchor="middle" font-size="10.5" fill="var(--fg-3)">${fmtDate(d.date).slice(0, 5)}</text>`).join('');
-      chart = `<div class="an-chartwrap"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Vizite pe zile">${grid}${xl}
-        <polygon points="${x(0)},${y(0)} ${pts} ${x(D.length - 1)},${y(0)}" fill="var(--blue)" opacity=".12"/>
-        <polyline points="${pts}" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-        <line id="an-x" y1="${T}" y2="${H - B}" stroke="var(--fg-3)" stroke-width="1" stroke-dasharray="3 3" opacity="0"/>
-        <circle id="an-dot" r="4.5" fill="var(--blue)" stroke="var(--bg-1)" stroke-width="2" opacity="0"/>
-        <circle cx="${x(D.length - 1)}" cy="${y(D[D.length - 1].visits)}" r="4" fill="var(--blue)" stroke="var(--bg-1)" stroke-width="2"/>
-        <rect x="${L}" y="0" width="${W - L - R}" height="${H}" fill="transparent" id="an-hit"/></svg><div class="an-tip" id="an-tip"></div></div>`;
-      setTimeout(() => {
-        const svg = body.querySelector('.an-chartwrap svg'), hit = qs('#an-hit'), tip = qs('#an-tip'); if (!hit) return;
-        const move = ev => { const r = svg.getBoundingClientRect(), px = ((ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left) / r.width * W;
-          const i = Math.max(0, Math.min(D.length - 1, Math.round((px - L) / ((W - L - R) / (D.length - 1))))), d = D[i], sx = r.width / W;
-          qs('#an-x').setAttribute('x1', x(i)); qs('#an-x').setAttribute('x2', x(i)); qs('#an-x').setAttribute('opacity', 1);
-          qs('#an-dot').setAttribute('cx', x(i)); qs('#an-dot').setAttribute('cy', y(d.visits)); qs('#an-dot').setAttribute('opacity', 1);
-          tip.innerHTML = `${fmtDate(d.date)}<br><b>${N(d.visits)}</b> vizite · ${N(d.views)} pagini`; tip.style.left = x(i) * sx + 'px'; tip.style.top = y(d.visits) * sx + 'px'; tip.style.opacity = 1; };
-        const out = () => { tip.style.opacity = 0; qs('#an-x').setAttribute('opacity', 0); qs('#an-dot').setAttribute('opacity', 0); };
-        hit.addEventListener('mousemove', move); hit.addEventListener('touchmove', move, { passive: true }); hit.addEventListener('touchstart', move, { passive: true });
-        hit.addEventListener('mouseleave', out); hit.addEventListener('touchend', () => setTimeout(out, 1500));
-      }, 0);
-    }
+    else chart = `<div class="an-sumrow" id="an-sum"></div><div class="an-chartwrap" id="an-cw"></div>`;
     // drumul spre ofertă
     const calc = (a.pages || []).find(p => p.name === '/calculator-pret.html'), calcV = calc ? (calc.visits || calc.views) : 0;
     const funnel = `<div class="an-funnel">
@@ -6398,11 +6443,15 @@ async function loadAnalytics() {
     const dev = dv.length ? `<div class="an-seg">${dv.map(d => `<i style="width:${(d.visits || 0) / dt * 100}%;background:${(DEVC[d.name] || [0, 'var(--border)'])[1]}"></i>`).join('')}</div>
       <div class="an-legend">${dv.map(d => `<div><s style="background:${(DEVC[d.name] || [0, 'var(--border)'])[1]}"></s>${escapeHtml((DEVC[d.name] || [d.name || 'Altul'])[0])}<b>${N(d.visits)} · ${Math.round((d.visits || 0) / dt * 100)}%</b></div>`).join('')}</div>` : '<div class="cm-hint">Încă nu sunt date.</div>';
     const per = days ? (days === 1 ? 'ultimele 24 de ore' : `ultimele ${days} zile`) : 'de la lansare';
-    body.innerHTML = kpis + `<div class="an-card"><h4>Vizite pe zile <span>${per}</span></h4>${chart}</div>
+    body.innerHTML = kpis + `<div class="an-card"><h4>Pe zile <span class="an-sw" id="an-sw"><button type="button" data-m="visits" class="on">Vizite</button><button type="button" data-m="views">Pagini</button><i></i></span><span>${per}</span></h4>${chart}</div>
       <div class="an-grid"><div class="an-card"><h4>Drumul spre ofertă</h4>${funnel}</div><div class="an-card"><h4>Dispozitive</h4>${dev}</div></div>
       <div class="an-grid an-grid3"><div class="an-card"><h4>Pagini citite</h4>${lst(pages, anPage, () => '📄')}</div><div class="an-card"><h4>De unde vin</h4>${lst(a.refs || [], src, srcIc)}</div>
       <div class="an-card"><h4>Țări</h4>${lst(a.countries || [], cName, flag)}</div></div>
       <div class="an-foot">Date din Cloudflare Web Analytics, actualizate la 10 minute, fără roboți. Se numără de la lansarea site-ului (${new Date(a.since || Date.now()).toLocaleString('ro-RO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}).</div>`;
+    if (D.length >= 2) { let m = 'visits'; try { m = localStorage.getItem('yca_an_m') === 'views' ? 'views' : 'visits'; } catch {}
+      anChart(body, D, m);
+      body.querySelectorAll('#an-sw button').forEach(b => { b.classList.toggle('on', b.dataset.m === m); b.addEventListener('click', () => { body.querySelectorAll('#an-sw button').forEach(x => x.classList.toggle('on', x === b)); try { localStorage.setItem('yca_an_m', b.dataset.m); } catch {} anChart(body, D, b.dataset.m); }); }); }
+    anAnimate(body);
   } catch (e) { body.innerHTML = `<div class="cm-hint">${escapeHtml(/HTTP 40[45]|Operație/.test(e.message) ? 'Serverul nu are încă statisticile — actualizează serverul' : e.message)}</div>`; }
   finally { anBusy = false; }
 }
