@@ -6839,7 +6839,9 @@ function setLang(l) { try { localStorage.setItem('yca_lang', l === 'en' ? 'en' :
 let seap = null, spType = '', spSt = 'active', spPoll = null;
 const SP_SEEN_KEY = 'yca_seap_seen';
 function spSeen() { try { return +localStorage.getItem(SP_SEEN_KEY) || 0; } catch { return 0; } }
-let spSeenSnap = null;   // „NOU” rămâne pe ecran până ieși din tab, chiar dacă le marcăm văzute
+let spSeenSnap = null;
+// „NOU”: necitit încă SAU găsit în ultimele 24 de ore
+const spIsNew = (it, seen) => it.status === 'new' && (it.firstSeen > seen || Date.now() - (it.firstSeen || 0) < 864e5);   // „NOU” rămâne pe ecran până ieși din tab, chiar dacă le marcăm văzute
 function spMarkSeen() { try { localStorage.setItem(SP_SEEN_KEY, String(Date.now())); } catch {} }
 const spLei = v => v ? Math.round(v).toLocaleString('ro-RO') + ' lei' : '—';
 function spDead(d) {
@@ -6876,7 +6878,7 @@ function spFiltered() {
   }).sort((a, b) => {
     if (spSt !== 'active') return b.firstSeen - a.firstSeen;
     const seen = spSeenSnap != null ? spSeenSnap : spSeen();
-    const na = a.firstSeen > seen && a.status === 'new' ? 0 : 1, nb = b.firstSeen > seen && b.status === 'new' ? 0 : 1;   // întâi cele noi
+    const na = spIsNew(a, seen) ? 0 : 1, nb = spIsNew(b, seen) ? 0 : 1;   // întâi cele noi
     return na - nb || (Date.parse(a.deadline || 0) || 9e15) - (Date.parse(b.deadline || 0) || 9e15);                    // apoi după termen
   });
 }
@@ -6901,7 +6903,7 @@ function renderSeap() {
   if (!list.length) { qs('#sp-list').innerHTML = '<div class="cl-empty">Niciun anunț în această listă.</div>'; return; }
   const ed = myRole() !== 'staff' || roleLevel('seap') === 'edit';
   qs('#sp-list').innerHTML = list.map(it => {
-    const d = spDead(it.deadline), isNew = it.firstSeen > seen && it.status === 'new';
+    const d = spDead(it.deadline), isNew = spIsNew(it, seen);
     const nd = (it.docs || []).length;
     const sb = (v, l) => ed ? `<button class="sp-btn${it.status === v ? ' on' : ''}" data-sps="${v}">${l}</button>` : '';
     return `<div class="sp-card${isNew ? ' is-new' : ''}" data-k="${escapeHtml(it.key)}">
