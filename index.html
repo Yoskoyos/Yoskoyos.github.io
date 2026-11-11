@@ -1142,7 +1142,11 @@ html:not(.unlocked) .app{display:none}
 .of-stkw{margin-top:3px;min-height:0}.of-stk{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px}.of-stk.ok{color:var(--ok);background:rgba(34,197,94,.1)}.of-stk.bad{color:var(--err);background:rgba(239,68,68,.1)}.of-stk.warn{color:var(--warn);background:rgba(245,158,11,.12)}.of-stk.wait{color:var(--fg-3)}
 .ofo-t{width:100%;border-collapse:collapse;font-size:13px}.ofo-t th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--fg-3);padding:6px;border-bottom:1px solid var(--border)}.ofo-t td{padding:8px 6px;border-bottom:1px solid var(--border);vertical-align:top}.ofo-t .r{text-align:right;white-space:nowrap}.ofo-t a{color:inherit}.ofo-t tfoot td{font-size:12px;color:var(--fg-3);border:0}
 .ofo-warn{background:rgba(245,158,11,.12);color:var(--warn);border-radius:10px;padding:9px 12px;font-weight:600;font-size:13px}.ofo-ok{background:rgba(34,197,94,.1);color:var(--ok);border-radius:10px;padding:9px 12px;font-weight:600;font-size:13px}
-.okc{color:var(--ok)}#ofo-open{text-decoration:none}
+.okc{color:var(--ok)}
+.ofo-bm{border:1px dashed var(--accent);border-radius:12px;padding:12px 14px;background:var(--accent-dim);font-size:13px}.ofo-bm.done{border-style:solid;border-color:var(--border);background:var(--bg-2)}
+.ofo-bm-h{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:6px}.ofo-bm ol{margin:6px 0 10px;padding-left:20px;display:flex;flex-direction:column;gap:8px;line-height:1.45}
+.ofo-bm-btn{margin-top:8px}.ofo-bm-btn a{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:999px;background:var(--accent);color:#fff;font-weight:800;text-decoration:none;cursor:grab;box-shadow:0 6px 16px -6px var(--accent)}
+.linkbtn{border:0;background:none;color:var(--accent);font:inherit;font-size:12px;cursor:pointer;text-decoration:underline;padding:0}#ofo-open{text-decoration:none}
 .of-i{font-size:12px;color:var(--fg-3);padding-top:8px;display:flex;flex-direction:column;align-items:center;gap:2px}.of-mv{display:flex;flex-direction:column;opacity:0;transition:opacity .15s}.of-row:hover .of-mv{opacity:1}
 .of-mv button{border:0;background:none;color:var(--fg-3);font-size:9px;cursor:pointer;line-height:1;padding:1px}
 .of-val{padding-top:8px;font-weight:700;font-variant-numeric:tabular-nums}.of-x{border:0;background:none;color:var(--fg-3);cursor:pointer;padding-top:8px}.of-x:hover{color:var(--err)}
@@ -2487,7 +2491,7 @@ html:not(.unlocked) .app{display:none}
   <div class="modal" style="max-width:860px">
     <div class="modal-hdr"><div class="modal-title" id="ofo-title">Comandă la A2T</div><div class="modal-x" id="ofo-x" role="button" aria-label="Închide">✕</div></div>
     <div class="modal-body"><div id="ofo-body"></div></div>
-    <div class="modal-foot"><button class="btn" id="ofo-refresh" type="button">🔄 Verifică stocul acum</button><span style="flex:1"></span><button class="btn" id="ofo-copy" type="button">📋 Copiază lista</button><a class="btn primary" id="ofo-open" href="https://www.a2t.ro/" target="_blank" rel="noopener">Deschide a2t.ro ↗</a></div>
+    <div class="modal-foot"><button class="btn" id="ofo-refresh" type="button">🔄 Verifică stocul acum</button><span style="flex:1"></span><button class="btn" id="ofo-copy" type="button">📋 Copiază lista</button><a class="btn primary" id="ofo-open" href="https://www.a2t.ro/" target="_blank" rel="noopener">Deschide a2t.ro și pune în coș ↗</a></div>
   </div>
 </div>
 <div class="overlay hidden" id="ofc-modal" role="dialog" aria-modal="true" aria-labelledby="ofc-title">
@@ -7608,6 +7612,16 @@ function ofOrderList() {
     const x = m.get(K) || { sku, name: l.name, qty: 0, per, need: 0 }; x.qty += qty; x.need += +l.qty; m.set(K, x); }
   return [...m.values()];
 }
+const OF_BM = "javascript:(async()=>{try{const m=decodeURIComponent(location.hash).match(/yca=([^&]+)/);if(!m)return alert('Deschide a2t.ro din aplicație (Comandă A2T → Deschide a2t.ro și pune în coș), apoi apasă din nou butonul.');const st=document.querySelector('#app').__vue__.$store;const L=m[1].split(';').filter(Boolean).map(x=>x.split('*'));let ok=0;const bad=[];for(const[s,q]of L){try{const p=await st.dispatch('product/single',{options:{sku:s},setCurrentProduct:false,selectDefaultVariant:false});if(!p)throw 0;await st.dispatch('cart/addItem',{productToAdd:Object.assign({},p,{qty:+q||1})});ok++}catch(e){bad.push(s)}}history.replaceState(null,'',location.pathname+location.search);try{st.dispatch('cart/toggleMicrocart')}catch(e){}alert('Am pus '+ok+' din '+L.length+' produse în coș.'+(bad.length?' Nu am putut adăuga: '+bad.join(', ')+'.':'')+' Comanda o verifici și o trimiți tu.')}catch(e){alert('Nu am putut pune produsele în coș: '+(e&&e.message||e))}})();";
+function ofBmHtml() {
+  let done = false; try { done = localStorage.getItem('yca_a2t_bm') === '1'; } catch {}
+  return `<div class="ofo-bm${done ? ' done' : ''}"><div class="ofo-bm-h"><b>🛒 Produsele direct în coșul tău A2T</b>${done ? '<button type="button" class="linkbtn" id="ofo-bm-re">arată din nou instalarea</button>' : ''}</div>
+    ${done ? '<div class="cm-hint">Apasă <b>Deschide a2t.ro și pune în coș</b>, apoi pe pagina A2T apasă favoritul <b>🛒 Pune în coș A2T</b>. Produsele intră în coș — comanda n-o trimite, o verifici și o finalizezi tu.</div>'
+    : `<ol><li>O singură dată, pe calculator: <b>trage butonul de mai jos în bara de favorite</b> a browserului (Ctrl+Shift+B dacă nu se vede bara).<div class="ofo-bm-btn"><a href="${escapeHtml(OF_BM)}" onclick="event.preventDefault();toast('Nu-l apăsa aici — trage-l în bara de favorite','warn')" draggable="true">🛒 Pune în coș A2T</a></div></li>
+      <li>Intră o dată pe a2t.ro și loghează-te în contul tău (rămâi logat).</li>
+      <li>De acum: apasă <b>Deschide a2t.ro și pune în coș</b>, iar pe pagina A2T apasă favoritul <b>🛒 Pune în coș A2T</b>. Produsele cu cantitățile intră în coș; comanda nu se trimite.</li></ol>
+      <button type="button" class="btn" id="ofo-bm-ok">✓ Am pus butonul în favorite</button>`}</div>`;
+}
 function ofOrderRender() {
   const L = ofOrderList(); let tot = 0, miss = 0;
   const rows = L.map(x => { const st = ofStock[x.sku.toUpperCase()], site = st ? st.site : 0; tot += site * x.qty; if (st && (!st.inStock || st.qty < x.qty)) miss++;
@@ -7616,9 +7630,16 @@ function ofOrderRender() {
   qs('#ofo-body').innerHTML = L.length ? `${miss ? `<div class="ofo-warn">⚠ ${miss} ${miss === 1 ? 'produs nu e' : 'produse nu sunt'} în stoc suficient la A2T — alege o alternativă sau întreabă agentul.</div>` : '<div class="ofo-ok">✓ Toate produsele sunt în stoc la A2T.</div>'}
     <table class="ofo-t"><thead><tr><th>Cod A2T</th><th>Produs</th><th class="r">Cant.</th><th>Stoc A2T</th><th class="r">Preț site</th><th class="r">Total site</th></tr></thead><tbody>${rows}</tbody>
     <tfoot><tr><td colspan="5">Total estimativ la prețul de pe site (cu TVA; prețul tău de instalator e mai mic)</td><td class="r"><b>${ofL(tot)}</b></td></tr></tfoot></table>
-    <div class="cm-hint">Montajul, consumabilele și liniile fără cod A2T nu intră în listă. Apasă pe un produs ca să-l deschizi pe a2t.ro și să-l pui în coș, sau copiază lista și trimite-o agentului tău.</div>`
+    <div class="cm-hint">Montajul, consumabilele și liniile fără cod A2T nu intră în listă.</div>${ofBmHtml()}`
     : '<div class="cl-empty">Nicio linie cu cod A2T. Liniile generate de configurator au codul pus automat; la celelalte îl poți scrie sub denumire.</div>';
 }
+qs('#ofo-body').addEventListener('click', e => {
+  if (e.target.closest('#ofo-bm-ok')) { try { localStorage.setItem('yca_a2t_bm', '1'); } catch {} ofOrderRender(); }
+  if (e.target.closest('#ofo-bm-re')) { try { localStorage.removeItem('yca_a2t_bm'); } catch {} ofOrderRender(); }
+});
+qs('#ofo-open').addEventListener('click', () => {
+  const L = ofOrderList(); qs('#ofo-open').href = 'https://www.a2t.ro/' + (L.length ? '#yca=' + L.map(x => encodeURIComponent(x.sku) + '*' + x.qty).join(';') : '');
+});
 qs('#of-order').addEventListener('click', () => { qs('#ofo-modal').classList.remove('hidden'); ofOrderRender(); ofStockRefresh(true); });
 qs('#ofo-x').addEventListener('click', () => qs('#ofo-modal').classList.add('hidden'));
 qs('#ofo-refresh').addEventListener('click', () => { ofOrderList().forEach(x => { delete ofStock[x.sku.toUpperCase()]; }); ofOrderRender(); ofStockRefresh(true); });
