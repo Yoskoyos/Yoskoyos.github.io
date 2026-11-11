@@ -655,7 +655,7 @@ html:not([data-role="admin"]) .ro-admin{display:none!important}
 .cm-check input{width:18px;height:18px;accent-color:var(--accent)}
 .spb-evs{margin:8px 0 2px;border-left:2px solid var(--border);padding-left:10px;display:flex;flex-direction:column;gap:6px}
 .spb-ev{font-size:12.5px;line-height:1.45}.spb-ev span{display:block;font-size:10.5px;color:var(--text-3,#888);font-weight:600}
-.spb-ev.castigat{color:var(--ok)}.spb-ev.pierdut,.spb-ev.anulat{color:var(--err)}.spb-ev.comanda,.spb-ev.suspendat,.spb-ev.contestatie{color:var(--warn)}
+.spb-ev.castigat{color:var(--ok)}.spb-ev.pierdut,.spb-ev.anulat{color:var(--err)}.spb-ev.comanda,.spb-ev.suspendat,.spb-ev.contestatie{color:var(--warn)}.spb-ev.modificat{color:var(--accent,#3b82f6)}
 .spb-trk{font-size:11px;color:var(--text-3,#888);margin-top:6px}
 .cm-months{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px}
 .cm-month{border:1px solid var(--border);background:var(--bg-2);border-radius:8px;padding:7px 6px;font-size:11px;font-weight:700;cursor:pointer;text-align:center;font-family:var(--sans);color:var(--fg-2);line-height:1.3}
@@ -1509,7 +1509,7 @@ html:not(.unlocked) .app{display:none}
         <div class="cl-tools"><input type="search" class="cl-search" id="spb-search" placeholder="Caută: autoritate, obiect, număr…" autocomplete="off"></div>
         <div class="sp-chips" id="spb-res"><button class="sp-chip on" data-v="">Toate</button><button class="sp-chip" data-v="evaluare">În evaluare</button><button class="sp-chip" data-v="castigat">Câștigate</button><button class="sp-chip" data-v="pierdut">Pierdute</button><button class="sp-chip" data-v="anulat">Anulate / retrase</button></div>
         <div class="cl-list" id="spb-list"><div class="cl-empty">Se încarcă…</div></div>
-        <div class="cm-hint" style="margin-top:12px">Aici apar licitațiile marcate „✔ Ofertat” în Anunțuri și cele adăugate de mână. Rămân salvate și după termen, cu prețul ofertat și rezultatul. Serverul verifică singur în SEAP la ~3 ore (08–21) cele aflate „În evaluare” și îți trimite alertă pe telefon și Telegram când licitația e anulată, suspendată, contestată, atribuită (cu câștigătorul și prețul) sau când primești comanda directă de acceptat. Respingerea ofertei din raportul procedurii nu e publică — aceea vine pe e-mail / în SEAP.</div>
+        <div class="cm-hint" style="margin-top:12px">Aici apar licitațiile marcate „✔ Ofertat” în Anunțuri și cele adăugate de mână. Rămân salvate și după termen, cu prețul ofertat și rezultatul. Serverul verifică singur în SEAP cele aflate „În evaluare” (din oră în oră cât e termenul deschis, apoi la ~3 ore, 08–21) și îți trimite alertă pe telefon și Telegram la orice modificare făcută de autoritate (termen, valoare, erată, texte, documente noi — ex. răspunsuri la clarificări) și când licitația e anulată, suspendată, contestată, atribuită (cu câștigătorul și prețul) sau când primești comanda directă de acceptat. Respingerea ofertei din raportul procedurii nu e publică — aceea vine pe e-mail / în SEAP.</div>
       </div>
       </div>
     </div>
@@ -6967,7 +6967,7 @@ function spbTrackHtml(x) {
 qs('#spb-track').addEventListener('click', async () => {
   const b = qs('#spb-track'); if (b.dataset.busy) return; b.dataset.busy = 1; const old = b.innerHTML; b.innerHTML = 'Verific în SEAP…';
   try { const r = await clApi('/seap/track', jsonOpt('POST', {})); await loadSeap(true); toast(r.events ? `${r.events} ${r.events === 1 ? 'noutate' : 'noutăți'} în SEAP` : `Verificate ${r.checked} — nimic nou`, r.events ? 'ok' : 'info'); }
-  catch (e) { toast(/HTTP 40[45]|Operație|inexistent/.test(e.message) ? 'Actualizează serverul (v8.9)' : e.message, 'err'); }
+  catch (e) { toast(/HTTP 40[45]|Operație|inexistent/.test(e.message) ? 'Actualizează serverul (v9.0)' : e.message, 'err'); }
   finally { delete b.dataset.busy; b.innerHTML = old; }
 });
 function openBid(key) {

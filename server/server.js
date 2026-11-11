@@ -1953,7 +1953,7 @@ async function seapTick(db) {
   const st0 = loadSeap();
   const slot = [...SEAP_RUN_AT].reverse().find(s => hm >= s);
   if (slot && st0.lastSlot !== today + ' ' + slot) { const s2 = loadSeap(); s2.lastSlot = today + ' ' + slot; saveSeap(s2); seapRun(db, 'program ' + slot).catch(e => console.error('[seap]', e.message)); return; }
-  if (hm >= '08:00' && hm < '21:30' && !seapBusy && !seapTrackBusy && Date.now() - (st0.lastTrack || 0) > SEAP_TRACK_EVERY) { seapTrack(db).catch(e => console.error('[seap-track]', e.message)); return; }
+  if (hm >= '08:00' && hm < '21:30' && !seapBusy && !seapTrackBusy && Date.now() - (st0.lastTrack || 0) > (Object.values(st0.items).some(x => x.status === 'applied' && !seapFinal(x) && x.deadline && Date.parse(x.deadline) > Date.now() - 864e5) ? 3600e3 : SEAP_TRACK_EVERY)) { seapTrack(db).catch(e => console.error('[seap-track]', e.message)); return; }
   if (hm >= SEAP_ALERT_AT && st0.lastAlertDay !== today && !seapBusy) {
     const st = loadSeap(); st.lastAlertDay = today;
     const since = st.lastAlertAt || 0;
@@ -2195,7 +2195,7 @@ function seapBid(b) {
     winnerPrice: Math.max(0, num(b.winnerPrice)) || null, winner: str(b.winner, 200), notes: str(b.notes, 2000), updatedAt: Date.now() };
 }
 /* ═════════════ Urmărirea licitațiilor ofertate („Licitațiile noastre”): anulare, atribuire, câștigător ═════════════
-   Rulează din seapTick la ~3 ore (08–21). Doar pentru cele cu status 'applied' și rezultat încă „în evaluare”.
+   Rulează din seapTick: la 1 oră cât timp termenul e deschis (sau a trecut de < 1 zi), apoi la ~3 ore (08–21). Orice modificare a anunțului (termen, valoare, erată, texte, documente noi) → alertă. Doar pentru cele cu status 'applied' și rezultat încă „în evaluare”.
    • anunț publicitar (ADV, achiziție directă): anularea = o versiune nouă a anunțului cu „anulat/anulare”;
      atribuirea = achiziția directă (DA) făcută de aceeași autoritate după anunț — la noi (comandă de acceptat / acceptată)
      sau la alt furnizor cu obiect asemănător (pierdută, cu câștigătorul și prețul).
@@ -2237,7 +2237,7 @@ async function seapTrackRef(st, it) {
 // verifică o licitație; întoarce lista de evenimente noi { id, type, text, set? }
 async function seapTrackOne(st, it) {
   const t = await seapTrackRef(st, it); if (!t) return { t: null, ev: [] };
-  const ev = [];
+  const ev = []; let snap = null;
   if (t.kind === 'adv') {
     // anulare: versiune nouă a aceluiași anunț
     const r = await seapReq('POST', 'api-pub/AdvNoticeCommon/GetAdvNoticeList/', { pageSize: 20, pageIndex: 0, noticeNo: t.no });
@@ -2247,7 +2247,9 @@ async function seapTrackOne(st, it) {
       const v = await seapReq('GET', `api-pub/PUBLICAdvNotice/getForView/${last.advNoticeId}`).catch(() => null);
       const txt = seapNorm([last.contractObject, v && v.contractDescription, v && v.additionalInformation].join(' '));
       if (/\banulat[ae]?\b|\banularea\b|\banulare\b|\bse anuleaza\b/.test(txt)) ev.push({ id: 'anulat', type: 'anulat', text: 'Anunțul a fost <b>anulat</b> de autoritate.' + (v && v.additionalInformation ? '\n<i>' + escHtml(String(v.additionalInformation).slice(0, 300)) + '</i>' : ''), set: { result: 'anulat' } });
-      else if (last.advNoticeId !== t.ref) ev.push({ id: 'mod' + last.advNoticeId, type: 'modificat', text: 'Anunțul a fost <b>modificat</b> (versiune nouă publicată) — verifică ce s-a schimbat.' });
+      if (v) snap = { ver: last.advNoticeId, deadline: v.tenderReceiptDeadline || last.tenderReceiptDeadline || '', value: v.estimatedValue || last.estimatedValue || null,
+        h: { desc: seapHash(v.contractDescription), cond: seapHash([v.participationConditions, v.contractRelatedConditions].join('|')), info: seapHash(v.additionalInformation), crit: seapHash(v.awardCriteria), obj: seapHash(last.contractObject) },
+        docs: v.documentName ? [String(v.documentName)] : [] };
     }
     // atribuire: achizițiile directe ale autorității după anunț
     if (t.caId && !ev.some(e => e.type === 'anulat')) {
@@ -2281,6 +2283,10 @@ async function seapTrackOne(st, it) {
     const x = ((r && r.items) || []).find(y => y.noticeNo === t.no);
     if (x) {
       const ps = (x.sysProcedureState || {}).id;
+      const f = await seapReq('GET', `api-pub/NoticeCommon/GetDfNoticeSectionFiles/?initNoticeId=${t.ref}&sysNoticeTypeId=17`).catch(() => null);
+      const docs = []; for (const k of ['dfNoticeDocs', 'contractingStrategyDocs', 'decisionDocs', 'duaeDocs']) for (const d of (f && f[k]) || []) docs.push(String(d.noticeDocumentName || ''));
+      const chg = await seapReq('POST', 'api-pub/ENotice/GetAllNoticeChanges/', { initNoticeId: t.ref, sysNoticeTypeId: 17, pageIndex: 0, pageSize: 50 }).catch(() => null);
+      snap = { deadline: x.maxTenderReceiptDeadline || x.minTenderReceiptDeadline || '', value: x.estimatedValueRon || null, errata: x.errataNo || 0, changes: (chg && chg.total) || 0, docs: f ? docs : null };
       if (x.hasAppeal) ev.push({ id: 'contestatie', type: 'contestatie', text: '⚖️ Procedura are o <b>contestație</b> depusă (CNSC) — termenele se pot decala.' });
       if (ps === 3) ev.push({ id: 'anulat', type: 'anulat', text: 'Procedura a fost <b>anulată</b> de autoritate.', set: { result: 'anulat' } });
       if (ps === 4) ev.push({ id: 'suspendat-' + String(x.noticeStateDate || '').slice(0, 10), type: 'suspendat', text: '⏸ Procedura a fost <b>suspendată</b> (de obicei din cauza unei contestații).' });
@@ -2304,8 +2310,29 @@ async function seapTrackOne(st, it) {
       }
     }
   }
-  return { t, ev };
+  if (snap) {
+    const old = (it.track || {}).snap;
+    if (old) {
+      const d = [], fmtD = x => x ? new Date(x).toLocaleString('ro-RO', { timeZone: 'Europe/Bucharest', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+      const lei = v => v ? Math.round(v).toLocaleString('ro-RO') + ' lei' : '—';
+      if (old.deadline && snap.deadline && Date.parse(old.deadline) !== Date.parse(snap.deadline)) d.push(`⏰ <b>Termen de depunere</b>: ${fmtD(old.deadline)} → <b>${fmtD(snap.deadline)}</b>`);
+      if (old.value && snap.value && Math.abs(old.value - snap.value) > 0.5) d.push(`💰 <b>Valoare estimată</b>: ${lei(old.value)} → <b>${lei(snap.value)}</b>`);
+      if (snap.errata > (old.errata || 0)) d.push(`📝 <b>Erată publicată</b> (nr. ${snap.errata}) — anunțul a fost corectat`);
+      if (snap.changes > (old.changes || 0)) d.push(`📝 <b>Anunț de modificare</b> publicat (${snap.changes - (old.changes || 0)} nou)`);
+      const H = { obj: 'obiectul', desc: 'descrierea', cond: 'condițiile de participare / contractuale', info: 'informațiile suplimentare (cerințe, listă produse)', crit: 'criteriul de atribuire' };
+      const hc = Object.keys(H).filter(k => old.h && snap.h && old.h[k] !== snap.h[k]); if (hc.length) d.push(`✏️ S-au modificat: <b>${hc.map(k => H[k]).join(', ')}</b>`);
+      if (old.docs && snap.docs) {
+        const add = snap.docs.filter(n => !old.docs.includes(n)), rem = old.docs.filter(n => !snap.docs.includes(n));
+        if (add.length) d.push(`📎 <b>${add.length === 1 ? 'Document nou' : add.length + ' documente noi'}</b>: ${add.slice(0, 6).map(escHtml).join(', ')}${add.length > 6 ? '…' : ''}`);
+        if (rem.length) d.push(`🗑 Document retras: ${rem.slice(0, 4).map(escHtml).join(', ')}`);
+      }
+      if (snap.ver && old.ver && snap.ver !== old.ver && !d.length) d.push('✏️ A fost publicată o <b>versiune nouă</b> a anunțului (fără schimbări vizibile în termen, valoare sau texte)');
+      if (d.length) ev.push({ id: 'chg-' + seapHash(JSON.stringify(snap)), type: 'modificat', text: '🔔 <b>Autoritatea a modificat anunțul</b>\n' + d.join('\n'), upd: { deadline: snap.deadline || undefined, value: snap.value || undefined } });
+    }
+  }
+  return { t, ev, snap };
 }
+const seapHash = s => crypto.createHash('sha1').update(String(s || '').replace(/\s+/g, ' ').trim()).digest('hex').slice(0, 12);
 let seapTrackBusy = null;
 async function seapTrack(db, opt = {}) {
   if (seapTrackBusy) return seapTrackBusy;
@@ -2322,6 +2349,7 @@ async function seapTrack(db, opt = {}) {
     for (const [k, r] of Object.entries(out)) {
       const it = cur.items[k]; if (!it) continue;
       it.track = { ...(it.track || {}), ...(r.t || {}), lastCheck: now, err: r.err || '', events: (it.track && it.track.events) || [] };
+      if (r.snap) { it.track.snap = r.snap; if (r.snap.deadline) it.deadline = r.snap.deadline; if (r.snap.value) it.value = r.snap.value; }
       for (const e of (r.ev || [])) {
         if (it.track.events.some(x => x.id === e.id)) continue;
         it.track.events.push({ id: e.id, type: e.type, text: e.text, t: now });
@@ -3487,7 +3515,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 8.9, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 9.0, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
