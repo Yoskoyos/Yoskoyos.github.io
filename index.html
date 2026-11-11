@@ -1100,6 +1100,46 @@ html:not(.unlocked) .app{display:none}
 .an-legend div{display:flex;align-items:center;gap:8px;font-size:13.5px}
 .an-legend s{width:10px;height:10px;border-radius:3px;flex-shrink:0}
 .an-legend b{margin-left:auto;font-variant-numeric:tabular-nums}
+.of-list{display:flex;flex-direction:column;gap:8px}
+.of-card{display:grid;grid-template-columns:86px minmax(0,1fr) auto 130px;align-items:center;gap:12px;background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r,12px);padding:12px 14px;cursor:pointer;transition:border-color .15s,transform .15s}
+.of-card:hover{border-color:var(--accent);transform:translateY(-1px)}
+.of-no{font-weight:800;font-variant-numeric:tabular-nums}.of-no small{display:block;font-weight:500;font-size:11.5px;color:var(--fg-3)}
+.of-mid{min-width:0;display:flex;flex-direction:column}.of-mid b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.of-mid span{font-size:12px;color:var(--fg-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.of-sum{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}.of-sum small{display:block;font-size:11px;font-weight:500;color:var(--fg-3)}
+.sp-tag.ok{background:var(--ok-dim,rgba(34,197,94,.12));color:var(--ok)}.sp-tag.bad{background:rgba(239,68,68,.1);color:var(--err)}
+.of-modal{max-width:1040px!important}.of-modal .modal-body{max-height:78vh}
+.of-g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 12px}.of-g4 .fg{margin:0}.of-span2{grid-column:span 2}.of-span3{grid-column:span 3}.of-span4{grid-column:1/-1}
+.of-g4 .form-input,.of-texts .form-input{width:100%}
+.of-checks{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;padding-top:18px}.of-checks label{display:flex;gap:6px;align-items:center;font-size:13px;font-weight:600;color:var(--fg-2)}
+.of-quick{border:1px solid var(--accent);background:var(--accent-dim);border-radius:12px;padding:10px 14px}.of-quick summary{cursor:pointer;font-weight:700;font-size:13.5px}
+.of-qfoot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;flex-wrap:wrap}
+.of-tog{float:right;text-transform:none;letter-spacing:0;font-weight:500}.of-tog label{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--fg-3)}
+.of-row{display:grid;grid-template-columns:38px minmax(0,1fr) 112px 62px 70px 96px 96px 28px;gap:6px;align-items:start;padding:6px 0;border-bottom:1px solid var(--border)}
+.of-tbl.cost .of-row{grid-template-columns:38px minmax(0,1fr) 112px 62px 70px 96px 90px 96px 28px}
+.of-row .form-input,.of-tot .form-input,.ofc-g .form-input,#of-modal .form-input{font-family:var(--sans)}.of-row .form-input{width:100%;padding:7px 8px;font-size:13px}.of-row .r,.of-row input.r{text-align:right}
+.of-hd{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--fg-3);padding-bottom:4px}
+.of-desc{margin-top:4px;font-size:12px!important;color:var(--fg-3)}
+.of-i{font-size:12px;color:var(--fg-3);padding-top:8px;display:flex;flex-direction:column;align-items:center;gap:2px}.of-mv{display:flex;flex-direction:column;opacity:0;transition:opacity .15s}.of-row:hover .of-mv{opacity:1}
+.of-mv button{border:0;background:none;color:var(--fg-3);font-size:9px;cursor:pointer;line-height:1;padding:1px}
+.of-val{padding-top:8px;font-weight:700;font-variant-numeric:tabular-nums}.of-x{border:0;background:none;color:var(--fg-3);cursor:pointer;padding-top:8px}.of-x:hover{color:var(--err)}
+.of-add{display:flex;flex-wrap:wrap;gap:8px}
+.of-pick{border:1px solid var(--border);border-radius:10px;padding:10px}.of-pick .form-input{width:100%}#of-pick-res{max-height:240px;overflow:auto;margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.of-pi{display:flex;flex-direction:column;align-items:flex-start;text-align:left;border:1px solid var(--border);background:var(--bg-2);border-radius:8px;padding:7px 10px;cursor:pointer;font:inherit;color:inherit}.of-pi:hover{border-color:var(--accent)}.of-pi b{font-size:13px}.of-pi span{font-size:11.5px;color:var(--fg-3)}
+.of-bottom{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
+.of-texts{display:flex;flex-direction:column;gap:10px}
+.of-tot{background:var(--bg-2);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;font-size:13.5px}
+.of-tot>div{display:flex;justify-content:space-between;align-items:center;gap:10px}.of-tot b{font-variant-numeric:tabular-nums}
+.of-tot .of-line{border-top:1px solid var(--border);padding-top:6px}.of-grand{border-top:2px solid var(--fg);padding-top:8px;margin-top:2px;font-size:17px}.of-grand b{font-size:19px}
+.of-int{font-size:12.5px;color:var(--fg-3)}.of-sm{width:62px!important;padding:4px 6px!important;font-size:12px!important;display:inline-block}
+.ofc-g{border-bottom:1px solid var(--border);padding:10px 0;display:flex;flex-direction:column;gap:6px}.ofc-g>b{font-size:13px}
+.ofc-p{display:flex;flex-wrap:wrap;gap:8px}.ofc-r{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--fg-3)}.ofc-r .form-input{width:86px}.ofc-n{width:100%!important;font-size:12px!important}
+#ofc-body textarea{width:100%}
+@media (max-width:760px){.of-g4{grid-template-columns:1fr 1fr}.of-span3{grid-column:1/-1}.of-bottom{grid-template-columns:1fr}
+  .of-row,.of-tbl.cost .of-row{grid-template-columns:22px minmax(0,1fr) 52px 72px 70px 22px}
+  .of-row>div:nth-child(3),.of-row>div:nth-child(4){display:none}.of-tbl.cost .of-row>div:nth-child(7){display:none}.of-hd{display:none}.of-row>div:nth-child(6)::before{content:'preț';display:block;font-size:10px;color:var(--fg-3)}
+  .of-card{grid-template-columns:64px minmax(0,1fr) auto}.of-card .sp-tag{display:none}
+  #of-modal .modal-foot{flex-wrap:wrap}#of-modal .modal-foot .btn{flex:1 1 30%;padding:10px 8px;font-size:13px}#of-modal .modal-foot>span{display:none}}
+
 .an-in{animation:anIn .55s cubic-bezier(.22,1,.36,1) both}
 @keyframes anIn{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:none}}
 .an-sumrow{display:flex;align-items:flex-end;gap:22px;flex-wrap:wrap;margin:-2px 0 12px}
@@ -1580,6 +1620,7 @@ html:not(.unlocked) .app{display:none}
 
     <!-- ── Cereri ofertă ── -->
     <div class="panel" id="panel-quotes">
+      <div class="seg" role="tablist" id="qt-seg"><button type="button" class="on" data-qv="site">Cereri de pe site</button><button type="button" data-qv="own">Oferte proprii · calculator</button></div>
       <div id="cl-view-quotes">
       <div class="section">
         <div class="section-hdr">
@@ -1608,6 +1649,19 @@ html:not(.unlocked) .app{display:none}
       </div>
       </div>
 
+      <div id="of-view" hidden>
+      <div class="section">
+        <div class="section-hdr">
+          <div class="section-title sec-t"><span class="intg-ic" style="background:#0EA5E9"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h2M12 10h2M16 10h0M8 14h2M12 14h2M8 18h2M12 18h2M16 14v4"/></svg></span>Oferte proprii</div>
+          <div class="section-action" id="of-cfg-btn" style="margin-left:auto;margin-right:16px"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><circle cx="7" cy="7" r="1.5"/></svg>Prețurile mele</div>
+          <div class="section-action" id="of-new-btn"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Ofertă nouă</div>
+        </div>
+        <div class="qt-stats" id="of-stats"></div>
+        <div class="cl-tools"><input type="search" class="cl-search" id="of-search" placeholder="Caută după client, titlu, nr. ofertă…" autocomplete="off"></div>
+        <div class="of-list" id="of-list"><div class="cl-empty">Se încarcă…</div></div>
+        <div class="cm-hint" style="margin-top:10px">Oferte pentru orice client (case, firme, magazine), cu prețurile tale. Configuratorul rapid face lista din câteva întrebări, apoi modifici liber orice linie și o descarci ca PDF cu antetul firmei.</div>
+      </div>
+      </div>
     </div>
 
     <div class="panel" id="panel-alerts">
@@ -2347,6 +2401,60 @@ html:not(.unlocked) .app{display:none}
       <button class="btn" id="pur-cancel" type="button">Anulează</button>
       <button class="btn primary" id="pur-save" type="button">Adaugă în stoc</button>
     </div>
+  </div>
+</div>
+<div class="overlay hidden" id="of-modal" role="dialog" aria-modal="true" aria-labelledby="of-title">
+  <div class="modal of-modal">
+    <div class="modal-hdr"><div class="modal-title" id="of-title">Ofertă nouă</div><div class="modal-x" id="of-x" role="button" aria-label="Închide">✕</div></div>
+    <div class="modal-body">
+      <div class="of-g4">
+        <div class="fg of-span2"><label for="of-t">Titlul ofertei</label><input class="form-input" id="of-t" placeholder="ex. Sistem supraveghere video – casă Corbeanca"></div>
+        <div class="fg"><label for="of-date">Data</label><input class="form-input" id="of-date" type="date"></div>
+        <div class="fg"><label for="of-valid">Valabilă (zile)</label><input class="form-input" id="of-valid" inputmode="numeric" value="15"></div>
+      </div>
+      <div class="cm-sec">Client</div>
+      <div class="of-g4">
+        <div class="fg of-span2"><label for="of-cl">Alege din Clienți (opțional)</label><select class="form-input" id="of-cl"><option value="">— client nou / scriu eu —</option></select></div>
+        <div class="fg of-span2"><label for="of-cn">Nume client / firmă</label><input class="form-input" id="of-cn"></div>
+        <div class="fg"><label for="of-cui">CUI (firme)</label><input class="form-input" id="of-cui"></div>
+        <div class="fg"><label for="of-cc">Persoană de contact</label><input class="form-input" id="of-cc"></div>
+        <div class="fg"><label for="of-cp">Telefon</label><input class="form-input" id="of-cp" inputmode="tel"></div>
+        <div class="fg"><label for="of-ce">E-mail</label><input class="form-input" id="of-ce" inputmode="email"></div>
+        <div class="fg of-span4"><label for="of-ca">Adresa lucrării</label><input class="form-input" id="of-ca"></div>
+      </div>
+      <details class="of-quick" id="of-quick">
+        <summary>⚡ Configurator rapid — generează lista din câteva întrebări</summary>
+        <div class="of-g4" style="margin-top:12px">
+          <div class="fg"><label for="oq-ext">Camere exterior</label><input class="form-input" id="oq-ext" inputmode="numeric" value="4"></div>
+          <div class="fg"><label for="oq-int">Camere interior</label><input class="form-input" id="oq-int" inputmode="numeric" value="0"></div>
+          <div class="fg"><label for="oq-res">Rezoluție</label><select class="form-input" id="oq-res"><option value="2">2 MP (Full HD)</option><option value="4" selected>4 MP (2K)</option><option value="8">8 MP (4K)</option></select></div>
+          <div class="fg"><label for="oq-days">Zile de înregistrare</label><input class="form-input" id="oq-days" inputmode="numeric" value="30"></div>
+          <div class="fg"><label for="oq-m">Metri cablu / cameră</label><input class="form-input" id="oq-m" inputmode="numeric" value="25"></div>
+          <div class="fg of-span3 of-checks"><label><input type="checkbox" id="oq-ups"> UPS</label><label><input type="checkbox" id="oq-rack"> Rack</label><label><input type="checkbox" id="oq-mon"> Monitor</label><label><input type="checkbox" id="oq-doz" checked> Doze joncțiune</label><label><input type="checkbox" id="oq-tr" checked> Transport</label></div>
+        </div>
+        <div class="of-qfoot"><span class="cm-hint" id="oq-info"></span><button type="button" class="btn primary" id="oq-go">Generează lista</button></div>
+      </details>
+      <div class="cm-sec">Produse și servicii <span class="of-tog"><label><input type="checkbox" id="of-showcost"> arată costul meu (intern, nu apare în PDF)</label></span></div>
+      <div class="of-tbl" id="of-lines"></div>
+      <div class="of-add"><button type="button" class="btn" data-ofadd="echipament">+ Echipament</button><button type="button" class="btn" data-ofadd="material">+ Material</button><button type="button" class="btn" data-ofadd="manopera">+ Manoperă</button><button type="button" class="btn" id="of-fromstock">+ Din stoc / lista mea</button></div>
+      <div class="of-pick" id="of-pick" hidden><input class="form-input" id="of-pick-q" placeholder="Caută în stoc și în lista de prețuri…" autocomplete="off"><div id="of-pick-res"></div></div>
+      <div class="of-bottom">
+        <div class="of-texts">
+          <div class="fg"><label for="of-intro">Text de început (apare sub titlu)</label><textarea class="form-input" id="of-intro" rows="2"></textarea></div>
+          <div class="fg"><label for="of-notes">Condiții (garanție, plată, termen)</label><textarea class="form-input" id="of-notes" rows="5"></textarea></div>
+          <div class="fg"><label for="of-st">Stare</label><select class="form-input" id="of-st"><option value="draft">Ciornă</option><option value="sent">Trimisă clientului</option><option value="accepted">Acceptată</option><option value="rejected">Refuzată</option></select></div>
+        </div>
+        <div class="of-tot" id="of-tot"></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn cm-del" id="of-del" type="button">Șterge</button><button class="btn" id="of-dup" type="button">Duplică</button><button class="btn" id="of-client" type="button" hidden>➕ În Clienți</button><span style="flex:1"></span><button class="btn" id="of-pdf" type="button">📄 PDF</button><button class="btn primary" id="of-save" type="button">Salvează</button></div>
+  </div>
+</div>
+<div class="overlay hidden" id="ofc-modal" role="dialog" aria-modal="true" aria-labelledby="ofc-title">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-hdr"><div class="modal-title" id="ofc-title">Prețurile mele (lei fără TVA)</div><div class="modal-x" id="ofc-x" role="button" aria-label="Închide">✕</div></div>
+    <div class="modal-body"><div class="cm-hint">Prețurile de vânzare folosite de configuratorul rapid. Le poți modifica oricând și în fiecare ofertă. Se salvează pe server, le vezi pe toate dispozitivele.</div><div id="ofc-body"></div></div>
+    <div class="modal-foot"><button class="btn" id="ofc-reset" type="button">Prețuri implicite</button><span style="flex:1"></span><button class="btn" id="ofc-cancel" type="button">Anulează</button><button class="btn primary" id="ofc-save" type="button">Salvează</button></div>
   </div>
 </div>
 <div class="overlay hidden" id="spb-modal" role="dialog" aria-modal="true" aria-labelledby="spb-title">
@@ -7205,6 +7313,281 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('mess
   if (!/[?&](q|tab)=/.test(location.search)) return;
   let n = 0; const t = setInterval(() => { if (document.documentElement.classList.contains('unlocked') || ++n > 120) { clearInterval(t); if (n <= 120) setTimeout(() => openFromLink(location.href), 600); } }, 500);
 })();
+
+/* ═══ Oferte proprii (calculator) — pentru orice client, cu prețurile mele; PDF cu antet ═══ */
+const OF_DEF = {
+  cam_ext: { label: 'Cameră exterior', unit: 'buc', name: 'Cameră IP exterior {r}, IR / color noaptea, PoE, IP67', p: { 2: 220, 4: 330, 8: 520 } },
+  cam_int: { label: 'Cameră interior', unit: 'buc', name: 'Cameră IP interior dome {r}, IR / color noaptea, PoE', p: { 2: 200, 4: 300, 8: 480 } },
+  nvr: { label: 'NVR (după nr. de canale)', unit: 'buc', name: 'NVR {c} canale, {pp} porturi PoE, H.265+, acces de pe telefon', p: { 4: 600, 8: 900, 16: 1500, 32: 2600 } },
+  switch: { label: 'Switch PoE suplimentar (peste 16 camere)', unit: 'buc', name: 'Switch PoE 16 porturi, gigabit uplink', price: 700 },
+  hdd: { label: 'HDD supraveghere (după TB)', unit: 'buc', name: 'HDD supraveghere video {t} TB, funcționare 24/7', p: { 1: 350, 2: 500, 4: 800, 6: 1200, 8: 1800, 10: 2300 } },
+  cable: { label: 'Cablu FTP Cat5e (lei / m)', unit: 'm', name: 'Cablu FTP Cat5e cupru', price: 3 },
+  doza: { label: 'Doză joncțiune (pe cameră)', unit: 'buc', name: 'Doză de joncțiune pentru cameră', price: 40 },
+  cons: { label: 'Consumabile (pe cameră)', unit: 'set', name: 'Consumabile montaj (mufe RJ45, dibluri, coliere, tub/canal)', price: 25 },
+  ups: { label: 'UPS', unit: 'buc', name: 'UPS 850VA line-interactive pentru NVR', price: 450 },
+  rack: { label: 'Rack', unit: 'buc', name: 'Rack de perete 6U cu ușă din sticlă', price: 350 },
+  mon: { label: 'Monitor', unit: 'buc', name: 'Monitor 22" Full HD, HDMI', price: 450 },
+  lab_cam: { label: 'Manoperă montaj / cameră', unit: 'buc', name: 'Montaj și reglaj cameră', price: 150, kind: 'manopera' },
+  lab_cable: { label: 'Manoperă tragere cablu (lei / m)', unit: 'm', name: 'Pozare cablu (aparent, în canal sau tub)', price: 4, kind: 'manopera' },
+  lab_cfg: { label: 'Configurare NVR + aplicație telefon', unit: 'serv', name: 'Configurare NVR, înregistrare, acces de pe telefon și instruire', price: 250, kind: 'manopera' },
+  transport: { label: 'Transport / deplasare', unit: 'serv', name: 'Transport și deplasare', price: 100, kind: 'manopera' },
+  gb: { label: 'GB pe zi / cameră (2MP · 4MP · 8MP)', p: { 2: 10, 4: 20, 8: 40 }, calc: true },
+  notes: 'Garanție: 24 de luni pentru echipamente, 12 luni pentru manoperă.\nPlata: 50% avans la comandă, 50% la recepția lucrării.\nTermen de execuție: 5 zile lucrătoare de la plata avansului.\nOferta include montajul, configurarea și instruirea pentru folosirea aplicației.',
+  intro: 'Vă transmitem mai jos oferta noastră pentru furnizarea și montajul sistemului de supraveghere video.'
+};
+let ofCfg = null, offers = null, ofDraft = null;
+const ofCfgGet = () => { const c = JSON.parse(JSON.stringify(OF_DEF)); const u = ofCfg || {}; for (const k of Object.keys(c)) if (u[k] !== undefined) { if (typeof c[k] === 'object' && c[k] && typeof u[k] === 'object') { if (u[k].p) c[k].p = { ...c[k].p, ...u[k].p }; if (u[k].price !== undefined) c[k].price = u[k].price; if (u[k].name) c[k].name = u[k].name; } else c[k] = u[k]; } return c; };
+const ofN = v => { let x = String(v == null ? '' : v).trim().replace(/\s/g, ''); if (/,\d{1,2}$/.test(x)) x = x.replace(/\./g, '').replace(',', '.'); else x = x.replace(/,/g, ''); const n = parseFloat(x); return isFinite(n) ? n : 0; };
+const ofL = v => (Math.round((v || 0) * 100) / 100).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const OF_ST = { draft: ['Ciornă', ''], sent: ['Trimisă', 'sp'], accepted: ['Acceptată', 'ok'], rejected: ['Refuzată', 'bad'] };
+function ofTotals(o) {
+  const ls = o.lines || [], sub = k => ls.filter(l => k ? l.kind === k : true).reduce((t, l) => t + (+l.qty || 0) * (+l.price || 0), 0);
+  const eq = sub('echipament') + sub('material'), lab = sub('manopera'), gross = eq + lab, disc = gross * (+o.discount || 0) / 100, net = gross - disc, vat = net * (+o.vat || 0) / 100;
+  const cost = ls.reduce((t, l) => t + (+l.qty || 0) * (+l.cost || 0), 0), hasCost = ls.some(l => +l.cost > 0);
+  return { eq, lab, gross, disc, net, vat, total: net + vat, cost, hasCost, margin: net - cost };
+}
+async function loadOffers(force) {
+  if (offers && !force) return renderOffers();
+  try { const r = await clApi('/ops'); offers = r.offers || []; ofCfg = r.offerCfg || ofCfg; if (typeof ops !== 'undefined' && ops) { ops.stock = r.stock || ops.stock; } else ops = r; renderOffers(); }
+  catch (e) { qs('#of-list').innerHTML = `<div class="cl-empty">${escapeHtml(e.message)}</div>`; }
+}
+function renderOffers() {
+  if (!offers) return;
+  const q = qs('#of-search').value.trim().toLowerCase();
+  const acc = offers.filter(o => o.status === 'accepted'), sent = offers.filter(o => o.status === 'sent');
+  qs('#of-stats').innerHTML = [[offers.length, 'oferte'], [sent.length, 'trimise'], [acc.length, 'acceptate'], [Math.round(acc.reduce((t, o) => t + ofTotals(o).total, 0)).toLocaleString('ro-RO') + ' lei', 'valoare acceptată']]
+    .map(([n, l]) => `<div class="qt-stat"><b>${n}</b> ${l}</div>`).join('');
+  const L = offers.filter(o => !q || [o.clientName, o.title, 'OF-' + o.no, o.clientAddress, o.clientPhone].join(' ').toLowerCase().includes(q)).sort((a, b) => b.no - a.no);
+  qs('#of-list').innerHTML = L.length ? L.map(o => { const t = ofTotals(o), st = OF_ST[o.status] || OF_ST.draft;
+    return `<div class="of-card" role="button" tabindex="0" data-oid="${escapeHtml(o.id)}"><div class="of-no">OF-${o.no}<small>${fmtDate(o.date)}</small></div>
+      <div class="of-mid"><b>${escapeHtml(o.clientName)}</b><span>${escapeHtml(o.title || (o.lines || []).length + ' poziții')}${o.clientAddress ? ' · ' + escapeHtml(o.clientAddress) : ''}</span></div>
+      <span class="sp-tag ${st[1]}">${st[0]}</span><div class="of-sum">${ofL(t.total)} lei<small>${o.vat ? 'cu TVA' : 'fără TVA'}</small></div></div>`; }).join('')
+    : `<div class="cl-empty">${offers.length ? 'Nicio ofertă găsită.' : 'Nicio ofertă încă.<br>Apasă <b>Ofertă nouă</b>, completează câteva date și generează lista.'}</div>`;
+}
+function showQtView(v) {
+  document.querySelectorAll('#qt-seg button').forEach(b => b.classList.toggle('on', b.dataset.qv === v));
+  qs('#cl-view-quotes').hidden = v !== 'site'; qs('#of-view').hidden = v !== 'own';
+  try { localStorage.setItem('yca_qt_view', v); } catch {}
+  if (v === 'own') loadOffers(true);
+}
+document.querySelectorAll('#qt-seg button').forEach(b => b.addEventListener('click', () => showQtView(b.dataset.qv)));
+document.querySelectorAll('.nav-tab[data-tab="quotes"]').forEach(t => t.addEventListener('click', () => { let v = 'site'; try { v = localStorage.getItem('yca_qt_view') || 'site'; } catch {} showQtView(v === 'own' ? 'own' : 'site'); }));
+qs('#of-search').addEventListener('input', renderOffers);
+qs('#of-list').addEventListener('click', e => { const c = e.target.closest('.of-card'); if (c) openOffer(offers.find(o => o.id === c.dataset.oid)); });
+qs('#of-list').addEventListener('keydown', e => { if (e.key === 'Enter') { const c = e.target.closest('.of-card'); if (c) openOffer(offers.find(o => o.id === c.dataset.oid)); } });
+qs('#of-new-btn').addEventListener('click', () => openOffer(null));
+
+/* ── editorul ── */
+async function openOffer(o) {
+  const C = ofCfgGet();
+  ofDraft = o ? JSON.parse(JSON.stringify(o)) : { id: '', no: 0, date: new Date().toISOString().slice(0, 10), validDays: 15, title: '', lines: [], discount: 0, vat: 21, notes: C.notes, intro: C.intro, status: 'draft' };
+  qs('#of-title').textContent = o ? `Oferta OF-${o.no} · ${o.clientName}` : 'Ofertă nouă';
+  const set = (id, v) => { qs(id).value = v == null ? '' : v; };
+  set('#of-t', ofDraft.title); set('#of-date', ofDraft.date); set('#of-valid', ofDraft.validDays); set('#of-cn', ofDraft.clientName); set('#of-cui', ofDraft.clientCui); set('#of-cc', ofDraft.clientContact);
+  set('#of-cp', ofDraft.clientPhone); set('#of-ce', ofDraft.clientEmail); set('#of-ca', ofDraft.clientAddress); set('#of-intro', ofDraft.intro); set('#of-notes', ofDraft.notes); set('#of-st', ofDraft.status);
+  qs('#of-quick').open = !o || !(o.lines || []).length;
+  qs('#of-del').style.display = o ? '' : 'none'; qs('#of-dup').style.display = o ? '' : 'none';
+  qs('#of-pick').hidden = true;
+  const sel = qs('#of-cl'); sel.innerHTML = '<option value="">— client nou / scriu eu —</option>';
+  try { if (!clients) clients = (await clApi('/clients')).clients || []; } catch {}
+  (clients || []).slice().sort((a, b) => a.name.localeCompare(b.name, 'ro')).forEach(c => { const op = document.createElement('option'); op.value = c.id; op.textContent = c.name; sel.appendChild(op); });
+  sel.value = ofDraft.clientId || '';
+  ofRenderLines(); ofQuickInfo(); ofClientBtn();
+  qs('#of-modal').classList.remove('hidden'); qs('#of-modal .modal-body').scrollTop = 0;
+  if (!o) setTimeout(() => qs('#of-cn').focus(), 50);
+}
+function ofClientBtn() { qs('#of-client').style.display = ofDraft && ofDraft.id && !ofDraft.clientId && ofDraft.status === 'accepted' ? '' : 'none'; }
+qs('#of-cl').addEventListener('change', e => {
+  const c = (clients || []).find(x => x.id === e.target.value); ofDraft.clientId = c ? c.id : '';
+  if (!c) return;
+  qs('#of-cn').value = c.name || ''; qs('#of-cui').value = c.code || ''; qs('#of-cc').value = c.contact || ''; qs('#of-cp').value = c.phone || ''; qs('#of-ce').value = c.email || ''; qs('#of-ca').value = c.address || '';
+});
+const OF_KIND = { echipament: 'Echipament', material: 'Material', manopera: 'Manoperă' };
+function ofRenderLines() {
+  const showCost = qs('#of-showcost').checked;
+  const ls = ofDraft.lines;
+  qs('#of-lines').classList.toggle('cost', showCost);
+  qs('#of-lines').innerHTML = (ls.length ? `<div class="of-row of-hd"><div>#</div><div>Denumire</div><div>Tip</div><div>UM</div><div class="r">Cant.</div><div class="r">Preț unitar</div>${showCost ? '<div class="r">Cost unitar</div>' : ''}<div class="r">Valoare</div><div></div></div>` : '<div class="cl-empty" style="padding:18px">Lista e goală — folosește configuratorul rapid de mai sus sau butoanele de mai jos.</div>')
+    + ls.map((l, i) => `<div class="of-row" data-i="${i}"><div class="of-i">${i + 1}<span class="of-mv"><button type="button" data-mv="-1" title="Sus">▲</button><button type="button" data-mv="1" title="Jos">▼</button></span></div>
+      <div><input class="form-input" data-f="name" value="${escapeHtml(l.name)}" placeholder="Denumire"><input class="form-input of-desc" data-f="desc" value="${escapeHtml(l.desc || '')}" placeholder="detalii (opțional)"></div>
+      <div><select class="form-input" data-f="kind">${Object.entries(OF_KIND).map(([k, v]) => `<option value="${k}"${l.kind === k ? ' selected' : ''}>${v}</option>`).join('')}</select></div>
+      <div><input class="form-input" data-f="unit" value="${escapeHtml(l.unit || 'buc')}"></div>
+      <div><input class="form-input r" data-f="qty" inputmode="decimal" value="${l.qty}"></div>
+      <div><input class="form-input r" data-f="price" inputmode="decimal" value="${l.price}"></div>
+      ${showCost ? `<div><input class="form-input r" data-f="cost" inputmode="decimal" value="${l.cost || ''}" placeholder="—"></div>` : ''}
+      <div class="r of-val">${ofL((+l.qty || 0) * (+l.price || 0))}</div><div><button type="button" class="of-x" data-del title="Șterge linia">✕</button></div></div>`).join('');
+  ofRenderTot();
+}
+function ofRenderTot() {
+  const t = ofTotals(ofDraft), showCost = qs('#of-showcost').checked;
+  qs('#of-tot').innerHTML = `<div><span>Echipamente și materiale</span><b>${ofL(t.eq)}</b></div><div><span>Manoperă</span><b>${ofL(t.lab)}</b></div>
+    <div><span>Discount <input class="form-input of-sm" id="of-disc" inputmode="decimal" value="${ofDraft.discount || 0}"> %</span><b>${t.disc ? '−' + ofL(t.disc) : '0,00'}</b></div>
+    <div class="of-line"><span>Total fără TVA</span><b>${ofL(t.net)}</b></div>
+    <div><span>TVA <select class="form-input of-sm" id="of-vat">${[21, 19, 11, 9, 0].map(v => `<option value="${v}"${+ofDraft.vat === v ? ' selected' : ''}>${v}%</option>`).join('')}</select></span><b>${ofL(t.vat)}</b></div>
+    <div class="of-grand"><span>TOTAL</span><b>${ofL(t.total)} lei</b></div>
+    ${showCost ? `<div class="of-int"><span>Costul meu</span><b>${t.hasCost ? ofL(t.cost) : '—'}</b></div><div class="of-int"><span>Marjă</span><b>${t.hasCost ? ofL(t.margin) + ' (' + (t.net ? Math.round(t.margin / t.net * 100) : 0) + '%)' : 'completează costurile'}</b></div>` : ''}`;
+}
+qs('#of-showcost').addEventListener('change', ofRenderLines);
+qs('#of-lines').addEventListener('input', e => {
+  const row = e.target.closest('.of-row'), f = e.target.dataset.f; if (!row || !f) return;
+  const l = ofDraft.lines[+row.dataset.i]; l[f] = ['qty', 'price', 'cost'].includes(f) ? ofN(e.target.value) : e.target.value;
+  if (f === 'qty' || f === 'price') row.querySelector('.of-val').textContent = ofL((+l.qty || 0) * (+l.price || 0));
+  ofRenderTot();
+});
+qs('#of-lines').addEventListener('change', e => { if (e.target.dataset.f === 'kind') { ofDraft.lines[+e.target.closest('.of-row').dataset.i].kind = e.target.value; ofRenderTot(); } });
+qs('#of-lines').addEventListener('click', e => {
+  const row = e.target.closest('.of-row'); if (!row || row.classList.contains('of-hd')) return; const i = +row.dataset.i;
+  if (e.target.closest('[data-del]')) { ofDraft.lines.splice(i, 1); return ofRenderLines(); }
+  const mv = e.target.closest('[data-mv]'); if (mv) { const j = i + +mv.dataset.mv; if (j < 0 || j >= ofDraft.lines.length) return; const [x] = ofDraft.lines.splice(i, 1); ofDraft.lines.splice(j, 0, x); ofRenderLines(); }
+});
+qs('#of-tot').addEventListener('input', e => { if (e.target.id === 'of-disc') { ofDraft.discount = Math.min(100, Math.max(0, ofN(e.target.value))); const v = e.target.selectionStart; ofRenderTot(); const n = qs('#of-disc'); n.focus(); try { n.setSelectionRange(v, v); } catch {} } });
+qs('#of-tot').addEventListener('change', e => { if (e.target.id === 'of-vat') { ofDraft.vat = +e.target.value; ofRenderTot(); } });
+document.querySelectorAll('[data-ofadd]').forEach(b => b.addEventListener('click', () => {
+  const k = b.dataset.ofadd; ofDraft.lines.push({ name: '', desc: '', unit: k === 'manopera' ? 'serv' : 'buc', qty: 1, price: 0, cost: 0, kind: k }); ofRenderLines();
+  const ins = qs('#of-lines').querySelectorAll('input[data-f="name"]'); if (ins.length) ins[ins.length - 1].focus();
+}));
+// adaugă din stoc / din lista mea de prețuri
+qs('#of-fromstock').addEventListener('click', async () => { const p = qs('#of-pick'); p.hidden = !p.hidden; if (!p.hidden) { if (typeof ops === 'undefined' || !ops) { try { ops = await clApi('/ops'); } catch {} } qs('#of-pick-q').value = ''; ofPick(); qs('#of-pick-q').focus(); } });
+function ofPickItems() {
+  const C = ofCfgGet(), out = [];
+  for (const s of ((typeof ops !== 'undefined' && ops && ops.stock) || [])) out.push({ src: 'Stoc · ' + s.qty + ' ' + (s.unit || 'buc'), name: s.name, unit: s.unit || 'buc', price: 0, cost: +s.price || 0, kind: s.cat === 'cablu' ? 'material' : 'echipament', stockId: s.id });
+  for (const [k, d] of Object.entries(C)) { if (!d || typeof d !== 'object' || d.calc) continue;
+    if (d.p) for (const [v, pr] of Object.entries(d.p)) out.push({ src: 'Lista mea', name: d.name.replace('{r}', v + ' MP').replace('{t}', v).replace('{c}', v).replace('{pp}', v), unit: d.unit, price: +pr, cost: 0, kind: d.kind || 'echipament' });
+    else out.push({ src: 'Lista mea', name: d.name, unit: d.unit, price: +d.price, cost: 0, kind: d.kind || (k === 'cable' || k === 'cons' || k === 'doza' ? 'material' : 'echipament') }); }
+  return out;
+}
+function ofPick() {
+  const q = qs('#of-pick-q').value.trim().toLowerCase(), it = ofPickItems().filter(x => !q || x.name.toLowerCase().includes(q)).slice(0, 30);
+  qs('#of-pick-res').innerHTML = it.length ? it.map((x, i) => `<button type="button" class="of-pi" data-pi="${i}"><b>${escapeHtml(x.name)}</b><span>${escapeHtml(x.src)}${x.price ? ' · ' + ofL(x.price) + ' lei' : ''}${x.cost ? ' · cost ' + ofL(x.cost) : ''}</span></button>`).join('') : '<div class="cm-hint">Nimic găsit.</div>';
+  qs('#of-pick-res').__items = it;
+}
+qs('#of-pick-q').addEventListener('input', ofPick);
+qs('#of-pick-res').addEventListener('click', e => { const b = e.target.closest('.of-pi'); if (!b) return; const x = qs('#of-pick-res').__items[+b.dataset.pi];
+  const price = x.price || (x.cost ? Math.round(x.cost / 1.21 * 1.3) : 0);   // din stoc: cost (cu TVA, din factură) → preț fără TVA + 30% adaos
+  ofDraft.lines.push({ name: x.name, desc: '', unit: x.unit, qty: 1, price, cost: x.cost ? Math.round(x.cost / 1.21 * 100) / 100 : 0, kind: x.kind, stockId: x.stockId || '' });
+  ofRenderLines(); toast('Adăugat: ' + x.name.slice(0, 40), 'ok'); });
+
+/* ── configuratorul rapid ── */
+function ofQuickCalc() {
+  const C = ofCfgGet(), ext = Math.max(0, Math.round(ofN(qs('#oq-ext').value))), int = Math.max(0, Math.round(ofN(qs('#oq-int').value))), n = ext + int;
+  const r = qs('#oq-res').value, days = Math.max(1, Math.round(ofN(qs('#oq-days').value)) || 30), m = Math.max(0, ofN(qs('#oq-m').value));
+  const ch = [4, 8, 16, 32].find(c => c >= n) || 32, pp = Math.min(ch, 16);
+  const needTb = n * (C.gb.p[r] || 20) * days / 1000 * 1.1, sizes = Object.keys(C.hdd.p).map(Number).sort((a, b) => a - b);
+  let disks = 1, tb = sizes.find(s => s >= needTb); if (!tb) { tb = sizes[sizes.length - 1]; disks = Math.ceil(needTb / tb); }
+  return { C, ext, int, n, r, days, m, ch, pp, needTb, tb, disks };
+}
+function ofQuickInfo() {
+  const k = ofQuickCalc();
+  qs('#oq-info').innerHTML = k.n ? `${k.n} camere → NVR ${k.ch} canale · ${k.days} zile × ${k.r} MP ≈ ${k.needTb.toFixed(1).replace('.', ',')} TB → ${k.disks > 1 ? k.disks + ' × ' : ''}HDD ${k.tb} TB${k.n > 16 ? ' · + switch PoE' : ''}` : 'Pune numărul de camere.';
+}
+['#oq-ext', '#oq-int', '#oq-res', '#oq-days', '#oq-m'].forEach(id => qs(id).addEventListener('input', ofQuickInfo));
+qs('#oq-go').addEventListener('click', async () => {
+  const k = ofQuickCalc(), C = k.C; if (!k.n) return toast('Pune numărul de camere', 'warn');
+  if (ofDraft.lines.length && !(await confirmDialog({ title: 'Înlocuiești lista?', html: 'Lista actuală de produse se înlocuiește cu cea generată.', okLabel: 'Înlocuiește', tone: 'watch' }))) return;
+  const L = [], add = (d, qty, extra) => { if (qty > 0) L.push({ name: (d.name || '').replace('{r}', k.r + ' MP').replace('{c}', k.ch).replace('{pp}', k.pp).replace('{t}', k.tb), desc: '', unit: d.unit, qty, price: +(extra != null ? extra : d.price) || 0, cost: 0, kind: d.kind || 'echipament' }); };
+  add(C.cam_ext, k.ext, C.cam_ext.p[k.r]); add(C.cam_int, k.int, C.cam_int.p[k.r]);
+  add(C.nvr, 1, C.nvr.p[k.ch]); if (k.n > 16) add(C.switch, Math.ceil((k.n - 16) / 16));
+  add(C.hdd, k.disks, C.hdd.p[k.tb]);
+  if (qs('#oq-ups').checked) add(C.ups, 1); if (qs('#oq-rack').checked) add(C.rack, 1); if (qs('#oq-mon').checked) add(C.mon, 1);
+  const meters = Math.ceil(k.n * k.m / 5) * 5;
+  const mat = d => ({ ...d, kind: 'material' });
+  add(mat(C.cable), meters); if (qs('#oq-doz').checked) add(mat(C.doza), k.n); add(mat(C.cons), k.n);
+  add(C.lab_cam, k.n); add(C.lab_cable, meters); add(C.lab_cfg, 1); if (qs('#oq-tr').checked) add(C.transport, 1);
+  ofDraft.lines = L;
+  if (!qs('#of-t').value.trim()) qs('#of-t').value = `Sistem supraveghere video – ${k.n} ${k.n === 1 ? 'cameră' : 'camere'} ${k.r} MP`;
+  qs('#of-quick').open = false; ofRenderLines(); toast('Listă generată — verifică și ajustează prețurile', 'ok');
+});
+
+/* ── salvare / ștergere / duplicare ── */
+function ofCollect() {
+  const v = id => qs(id).value.trim();
+  return { ...ofDraft, title: v('#of-t'), date: v('#of-date'), validDays: ofN(v('#of-valid')) || 15, clientName: v('#of-cn'), clientCui: v('#of-cui'), clientContact: v('#of-cc'), clientPhone: v('#of-cp'),
+    clientEmail: v('#of-ce'), clientAddress: v('#of-ca'), intro: qs('#of-intro').value, notes: qs('#of-notes').value, status: qs('#of-st').value, lines: ofDraft.lines.filter(l => String(l.name || '').trim()) };
+}
+async function ofSave(quiet) {
+  const b = ofCollect(); if (!b.clientName) { toast('Scrie numele clientului', 'warn'); qs('#of-cn').focus(); return null; }
+  const btn = qs('#of-save'); btn.disabled = true;
+  try {
+    const r = await clApi('/ops/offers' + (b.id ? '/' + encodeURIComponent(b.id) : ''), jsonOpt(b.id ? 'PUT' : 'POST', b));
+    offers = r.offers || offers; ofDraft = JSON.parse(JSON.stringify(r.item)); qs('#of-title').textContent = `Oferta OF-${r.item.no} · ${r.item.clientName}`;
+    qs('#of-del').style.display = ''; qs('#of-dup').style.display = ''; ofClientBtn(); renderOffers(); if (!quiet) toast('Oferta OF-' + r.item.no + ' salvată', 'ok'); return r.item;
+  } catch (e) { toast(/HTTP 40[45]|necunoscut/i.test(e.message) ? 'Actualizează serverul (v9.2)' : e.message, 'err'); return null; }
+  finally { btn.disabled = false; }
+}
+qs('#of-save').addEventListener('click', () => ofSave());
+qs('#of-st').addEventListener('change', () => { ofDraft.status = qs('#of-st').value; ofClientBtn(); });
+const ofClose = () => { qs('#of-modal').classList.add('hidden'); ofDraft = null; };
+qs('#of-x').addEventListener('click', ofClose);
+qs('#of-del').addEventListener('click', async () => {
+  if (!ofDraft || !ofDraft.id) return;
+  if (!(await confirmDialog({ title: 'Ștergi oferta?', html: `Oferta <b>OF-${ofDraft.no}</b> pentru ${escapeHtml(ofDraft.clientName)} se șterge definitiv.`, okLabel: 'Șterge' }))) return;
+  try { const r = await clApi('/ops/offers/' + encodeURIComponent(ofDraft.id), { method: 'DELETE' }); offers = r.offers || offers.filter(o => o.id !== ofDraft.id); ofClose(); renderOffers(); } catch (e) { toast(e.message, 'err'); }
+});
+qs('#of-dup').addEventListener('click', () => { const b = ofCollect(); delete b.id; openOffer(null).then(() => { ofDraft = { ...b, id: '', no: 0, status: 'draft', date: new Date().toISOString().slice(0, 10) };
+  qs('#of-t').value = b.title; qs('#of-cn').value = b.clientName; qs('#of-cui').value = b.clientCui || ''; qs('#of-cc').value = b.clientContact || ''; qs('#of-cp').value = b.clientPhone || ''; qs('#of-ce').value = b.clientEmail || ''; qs('#of-ca').value = b.clientAddress || '';
+  qs('#of-intro').value = b.intro || ''; qs('#of-notes').value = b.notes || ''; qs('#of-quick').open = false; ofRenderLines(); toast('Copie făcută — salveaz-o ca ofertă nouă', 'info'); }); });
+qs('#of-client').addEventListener('click', async () => {
+  const b = ofCollect();
+  try { const r = await clApi('/clients', jsonOpt('POST', { kind: b.clientCui ? 'pj' : 'pf', name: b.clientName, code: b.clientCui, contact: b.clientContact, phone: b.clientPhone, email: b.clientEmail, address: b.clientAddress, notes: `Din oferta OF-${b.no}: ${b.title}` }));
+    const c = r.client || r.item || r; if (c && c.id) { ofDraft.clientId = c.id; if (clients) clients.push(c); await ofSave(true); toast('Client adăugat în Clienți', 'ok'); } }
+  catch (e) { toast(e.message, 'err'); }
+});
+
+/* ── PDF (tipărire cu antet) ── */
+qs('#of-pdf').addEventListener('click', async () => {
+  const o = await ofSave(true); if (!o) return;
+  const t = ofTotals(o), esc = escapeHtml, d = new Date(o.date), valid = new Date(d.getTime() + o.validDays * 864e5).toLocaleDateString('ro-RO');
+  const grp = (k, title) => { const ls = o.lines.filter(l => k.includes(l.kind)); if (!ls.length) return ''; let i = 0;
+    return `<tr class="g"><td colspan="6">${title}</td></tr>` + ls.map(l => `<tr><td class="c">${++i}</td><td><b>${esc(l.name)}</b>${l.desc ? `<div class="d">${esc(l.desc)}</div>` : ''}</td><td class="c">${esc(l.unit)}</td><td class="n">${String(l.qty).replace('.', ',')}</td><td class="n">${ofL(l.price)}</td><td class="n">${ofL(l.qty * l.price)}</td></tr>`).join(''); };
+  const logo = new URL('tools/contract/logo-antet.png', location.href).href;
+  const html = `<!doctype html><html lang="ro"><head><meta charset="utf-8"><title>Oferta OF-${o.no} – ${esc(o.clientName)}</title><style>
+@page{size:A4;margin:14mm 14mm 16mm}*{box-sizing:border-box}body{font:10.5pt/1.45 Arial,Helvetica,sans-serif;color:#1d2433;margin:0}
+.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #F2611D;padding-bottom:8px}.hd img{height:54px}.hd .co{text-align:right;font-size:8.5pt;color:#556}.hd .co b{color:#0b2a5b;font-size:10pt}
+h1{font-size:17pt;margin:18px 0 2px;color:#0b2a5b}.sub{color:#667;font-size:9.5pt}.meta{display:flex;gap:24px;margin:14px 0;font-size:9.5pt}.box{flex:1;background:#f5f7fa;border-radius:6px;padding:9px 11px}.box b{display:block;font-size:8pt;text-transform:uppercase;letter-spacing:.06em;color:#8a93a3;margin-bottom:3px}
+table{width:100%;border-collapse:collapse;margin-top:6px;font-size:9.5pt}th{background:#0b2a5b;color:#fff;font-weight:600;text-align:left;padding:6px 7px;font-size:8.5pt}td{padding:6px 7px;border-bottom:1px solid #e3e7ee;vertical-align:top}
+tr.g td{background:#fff4ed;color:#C2410C;font-weight:700;font-size:8.5pt;text-transform:uppercase;letter-spacing:.05em}.c{text-align:center}.n{text-align:right;white-space:nowrap}.d{color:#778;font-size:8.5pt}
+.tot{margin-left:auto;width:300px;margin-top:10px;font-size:10pt}.tot div{display:flex;justify-content:space-between;padding:3px 0}.tot .gr{border-top:2px solid #0b2a5b;margin-top:4px;padding-top:6px;font-size:13pt;font-weight:700;color:#0b2a5b}
+.cond{margin-top:18px;font-size:9.5pt;white-space:pre-line;background:#f5f7fa;border-radius:6px;padding:10px 12px}.cond b{display:block;margin-bottom:4px}.sig{display:flex;justify-content:space-between;margin-top:28px;font-size:9.5pt}.sig div{width:45%}
+.ft{margin-top:22px;font-size:8pt;color:#8a93a3;text-align:center}</style></head><body>
+<div class="hd"><img src="${logo}" alt="SUPRAVEGHERE24h"><div class="co"><b>YCA SOLUTIONS S.R.L.</b><br>CUI 45211628 · J40/19754/2021 · Licență IGPR nr. 6310/T<br>București, Str. Aviator Mircea Petre nr. 10, Sector 1<br>0763 354 355 · contact@supraveghere24h.ro · supraveghere24h.ro</div></div>
+<h1>Ofertă de preț nr. OF-${o.no}</h1><div class="sub">${esc(o.title || 'Sistem de supraveghere video')} · ${d.toLocaleDateString('ro-RO')} · valabilă până la ${valid}</div>
+<div class="meta"><div class="box"><b>Către</b>${esc(o.clientName)}${o.clientCui ? '<br>CUI ' + esc(o.clientCui) : ''}${o.clientContact ? '<br>În atenția: ' + esc(o.clientContact) : ''}${o.clientPhone ? '<br>' + esc(o.clientPhone) : ''}${o.clientEmail ? ' · ' + esc(o.clientEmail) : ''}</div><div class="box"><b>Adresa lucrării</b>${esc(o.clientAddress || '—')}</div></div>
+${o.intro ? `<p>${esc(o.intro)}</p>` : ''}
+<table><thead><tr><th class="c" style="width:30px">Nr.</th><th>Denumire</th><th class="c" style="width:44px">UM</th><th class="n" style="width:50px">Cant.</th><th class="n" style="width:84px">Preț unitar</th><th class="n" style="width:90px">Valoare</th></tr></thead><tbody>
+${grp(['echipament', 'material'], 'Echipamente și materiale')}${grp(['manopera'], 'Manoperă și servicii')}</tbody></table>
+<div class="tot"><div><span>Total fără TVA</span><b>${ofL(t.gross)} lei</b></div>${t.disc ? `<div><span>Discount ${String(o.discount).replace('.', ',')}%</span><b>−${ofL(t.disc)} lei</b></div><div><span>Total după discount</span><b>${ofL(t.net)} lei</b></div>` : ''}
+<div><span>TVA ${o.vat}%</span><b>${ofL(t.vat)} lei</b></div><div class="gr"><span>TOTAL</span><span>${ofL(t.total)} lei</span></div></div>
+${o.notes ? `<div class="cond"><b>Condiții</b>${esc(o.notes)}</div>` : ''}
+<div class="sig"><div>Cu stimă,<br><b>Dima Florin</b><br>Administrator, YCA SOLUTIONS S.R.L.</div><div style="text-align:right">Prețurile sunt exprimate în lei.<br>Pentru întrebări: 0763 354 355</div></div>
+<div class="ft">SUPRAVEGHERE24h · securitate rezidențială non-stop</div>
+<script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`;
+  const w = window.open('', '_blank'); if (!w) return toast('Permite ferestrele pop-up ca să descarci PDF-ul', 'warn');
+  w.document.write(html); w.document.close();
+});
+
+/* ── Prețurile mele ── */
+function ofcRender() {
+  const C = ofCfgGet(), row = (k, sub, lbl, val) => `<div class="ofc-r"><span>${escapeHtml(lbl)}</span><input class="form-input r" data-k="${k}" data-s="${sub}" inputmode="decimal" value="${val}"></div>`;
+  let h = '';
+  for (const [k, d] of Object.entries(C)) { if (!d || typeof d !== 'object') continue;
+    if (d.p) { const unit = k === 'cam_ext' || k === 'cam_int' || k === 'gb' ? ' MP' : k === 'hdd' ? ' TB' : ' canale';
+      h += `<div class="ofc-g"><b>${escapeHtml(d.label)}</b><div class="ofc-p">${Object.entries(d.p).map(([v, p]) => row(k, v, v + unit, p)).join('')}</div>${d.name ? `<input class="form-input ofc-n" data-k="${k}" data-s="name" value="${escapeHtml(d.name)}" title="Denumirea din ofertă ({r}=rezoluție, {t}=TB, {c}=canale)">` : ''}</div>`; }
+    else h += `<div class="ofc-g"><b>${escapeHtml(d.label)}</b><div class="ofc-p">${row(k, 'price', 'preț', d.price)}</div><input class="form-input ofc-n" data-k="${k}" data-s="name" value="${escapeHtml(d.name)}"></div>`; }
+  h += `<div class="ofc-g"><b>Condiții implicite în ofertă</b><textarea class="form-input" id="ofc-notes" rows="4">${escapeHtml(C.notes)}</textarea><b>Text de început implicit</b><textarea class="form-input" id="ofc-intro" rows="2">${escapeHtml(C.intro)}</textarea></div>`;
+  qs('#ofc-body').innerHTML = h;
+}
+qs('#of-cfg-btn').addEventListener('click', async () => { if (!ofCfg) { try { ofCfg = (await clApi('/ops/offer-cfg')).cfg; } catch {} } ofcRender(); qs('#ofc-modal').classList.remove('hidden'); });
+const ofcClose = () => qs('#ofc-modal').classList.add('hidden');
+qs('#ofc-x').addEventListener('click', ofcClose); qs('#ofc-cancel').addEventListener('click', ofcClose);
+qs('#ofc-reset').addEventListener('click', () => { ofCfg = null; ofcRender(); toast('Prețuri implicite — apasă Salvează ca să rămână', 'info'); });
+qs('#ofc-save').addEventListener('click', async () => {
+  const cfg = {};
+  qs('#ofc-body').querySelectorAll('[data-k]').forEach(i => { const k = i.dataset.k, s = i.dataset.s; cfg[k] = cfg[k] || {};
+    if (s === 'name') cfg[k].name = i.value.trim(); else if (s === 'price') cfg[k].price = ofN(i.value); else { cfg[k].p = cfg[k].p || {}; cfg[k].p[s] = ofN(i.value); } });
+  cfg.notes = qs('#ofc-notes').value; cfg.intro = qs('#ofc-intro').value;
+  try { const r = await clApi('/ops/offer-cfg', jsonOpt('PUT', { cfg })); ofCfg = r.cfg; ofcClose(); toast('Prețurile tale au fost salvate', 'ok'); if (ofDraft) ofQuickInfo(); }
+  catch (e) { toast(/HTTP 40[45]|necunoscut/i.test(e.message) ? 'Actualizează serverul (v9.2)' : e.message, 'err'); }
+});
 
 /* ═══ Generează contract (Word) din fișa clientului — șablon contract-template.docx, completat local cu JSZip ═══ */
 const CTR_KEYS = ['NR','DATA','LICENTA','ASOC','SEDIU','CIF','IBAN','BANCA','PRES','HAG_NR','HAG_DATA','IMOBIL','PRET','EMAIL','VALOARE','AMPLASARE','M_NVR','M_HDD','Q_HDD','M_EXT','Q_EXT','M_INT','Q_INT','M_LIFT','Q_LIFT','M_RACK','Q_MON'];

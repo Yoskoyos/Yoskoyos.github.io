@@ -1147,7 +1147,7 @@ async function handleCompanyDocs(req, res, pathname) {
    Lucrare terminată → scade din stoc piesele folosite (o singură dată) și, la revizii periodice, creează următoarea revizie. */
 const OPS_FILE = path.join(BASE_DIR, 'ops.json');
 const OPS_DIR = path.join(BASE_DIR, 'ops-files');
-const OPS_COLLS = ['works', 'stock', 'gdpr', 'catalog'];
+const OPS_COLLS = ['works', 'stock', 'gdpr', 'catalog', 'offers'];
 function loadOps() { try { const c = JSON.parse(fs.readFileSync(OPS_FILE, 'utf8')); return c && typeof c === 'object' ? c : {}; } catch { return {}; } }
 function saveOps(all) { const tmp = OPS_FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(all, null, 2), { mode: 0o600 }); fs.renameSync(tmp, OPS_FILE); }
 const pick = (v, list, def) => list.includes(v) ? v : def;
@@ -1162,6 +1162,15 @@ function cleanOp(coll, b, prev) {
       date: ymd(b.date), time: hhmm(b.time), doneDate: ymd(b.doneDate), description: str(b.description, 4000), solution: str(b.solution, 4000),
       parts, repeatMonths: Math.min(24, Math.max(0, Math.round(num(b.repeatMonths)))), source: str(b.source, 300), quoteId: str(b.quoteId, 40),
       stockApplied: prev ? !!prev.stockApplied : false, nextCreated: prev ? !!prev.nextCreated : false };
+  }
+  if (coll === 'offers') {   // oferte făcute de mână (calculator) — pentru orice client, cu prețurile mele
+    const lines = (Array.isArray(b.lines) ? b.lines : []).slice(0, 120).map(x => ({ name: str(x && x.name, 300).trim(), desc: str(x && x.desc, 600), unit: str(x && x.unit, 12) || 'buc',
+      qty: Math.max(0, num(x && x.qty)), price: Math.max(0, num(x && x.price)), cost: Math.max(0, num(x && x.cost)), kind: pick(x && x.kind, ['echipament', 'material', 'manopera'], 'echipament'), stockId: str(x && x.stockId, 40) })).filter(x => x.name);
+    return { ...base, no: prev ? prev.no : 0, date: ymd(b.date) || new Date().toISOString().slice(0, 10), validDays: Math.min(365, Math.max(1, Math.round(num(b.validDays)) || 15)),
+      title: str(b.title, 200), clientId: str(b.clientId, 40), clientName: str(b.clientName, 200).trim(), clientCui: str(b.clientCui, 40), clientContact: str(b.clientContact, 200),
+      clientPhone: str(b.clientPhone, 60), clientEmail: str(b.clientEmail, 200), clientAddress: str(b.clientAddress, 300), lines,
+      discount: Math.min(100, Math.max(0, num(b.discount))), vat: [0, 5, 9, 11, 19, 21].includes(num(b.vat)) ? num(b.vat) : 21,
+      notes: str(b.notes, 4000), intro: str(b.intro, 2000), status: pick(b.status, ['draft', 'sent', 'accepted', 'rejected'], 'draft') };
   }
   if (coll === 'catalog') {   // echipamentele prezentate pe site (pagina Echipamente)
     return { ...base, name: str(b.name, 160).trim(), brand: str(b.brand, 60), model: str(b.model, 120),
@@ -1179,7 +1188,7 @@ function cleanOp(coll, b, prev) {
     channels: str(b.channels, 200), reason: str(b.reason, 2000), status: pick(b.status, ['primita', 'livrata', 'refuzata', 'fara-imagini'], 'primita'),
     deliveredDate: ymd(b.deliveredDate), deliveredTo: str(b.deliveredTo, 200), method: str(b.method, 200), notes: str(b.notes, 4000) };
 }
-const opsRequired = { catalog: ['name', 'Scrie denumirea echipamentului'], works: ['title', 'Scrie titlul lucrării'], stock: ['name', 'Scrie denumirea produsului'], gdpr: ['requester', 'Scrie cine a cerut imaginile'] };
+const opsRequired = { offers: ['clientName', 'Scrie numele clientului'], catalog: ['name', 'Scrie denumirea echipamentului'], works: ['title', 'Scrie titlul lucrării'], stock: ['name', 'Scrie denumirea produsului'], gdpr: ['requester', 'Scrie cine a cerut imaginile'] };
 function addMonthsYmd(d, m) { const [y, mo, da] = d.split('-').map(Number); const t = new Date(Date.UTC(y, mo - 1 + m, 1)); const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate(); t.setUTCDate(Math.min(da, last)); return t.toISOString().slice(0, 10); }
 // efectele unei lucrări terminate
 function worksOnDone(u, w) {
@@ -1374,16 +1383,21 @@ async function handlePurchase(req, res, pathname) {
   return sendJson(res, 405, { error: 'Operație necunoscută' });
 }
 async function handleOps(req, res, pathname) {
-  const coll0 = (/^\/ops\/(works|stock|gdpr|catalog)/.exec(pathname) || [])[1];
-  const ctx = requireUser(req, res, coll0 ? ({ works: 'works', stock: 'works', gdpr: 'clients', catalog: 'catalog' })[coll0] : null); if (!ctx) return;
+  const coll0 = (/^\/ops\/(works|stock|gdpr|catalog|offers|offer-cfg)/.exec(pathname) || [])[1];
+  const ctx = requireUser(req, res, coll0 ? ({ works: 'works', stock: 'works', gdpr: 'clients', catalog: 'catalog', offers: 'quotes', 'offer-cfg': 'quotes' })[coll0] : null); if (!ctx) return;
   if (!coll0 && ctx.user.role === 'client') return sendJson(res, 403, { error: 'Nu ai acces la această secțiune' });
   const uname = ctx.uname;
   const all = loadOps(); const u = all[uname] = all[uname] || {}; for (const c of OPS_COLLS) if (!Array.isArray(u[c])) u[c] = [];
   const parts = pathname.split('/').filter(Boolean);       // ops/<coll>[/id[/files[/fid]]]
   const coll = parts[1], id = parts[2], fid = parts[4];
-  const OPS_PERM = { works: 'works', stock: 'works', gdpr: 'clients', catalog: 'catalog' };
+  const OPS_PERM = { works: 'works', stock: 'works', gdpr: 'clients', catalog: 'catalog', offers: 'quotes' };
   const view = () => { const o = {}; for (const c of OPS_COLLS) o[c] = userCan(ctx.user, OPS_PERM[c]) ? u[c] : []; return o; };   // angajatul vede doar secțiunile lui
-  if (parts.length === 1 && req.method === 'GET') return sendJson(res, 200, view());
+  if (parts.length === 1 && req.method === 'GET') return sendJson(res, 200, { ...view(), offerCfg: userCan(ctx.user, 'quotes') ? (u.offerCfg || null) : null });
+  if (coll === 'offer-cfg') {   // lista mea de prețuri pentru calculatorul de oferte
+    if (req.method === 'GET') return sendJson(res, 200, { cfg: u.offerCfg || null });
+    if (req.method === 'PUT') { const b = await readJson(req); const raw = JSON.stringify(b && b.cfg || {}); if (raw.length > 60000) return sendJson(res, 413, { error: 'Prea mult conținut' });
+      u.offerCfg = JSON.parse(raw); saveOps(all); return sendJson(res, 200, { cfg: u.offerCfg }); }
+  }
   if (!OPS_COLLS.includes(coll)) return sendJson(res, 404, { error: 'Secțiune necunoscută' });
   const list = u[coll];
   if (id && !/^[\w-]+$/.test(id)) return sendJson(res, 400, { error: 'ID invalid' });
@@ -1396,6 +1410,7 @@ async function handleOps(req, res, pathname) {
     const b = await readJson(req); const [f, msg] = opsRequired[coll];
     if (!str(b[f]).trim()) return sendJson(res, 400, { error: msg });
     const x = cleanOp(coll, b, it);
+    if (coll === 'offers' && !it) x.no = u.offerSeq = (u.offerSeq || 0) + 1;
     if (it) list[list.indexOf(it)] = x; else list.push(x);
     if (coll === 'works') worksOnDone(u, x);
     saveOps(all); return reply(200, { item: x });
@@ -3552,7 +3567,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 9.1, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 9.2, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
