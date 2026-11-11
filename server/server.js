@@ -790,6 +790,7 @@ async function monitorRun() {
     try { await cdocReminders(db); } catch (e) { console.error('[acte] remindere:', e.message); }
     try { await opsMorning(db); } catch (e) { console.error('[lucrari] dimineata:', e.message); }
     try { await seapTick(db); } catch (e) { console.error('[seap]', e.message); }
+    try { await a2tTick(db); } catch (e) { console.error('[a2t]', e.message); }
     try { await grRefresh(db); } catch (e) { console.error('[recenzii]', e.message); }
 
     monLastRun = new Date().toISOString();
@@ -1267,6 +1268,46 @@ function purchParse(buf, name) {
   if (/<Signature\b/.test(s)) throw new Error('Acesta e fișierul de semnătură ANAF (semnatura_…xml). Încarcă celălalt XML din arhivă — cel cu factura — sau toată arhiva ZIP descărcată din SPV');
   throw new Error('Nu recunosc fișierul — încarcă factura PDF sau XML-ul e-Factura');
 }
+/* ═════════════ Prețurile calculatorului de oferte, actualizate din A2T (prețul de pe site + adaos), o dată la 7 zile ═════════════
+   cheia = <poziție>.<variantă> (ex. cam_ext.4 = cameră exterior 4MP) · preț ofertă (fără TVA) = preț site (cu TVA) / 1,21 × (1 + adaos%) */
+const A2T_MAP = { 'cam_ext.2': 'IPC-B120HA-LU', 'cam_ext.4': 'IPC-B140HA-LU', 'cam_ext.8': 'IPC-B180HA-LU', 'cam_int.2': 'IPC-D120HA-LU', 'cam_int.4': 'IPC-D140HA-LU', 'cam_int.8': 'IPC-D180HA-LU',
+  'nvr.4': 'NVR-104MH-C/4P(E)', 'nvr.8': 'NVR-108MH-C/8P(E)', 'nvr.16': 'NVR-216MH-K/16P', 'nvr.32': 'NVR-232MH-K/16P',
+  'hdd.1': 'WD11PURZ', 'hdd.2': 'ST2000VX017', 'hdd.4': 'ST4000VX016', 'hdd.6': 'ST6000VX009', 'hdd.8': 'ST8000VX010', 'hdd.10': 'ST10000VE001',
+  'switch': 'NS-0518P-125(B)', 'cable': 'SAF-FTP5S305-CU', 'doza': 'DS-1280ZJ-XS', 'ups': 'UPCSBLS665TRECG01B', 'rack': 'ASY-6U-6060W', 'mon': 'DH-LM22-A200Y' };
+const A2T_PER = { cable: 305 };   // rola de 305 m → preț pe metru
+const A2T_EVERY = 7 * 864e5;
+async function a2tPriceSync(u) {
+  const cfg = u.offerCfg = u.offerCfg || {}; const a = cfg.a2t = { on: true, markup: 50, skus: {}, ...(cfg.a2t || {}) };
+  const map = { ...A2T_MAP }; for (const [k, v] of Object.entries(a.skus || {})) { if (v === '') delete map[k]; else if (v) map[k] = String(v).trim(); }
+  const got = await a2tBySku([...new Set(Object.values(map))]);
+  if (!Object.keys(got).length) { a.err = 'A2T nu a răspuns — încerc din nou mâine'; a.tryAt = Date.now(); return { ok: 0, missing: Object.keys(map).length }; }
+  const items = {}; let ok = 0; const missing = [];
+  for (const [key, sku] of Object.entries(map)) {
+    const s = got[sku.toUpperCase()]; const site = s ? +(s.final_price || s.price) : 0;
+    if (!site) { missing.push(sku); items[key] = { sku, missing: true }; continue; }
+    const [k, v] = key.split('.'); const per = A2T_PER[k] || 1;
+    let price = site / 1.21 * (1 + (+a.markup || 0) / 100) / per; price = per > 1 ? Math.round(price * 10) / 10 : Math.round(price);
+    cfg[k] = cfg[k] || {}; if (v) { cfg[k].p = cfg[k].p || {}; cfg[k].p[v] = price; } else cfg[k].price = price;
+    items[key] = { sku, name: String(s.name || '').slice(0, 160), site: Math.round(site * 100) / 100, price }; ok++;
+  }
+  Object.assign(a, { at: Date.now(), tryAt: Date.now(), items, err: missing.length ? 'Nu am găsit pe A2T: ' + missing.join(', ') : '' });
+  return { ok, missing: missing.length };
+}
+let a2tBusy = false;
+async function a2tTick(db) {
+  if (a2tBusy || process.env.A2T_SYNC === '0') return;
+  const hm = new Date().toLocaleTimeString('ro-RO', { timeZone: 'Europe/Bucharest', hour: '2-digit', minute: '2-digit', hour12: false }); if (hm < '05:00') return;
+  const all = loadOps(); let changed = false; a2tBusy = true;
+  try {
+    for (const usr of (db.users || []).filter(x => x.role === 'admin')) {
+      const u = all[usr.username] = all[usr.username] || {}; const a = (u.offerCfg && u.offerCfg.a2t) || {};
+      if (a.on === false) continue;
+      if (Date.now() - (a.at || 0) < A2T_EVERY || Date.now() - (a.tryAt || 0) < 864e5) continue;
+      const r = await a2tPriceSync(u); changed = true; console.log(`[a2t] ${usr.username}: ${r.ok} prețuri actualizate${r.missing ? ', ' + r.missing + ' negăsite' : ''}`);
+    }
+    if (changed) { const cur = loadOps(); for (const [k, v] of Object.entries(all)) if (v.offerCfg) { cur[k] = cur[k] || {}; cur[k].offerCfg = v.offerCfg; } saveOps(cur); }
+  } finally { a2tBusy = false; }
+}
 // detaliile unui produs de pe a2t.ro după cod
 function a2tBySku(skus) {
   return new Promise(resolve => {
@@ -1396,7 +1437,13 @@ async function handleOps(req, res, pathname) {
   if (coll === 'offer-cfg') {   // lista mea de prețuri pentru calculatorul de oferte
     if (req.method === 'GET') return sendJson(res, 200, { cfg: u.offerCfg || null });
     if (req.method === 'PUT') { const b = await readJson(req); const raw = JSON.stringify(b && b.cfg || {}); if (raw.length > 60000) return sendJson(res, 413, { error: 'Prea mult conținut' });
-      u.offerCfg = JSON.parse(raw); saveOps(all); return sendJson(res, 200, { cfg: u.offerCfg }); }
+      const old = (u.offerCfg && u.offerCfg.a2t) || {}; const nc = JSON.parse(raw); const na = nc.a2t || {};
+      nc.a2t = { ...old, on: na.on !== undefined ? !!na.on : old.on !== false, markup: na.markup !== undefined ? Math.min(500, Math.max(0, num(na.markup))) : (old.markup ?? 50), skus: na.skus && typeof na.skus === 'object' ? na.skus : (old.skus || {}) };
+      u.offerCfg = nc; saveOps(all); return sendJson(res, 200, { cfg: u.offerCfg }); }
+    if (req.method === 'POST' && parts[2] === 'a2t') {   // actualizează acum din A2T
+      if (ctx.user.role !== 'admin') return sendJson(res, 403, { error: 'Doar administratorul' });
+      const r = await a2tPriceSync(u); const cur = loadOps(); cur[uname] = cur[uname] || {}; cur[uname].offerCfg = u.offerCfg; saveOps(cur);
+      return sendJson(res, 200, { cfg: u.offerCfg, ...r }); }
   }
   if (!OPS_COLLS.includes(coll)) return sendJson(res, 404, { error: 'Secțiune necunoscută' });
   const list = u[coll];
@@ -3567,7 +3614,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 9.2, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 9.3, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
