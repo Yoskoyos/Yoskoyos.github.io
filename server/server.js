@@ -1938,7 +1938,7 @@ async function seapRun(db, reason) {
       await sleep(300);
     }
     for (const [k, it] of Object.entries(st.items)) if (it.status !== 'applied' && it.deadline && Date.parse(it.deadline) < now - 7 * 864e5) delete st.items[k];   // cele ofertate de noi rămân pentru totdeauna   // păstrăm o săptămână după termen
-    { const cur = loadSeap(); for (const [k, x] of Object.entries(cur.items)) if (st.items[k]) { for (const f of ['analysis', 'status', 'note', 'bid']) if (x[f] !== undefined) st.items[k][f] = x[f]; } }   // păstrăm ce s-a schimbat între timp (stare, analiză)
+    { const cur = loadSeap(); for (const [k, x] of Object.entries(cur.items)) if (st.items[k]) { for (const f of ['analysis', 'status', 'note', 'bid', 'track']) if (x[f] !== undefined) st.items[k][f] = x[f]; } }   // păstrăm ce s-a schimbat între timp (stare, analiză)
     st.lastRun = now; st.lastErr = errs ? `${errs} căutări eșuate` : ''; st.lastReason = reason || '';
     saveSeap(st);
     return { added, total: Object.keys(st.items).length, errs };
@@ -1953,6 +1953,7 @@ async function seapTick(db) {
   const st0 = loadSeap();
   const slot = [...SEAP_RUN_AT].reverse().find(s => hm >= s);
   if (slot && st0.lastSlot !== today + ' ' + slot) { const s2 = loadSeap(); s2.lastSlot = today + ' ' + slot; saveSeap(s2); seapRun(db, 'program ' + slot).catch(e => console.error('[seap]', e.message)); return; }
+  if (hm >= '08:00' && hm < '21:30' && !seapBusy && !seapTrackBusy && Date.now() - (st0.lastTrack || 0) > SEAP_TRACK_EVERY) { seapTrack(db).catch(e => console.error('[seap-track]', e.message)); return; }
   if (hm >= SEAP_ALERT_AT && st0.lastAlertDay !== today && !seapBusy) {
     const st = loadSeap(); st.lastAlertDay = today;
     const since = st.lastAlertAt || 0;
@@ -2193,6 +2194,152 @@ function seapBid(b) {
   return { price: Math.max(0, num(b.price)) || null, submittedAt: ymd(b.submittedAt), result: ['evaluare', 'castigat', 'pierdut', 'anulat', 'retras'].includes(b.result) ? b.result : 'evaluare',
     winnerPrice: Math.max(0, num(b.winnerPrice)) || null, winner: str(b.winner, 200), notes: str(b.notes, 2000), updatedAt: Date.now() };
 }
+/* ═════════════ Urmărirea licitațiilor ofertate („Licitațiile noastre”): anulare, atribuire, câștigător ═════════════
+   Rulează din seapTick la ~3 ore (08–21). Doar pentru cele cu status 'applied' și rezultat încă „în evaluare”.
+   • anunț publicitar (ADV, achiziție directă): anularea = o versiune nouă a anunțului cu „anulat/anulare”;
+     atribuirea = achiziția directă (DA) făcută de aceeași autoritate după anunț — la noi (comandă de acceptat / acceptată)
+     sau la alt furnizor cu obiect asemănător (pierdută, cu câștigătorul și prețul).
+   • procedură simplificată (SCN/CN): starea procedurii (anulată / suspendată / atribuită) + anunțul de atribuire cu câștigătorul și valoarea.
+   SEAP nu publică raportul procedurii sau respingerea ofertei noastre — acelea vin pe e-mail / în SEAP. */
+const SEAP_OUR_CUI = String(process.env.SEAP_CUI || '45211628');
+const SEAP_TRACK_EVERY = 3 * 3600e3;
+const seapFinal = it => it.bid && ['castigat', 'pierdut', 'anulat', 'retras'].includes(it.bid.result);
+const seapWords = s => new Set(seapNorm(s).replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(w => w.length >= 4 && !/^(pentru|achizitie|achizitia|furnizare|servicii|lucrari|materiale|produse|necesare|conform|privind|diverse|unitatea|militara)$/.test(w)));
+function seapSim(a, b) { const A = seapWords(a), B = seapWords(b); if (!A.size || !B.size) return 0; let n = 0; for (const w of A) if (B.has(w)) n++; return n / Math.min(A.size, B.size); }
+const seapCpv8 = s => (/(\d{8})/.exec(String(s || '')) || [])[1] || '';
+async function seapCaId(st, cif) {
+  if (!cif) return null; st.ca[cif] = st.ca[cif] || {};
+  if (st.ca[cif].id) return st.ca[cif].id;
+  try { const s = await seapReq('GET', `api-pub/ComboPub/searchContractingAuthorities?pageIndex=0&pageSize=5&filter=${cif}`); const x = (s && s.items || [])[0]; if (x) st.ca[cif].id = x.id; } catch {}
+  return st.ca[cif].id || null;
+}
+// ce urmărim: tipul + id-urile SEAP (și pentru cele adăugate de mână, după numărul anunțului)
+async function seapTrackRef(st, it) {
+  const t = it.track || {};
+  if (t.kind && t.ref) return t;
+  const no = String(it.no || '').trim().toUpperCase();
+  if (it.type === 'da' || /^ADV\d+/.test(no)) {
+    let id = it.type === 'da' && !it.manual ? it.id : null, pub = it.published;
+    if (!id && no) { const r = await seapReq('POST', 'api-pub/AdvNoticeCommon/GetAdvNoticeList/', { pageSize: 20, pageIndex: 0, noticeNo: no }); const x = ((r && r.items) || []).filter(y => y.noticeNo === no).sort((a, b) => a.advNoticeId - b.advNoticeId)[0]; if (x) { id = x.advNoticeId; pub = x.publicationDate; } }
+    if (!id) return null;
+    const v = await seapReq('GET', `api-pub/PUBLICAdvNotice/getForView/${id}`);
+    return { kind: 'adv', ref: id, no: no || (v && v.noticeNo), caId: v && v.contractingAuthorityId, published: pub || (v && v.publicationDate), cpv: seapCpv8(it.cpv) || seapCpv8(v && v.cpvCode && v.cpvCode.localeKey), title: it.title };
+  }
+  if (it.type === 'sp' || /^S?CN\d+/.test(no)) {
+    const number = no || null; if (!number) return null;
+    const r = await seapReq('POST', 'api-pub/NoticeCommon/GetCNoticeList/', { sysNoticeTypeIds: [], sortProperties: [], pageSize: 5, pageIndex: 0, number });
+    const x = ((r && r.items) || []).find(y => y.noticeNo === number); if (!x) return null;
+    const cif = ((/^(?:RO\s*)?(\d{2,10})\s*-/i.exec(String(x.contractingAuthorityNameAndFN || '').trim()) || [])[1]) || '';
+    return { kind: 'cn', ref: x.cNoticeId, no: number, procedureId: x.procedureId, caId: await seapCaId(st, cif), published: x.noticeStateDate, title: it.title };
+  }
+  return null;
+}
+// verifică o licitație; întoarce lista de evenimente noi { id, type, text, set? }
+async function seapTrackOne(st, it) {
+  const t = await seapTrackRef(st, it); if (!t) return { t: null, ev: [] };
+  const ev = [];
+  if (t.kind === 'adv') {
+    // anulare: versiune nouă a aceluiași anunț
+    const r = await seapReq('POST', 'api-pub/AdvNoticeCommon/GetAdvNoticeList/', { pageSize: 20, pageIndex: 0, noticeNo: t.no });
+    const vers = ((r && r.items) || []).filter(y => y.noticeNo === t.no).sort((a, b) => b.advNoticeId - a.advNoticeId);
+    const last = vers[0];
+    if (last) {
+      const v = await seapReq('GET', `api-pub/PUBLICAdvNotice/getForView/${last.advNoticeId}`).catch(() => null);
+      const txt = seapNorm([last.contractObject, v && v.contractDescription, v && v.additionalInformation].join(' '));
+      if (/\banulat[ae]?\b|\banularea\b|\banulare\b|\bse anuleaza\b/.test(txt)) ev.push({ id: 'anulat', type: 'anulat', text: 'Anunțul a fost <b>anulat</b> de autoritate.' + (v && v.additionalInformation ? '\n<i>' + escHtml(String(v.additionalInformation).slice(0, 300)) + '</i>' : ''), set: { result: 'anulat' } });
+      else if (last.advNoticeId !== t.ref) ev.push({ id: 'mod' + last.advNoticeId, type: 'modificat', text: 'Anunțul a fost <b>modificat</b> (versiune nouă publicată) — verifică ce s-a schimbat.' });
+    }
+    // atribuire: achizițiile directe ale autorității după anunț
+    if (t.caId && !ev.some(e => e.type === 'anulat')) {
+      const since = Date.parse(t.published || 0) || 0, rows = [];
+      for (const ongoing of [true, false]) {
+        const d = await seapReq('POST', 'api-pub/DirectAcquisitionCommon/GetDirectAcquisitionList/', { pageSize: 100, pageIndex: 0, showOngoingDa: ongoing, contractingAuthorityId: t.caId }).catch(() => null);
+        for (const x of (d && d.items) || []) if (Date.parse(x.publicationDate) >= since) rows.push(x);
+        await sleep(300);
+      }
+      const seen = new Set();
+      for (const x of rows) {
+        if (seen.has(x.directAcquisitionId)) continue; seen.add(x.directAcquisitionId);
+        const stt = String((x.sysDirectAcquisitionState || {}).text || ''), sid = (x.sysDirectAcquisitionState || {}).id;
+        const ours = String(x.supplier || '').replace(/\s/g, '').includes(SEAP_OUR_CUI);
+        const sim = seapSim(t.title, x.directAcquisitionName), sameCpv = t.cpv && seapCpv8(x.cpvCode) === t.cpv;
+        const val = x.closingValue || x.estimatedValueRon, lei = v => v ? Math.round(v).toLocaleString('ro-RO') + ' lei' : '—';
+        const dl = x.supplierDecisionDeadline ? new Date(x.supplierDecisionDeadline).toLocaleString('ro-RO', { timeZone: 'Europe/Bucharest', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+        if (ours) {
+          if (/accept/i.test(stt)) ev.push({ id: 'da-ok-' + x.directAcquisitionId, type: 'castigat', text: `🏆 <b>Câștigată!</b> Achiziția directă ${escHtml(x.uniqueIdentificationCode)} — „${escHtml(x.directAcquisitionName)}” — ${lei(val)}, acceptată.`, set: { result: 'castigat', winner: 'YCA SOLUTIONS S.R.L.', winnerPrice: val } });
+          else if (/refuz|respins|anul/i.test(stt)) ev.push({ id: 'da-x-' + x.directAcquisitionId, type: 'info', text: `Achiziția directă ${escHtml(x.uniqueIdentificationCode)} către noi are starea „${escHtml(stt)}”.` });
+          else ev.push({ id: 'da-new-' + x.directAcquisitionId, type: 'comanda', text: `📥 <b>Ai primit comanda în SEAP</b> — ${escHtml(x.uniqueIdentificationCode)} „${escHtml(x.directAcquisitionName)}”, ${lei(val)}.\n<b>Intră în SEAP și acceptă oferta</b>${dl ? ' până la ' + dl : ''}, altfel se pierde.` });
+        } else if ((sim >= 0.5 || (sameCpv && sim >= 0.25)) && sid !== 2 ? /accept/i.test(stt) : false) {
+          const strong = sim >= 0.5 && sameCpv !== false;
+          const w = String(x.supplier || '').replace(/^(RO\s*)?\d+\s*/i, '').trim();
+          ev.push({ id: 'da-lost-' + x.directAcquisitionId, type: 'pierdut', text: `${strong ? '❌ <b>Nu am câștigat</b>' : '⚠️ <b>Posibil atribuită altcuiva</b>'} — autoritatea a cumpărat direct de la <b>${escHtml(w)}</b>: ${escHtml(x.uniqueIdentificationCode)} „${escHtml(x.directAcquisitionName)}”, ${lei(val)}.`, set: strong ? { result: 'pierdut', winner: w, winnerPrice: val } : { winner: w, winnerPrice: val } });
+        }
+      }
+    }
+  } else if (t.kind === 'cn') {
+    const r = await seapReq('POST', 'api-pub/NoticeCommon/GetCNoticeList/', { sysNoticeTypeIds: [], sortProperties: [], pageSize: 5, pageIndex: 0, number: t.no });
+    const x = ((r && r.items) || []).find(y => y.noticeNo === t.no);
+    if (x) {
+      const ps = (x.sysProcedureState || {}).id;
+      if (x.hasAppeal) ev.push({ id: 'contestatie', type: 'contestatie', text: '⚖️ Procedura are o <b>contestație</b> depusă (CNSC) — termenele se pot decala.' });
+      if (ps === 3) ev.push({ id: 'anulat', type: 'anulat', text: 'Procedura a fost <b>anulată</b> de autoritate.', set: { result: 'anulat' } });
+      if (ps === 4) ev.push({ id: 'suspendat-' + String(x.noticeStateDate || '').slice(0, 10), type: 'suspendat', text: '⏸ Procedura a fost <b>suspendată</b> (de obicei din cauza unei contestații).' });
+      if (ps === 5) {
+        let done = false;
+        if (t.caId) {
+          const ca = await seapReq('POST', 'api-pub/NoticeCommon/GetCANoticeList/', { sysNoticeTypeIds: [], sortProperties: [], pageSize: 50, pageIndex: 0, contractingAuthorityId: t.caId, startPublicationDate: t.published || null }).catch(() => null);
+          const can = ((ca && ca.items) || []).find(y => y.procedureId && y.procedureId === (t.procedureId || x.procedureId));
+          if (can) {
+            const c = await seapReq('POST', 'api-pub/C_PUBLIC_CANotice/GetCANoticeContracts/', { caNoticeId: can.caNoticeId, sortOrder: [], skip: 0, take: 50 }).catch(() => null);
+            const cs = (c && c.items) || [];
+            const ws = cs.map(k => ({ name: k.winnerCaption || ((k.winners || [])[0] || {}).name || '', cifs: (k.winners || []).map(w => String(w.fiscalNumber || '').replace(/\D/g, '')), val: k.defaultCurrencyContractValue || k.contractValue }));
+            const ours = ws.find(w => w.cifs.includes(SEAP_OUR_CUI));
+            const lei = v => v ? Math.round(v).toLocaleString('ro-RO') + ' lei' : '—';
+            if (ours) ev.push({ id: 'atribuit', type: 'castigat', text: `🏆 <b>Câștigată!</b> Anunț de atribuire ${escHtml(can.noticeNo)} — contract ${lei(ours.val)}.`, set: { result: 'castigat', winner: 'YCA SOLUTIONS S.R.L.', winnerPrice: ours.val } });
+            else if (ws.length) ev.push({ id: 'atribuit', type: 'pierdut', text: `❌ <b>Nu am câștigat</b> — atribuită către <b>${escHtml(ws.map(w => w.name).join(', '))}</b> (${ws.map(w => lei(w.val)).join(', ')}). Anunț ${escHtml(can.noticeNo)}.`, set: { result: 'pierdut', winner: ws.map(w => w.name).join(', ').slice(0, 200), winnerPrice: ws.reduce((a, w) => a + (w.val || 0), 0) || null } });
+            done = !!ws.length;
+          }
+        }
+        if (!done) ev.push({ id: 'atribuit-fara', type: 'atribuit', text: 'Procedura apare <b>atribuită</b> în SEAP; anunțul cu câștigătorul nu e încă publicat — revin când apare.' });
+      }
+    }
+  }
+  return { t, ev };
+}
+let seapTrackBusy = null;
+async function seapTrack(db, opt = {}) {
+  if (seapTrackBusy) return seapTrackBusy;
+  seapTrackBusy = (async () => {
+    const st = loadSeap(); const now = Date.now(); const out = {};
+    const list = Object.values(st.items).filter(it => it.status === 'applied' && !seapFinal(it) && (!opt.key || it.key === opt.key)
+      && (!it.deadline || Date.parse(it.deadline) > now - 180 * 864e5));
+    for (const it of list) {
+      try { out[it.key] = await seapTrackOne(st, it); } catch (e) { out[it.key] = { err: e.message }; console.error('[seap-track]', it.no, e.message); }
+      await sleep(500);
+    }
+    // aplicăm pe starea proaspătă (între timp poate s-a schimbat ceva din aplicație)
+    const cur = loadSeap(); cur.ca = { ...cur.ca, ...st.ca }; const alerts = [];
+    for (const [k, r] of Object.entries(out)) {
+      const it = cur.items[k]; if (!it) continue;
+      it.track = { ...(it.track || {}), ...(r.t || {}), lastCheck: now, err: r.err || '', events: (it.track && it.track.events) || [] };
+      for (const e of (r.ev || [])) {
+        if (it.track.events.some(x => x.id === e.id)) continue;
+        it.track.events.push({ id: e.id, type: e.type, text: e.text, t: now });
+        if (e.set && !seapFinal(it)) { const b = { ...(it.bid || {}) }; for (const [f, v] of Object.entries(e.set)) if (f === 'result' || !b[f]) b[f] = v; it.bid = seapBid(b); }
+        alerts.push({ it, e });
+      }
+    }
+    cur.lastTrack = now; saveSeap(cur);
+    if (alerts.length && !opt.silent) {
+      const owner = quoteOwner(db);
+      if (owner) for (const { it, e } of alerts) {
+        try { await notifyOwner(db, owner, `🏛 <b>Licitațiile noastre</b> · ${escHtml(it.no || '')}\n<b>${escHtml(String(it.title).slice(0, 140))}</b>\n${escHtml(String(it.ca || '').slice(0, 90))}\n\n${e.text}`, '/?tab=seap&view=bids'); } catch {}
+      }
+    }
+    return { checked: list.length, events: alerts.length };
+  })().finally(() => { seapTrackBusy = null; });
+  return seapTrackBusy;
+}
 async function handleSeap(req, res, pathname, parsed) {
   const ctx = requireUser(req, res, 'seap'); if (!ctx) return;
   const parts = pathname.split('/').filter(Boolean);   // seap[/refresh | /<key>[/zip]]
@@ -2202,7 +2349,7 @@ async function handleSeap(req, res, pathname, parsed) {
     const lite = items.map(it => { if (!it.analysis) return it; const an = it.analysis;
       const status = an.status === 'running' && !aiJobs.has(it.key) ? 'error' : an.status;
       return { ...it, analysis: { status, step: an.step || '', verdict: an.verdict || '', at: an.at || 0, error: status === 'error' ? (an.error || 'Analiza a fost întreruptă (serverul a repornit) — pornește-o din nou') : '' } }; });
-    return sendJson(res, 200, { items: lite, ai: !!(loadAi() || {}).key, lastRun: st.lastRun || 0, lastErr: st.lastErr || '', running: !!seapBusy, cpv: Object.values(SEAP_CPV), counties: SEAP_COUNTIES, expMax: SEAP_EXP_MAX, alertAt: SEAP_ALERT_AT });
+    return sendJson(res, 200, { items: lite, ai: !!(loadAi() || {}).key, lastRun: st.lastRun || 0, lastErr: st.lastErr || '', running: !!seapBusy, lastTrack: st.lastTrack || 0, cpv: Object.values(SEAP_CPV), counties: SEAP_COUNTIES, expMax: SEAP_EXP_MAX, alertAt: SEAP_ALERT_AT });
   }
   if (parts[1] === 'manual' && req.method === 'POST') {   // licitație ofertată adăugată de mână (găsită în afara aplicației)
     const b = await readJson(req); const title = str(b.title, 300).trim(); if (!title) return sendJson(res, 400, { error: 'Scrie obiectul licitației' });
@@ -2211,6 +2358,11 @@ async function handleSeap(req, res, pathname, parsed) {
     const it = { key: 'man:' + id, type: b.type === 'sp' ? 'sp' : b.type === 'da' ? 'da' : 'man', id, no: str(b.no, 60), title, ca: str(b.ca, 300), city: str(b.city, 100), county: '', cpv: '', kind: str(b.kind, 40),
       value: num(b.value) || null, deadline: str(b.deadline, 40), published: '', url: /^https?:\/\//.test(url0) ? url0 : '', docs: [], exp: { status: 'none' }, inArea: true, status: 'applied', firstSeen: Date.now(), manual: true, bid: seapBid(b.bid || {}) };
     st.items[it.key] = it; saveSeap(st); return sendJson(res, 200, { item: it });
+  }
+  if (parts[1] === 'track' && req.method === 'POST') {   // verifică acum licitațiile ofertate (sau una singură)
+    const b = await readJson(req).catch(() => ({}));
+    const r = await seapTrack(ctx.db, { key: b && b.key ? String(b.key) : '' });
+    return sendJson(res, 200, r);
   }
   if (parts[1] === 'refresh' && req.method === 'POST') {
     if (ctx.user.role !== 'admin') return sendJson(res, 403, { error: 'Doar administratorul' });
@@ -3335,7 +3487,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 8.8, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 8.9, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
