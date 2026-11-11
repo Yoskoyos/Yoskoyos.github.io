@@ -2430,7 +2430,7 @@ html:not(.unlocked) .app{display:none}
           <div class="fg"><label for="oq-res">Rezoluție</label><select class="form-input" id="oq-res"><option value="2">2 MP (Full HD)</option><option value="4" selected>4 MP (2K)</option><option value="8">8 MP (4K)</option></select></div>
           <div class="fg"><label for="oq-days">Zile de înregistrare</label><input class="form-input" id="oq-days" inputmode="numeric" value="30"></div>
           <div class="fg"><label for="oq-m">Metri cablu / cameră</label><input class="form-input" id="oq-m" inputmode="numeric" value="25"></div>
-          <div class="fg of-span3 of-checks"><label><input type="checkbox" id="oq-ups"> UPS</label><label><input type="checkbox" id="oq-rack"> Rack</label><label><input type="checkbox" id="oq-mon"> Monitor</label><label><input type="checkbox" id="oq-doz" checked> Doze joncțiune</label><label><input type="checkbox" id="oq-tr" checked> Transport</label></div>
+          <div class="fg of-span3 of-checks"><label><input type="checkbox" id="oq-ups"> UPS</label><label><input type="checkbox" id="oq-rack"> Rack</label><label><input type="checkbox" id="oq-mon"> Monitor</label><label><input type="checkbox" id="oq-doz" checked> Doze joncțiune</label></div>
         </div>
         <div class="of-qfoot"><span class="cm-hint" id="oq-info"></span><button type="button" class="btn primary" id="oq-go">Generează lista</button></div>
       </details>
@@ -7328,14 +7328,11 @@ const OF_DEF = {
   rack: { label: 'Rack', unit: 'buc', name: 'Rack de perete 6U cu ușă din sticlă', price: 350 },
   mon: { label: 'Monitor', unit: 'buc', name: 'Monitor 22" Full HD, HDMI', price: 450 },
   lab_cam: { label: 'Manoperă montaj / cameră', unit: 'buc', name: 'Montaj și reglaj cameră', price: 150, kind: 'manopera' },
-  lab_cable: { label: 'Manoperă tragere cablu (lei / m)', unit: 'm', name: 'Pozare cablu (aparent, în canal sau tub)', price: 4, kind: 'manopera' },
-  lab_cfg: { label: 'Configurare NVR + aplicație telefon', unit: 'serv', name: 'Configurare NVR, înregistrare, acces de pe telefon și instruire', price: 250, kind: 'manopera' },
-  transport: { label: 'Transport / deplasare', unit: 'serv', name: 'Transport și deplasare', price: 100, kind: 'manopera' },
-  gb: { label: 'GB pe zi / cameră (2MP · 4MP · 8MP)', p: { 2: 10, 4: 20, 8: 40 }, calc: true },
   notes: 'Garanție: 24 de luni pentru echipamente, 12 luni pentru manoperă.\nPlata: 50% avans la comandă, 50% la recepția lucrării.\nTermen de execuție: 5 zile lucrătoare de la plata avansului.\nOferta include montajul, configurarea și instruirea pentru folosirea aplicației.',
   intro: 'Vă transmitem mai jos oferta noastră pentru furnizarea și montajul sistemului de supraveghere video.'
 };
 let ofCfg = null, offers = null, ofDraft = null;
+const OF_GB = { 2: 10, 4: 20, 8: 40 };   // GB pe zi / cameră (înregistrare continuă, H.265) — pentru calculul HDD-ului
 const ofCfgGet = () => { const c = JSON.parse(JSON.stringify(OF_DEF)); const u = ofCfg || {}; for (const k of Object.keys(c)) if (u[k] !== undefined) { if (typeof c[k] === 'object' && c[k] && typeof u[k] === 'object') { if (u[k].p) c[k].p = { ...c[k].p, ...u[k].p }; if (u[k].price !== undefined) c[k].price = u[k].price; if (u[k].name) c[k].name = u[k].name; } else c[k] = u[k]; } return c; };
 const ofN = v => { let x = String(v == null ? '' : v).trim().replace(/\s/g, ''); if (/,\d{1,2}$/.test(x)) x = x.replace(/\./g, '').replace(',', '.'); else x = x.replace(/,/g, ''); const n = parseFloat(x); return isFinite(n) ? n : 0; };
 const ofL = v => (Math.round((v || 0) * 100) / 100).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -7451,7 +7448,7 @@ qs('#of-fromstock').addEventListener('click', async () => { const p = qs('#of-pi
 function ofPickItems() {
   const C = ofCfgGet(), out = [];
   for (const s of ((typeof ops !== 'undefined' && ops && ops.stock) || [])) out.push({ src: 'Stoc · ' + s.qty + ' ' + (s.unit || 'buc'), name: s.name, unit: s.unit || 'buc', price: 0, cost: +s.price || 0, kind: s.cat === 'cablu' ? 'material' : 'echipament', stockId: s.id });
-  for (const [k, d] of Object.entries(C)) { if (!d || typeof d !== 'object' || d.calc) continue;
+  for (const [k, d] of Object.entries(C)) { if (!d || typeof d !== 'object') continue;
     if (d.p) for (const [v, pr] of Object.entries(d.p)) out.push({ src: 'Lista mea', name: d.name.replace('{r}', v + ' MP').replace('{t}', v).replace('{c}', v).replace('{pp}', v), unit: d.unit, price: +pr, cost: 0, kind: d.kind || 'echipament' });
     else out.push({ src: 'Lista mea', name: d.name, unit: d.unit, price: +d.price, cost: 0, kind: d.kind || (k === 'cable' || k === 'cons' || k === 'doza' ? 'material' : 'echipament') }); }
   return out;
@@ -7472,7 +7469,7 @@ function ofQuickCalc() {
   const C = ofCfgGet(), ext = Math.max(0, Math.round(ofN(qs('#oq-ext').value))), int = Math.max(0, Math.round(ofN(qs('#oq-int').value))), n = ext + int;
   const r = qs('#oq-res').value, days = Math.max(1, Math.round(ofN(qs('#oq-days').value)) || 30), m = Math.max(0, ofN(qs('#oq-m').value));
   const ch = [4, 8, 16, 32].find(c => c >= n) || 32, pp = Math.min(ch, 16);
-  const needTb = n * (C.gb.p[r] || 20) * days / 1000 * 1.1, sizes = Object.keys(C.hdd.p).map(Number).sort((a, b) => a - b);
+  const needTb = n * (OF_GB[r] || 20) * days / 1000 * 1.1, sizes = Object.keys(C.hdd.p).map(Number).sort((a, b) => a - b);
   let disks = 1, tb = sizes.find(s => s >= needTb); if (!tb) { tb = sizes[sizes.length - 1]; disks = Math.ceil(needTb / tb); }
   return { C, ext, int, n, r, days, m, ch, pp, needTb, tb, disks };
 }
@@ -7492,7 +7489,7 @@ qs('#oq-go').addEventListener('click', async () => {
   const meters = Math.ceil(k.n * k.m / 5) * 5;
   const mat = d => ({ ...d, kind: 'material' });
   add(mat(C.cable), meters); if (qs('#oq-doz').checked) add(mat(C.doza), k.n); add(mat(C.cons), k.n);
-  add(C.lab_cam, k.n); add(C.lab_cable, meters); add(C.lab_cfg, 1); if (qs('#oq-tr').checked) add(C.transport, 1);
+  add(C.lab_cam, k.n);
   ofDraft.lines = L;
   if (!qs('#of-t').value.trim()) qs('#of-t').value = `Sistem supraveghere video – ${k.n} ${k.n === 1 ? 'cameră' : 'camere'} ${k.r} MP`;
   qs('#of-quick').open = false; ofRenderLines(); toast('Listă generată — verifică și ajustează prețurile', 'ok');
@@ -7570,7 +7567,7 @@ function ofcRender() {
   const C = ofCfgGet(), row = (k, sub, lbl, val) => `<div class="ofc-r"><span>${escapeHtml(lbl)}</span><input class="form-input r" data-k="${k}" data-s="${sub}" inputmode="decimal" value="${val}"></div>`;
   let h = '';
   for (const [k, d] of Object.entries(C)) { if (!d || typeof d !== 'object') continue;
-    if (d.p) { const unit = k === 'cam_ext' || k === 'cam_int' || k === 'gb' ? ' MP' : k === 'hdd' ? ' TB' : ' canale';
+    if (d.p) { const unit = k === 'cam_ext' || k === 'cam_int' ? ' MP' : k === 'hdd' ? ' TB' : ' canale';
       h += `<div class="ofc-g"><b>${escapeHtml(d.label)}</b><div class="ofc-p">${Object.entries(d.p).map(([v, p]) => row(k, v, v + unit, p)).join('')}</div>${d.name ? `<input class="form-input ofc-n" data-k="${k}" data-s="name" value="${escapeHtml(d.name)}" title="Denumirea din ofertă ({r}=rezoluție, {t}=TB, {c}=canale)">` : ''}</div>`; }
     else h += `<div class="ofc-g"><b>${escapeHtml(d.label)}</b><div class="ofc-p">${row(k, 'price', 'preț', d.price)}</div><input class="form-input ofc-n" data-k="${k}" data-s="name" value="${escapeHtml(d.name)}"></div>`; }
   h += `<div class="ofc-g"><b>Condiții implicite în ofertă</b><textarea class="form-input" id="ofc-notes" rows="4">${escapeHtml(C.notes)}</textarea><b>Text de început implicit</b><textarea class="form-input" id="ofc-intro" rows="2">${escapeHtml(C.intro)}</textarea></div>`;
