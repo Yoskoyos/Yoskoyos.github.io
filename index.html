@@ -7335,7 +7335,7 @@ const OF_DEF = {
   cam_ext: { label: 'Cameră exterior', unit: 'buc', name: 'Cameră IP exterior {r}, IR / color noaptea, PoE, IP67', p: { 2: 220, 4: 330, 8: 520 } },
   cam_int: { label: 'Cameră interior', unit: 'buc', name: 'Cameră IP interior dome {r}, IR / color noaptea, PoE', p: { 2: 200, 4: 300, 8: 480 } },
   nvr: { label: 'NVR (după nr. de canale)', unit: 'buc', name: 'NVR {c} canale, {pp} porturi PoE, H.265+, acces de pe telefon', p: { 4: 600, 8: 900, 16: 1500, 32: 2600 } },
-  switch: { label: 'Switch PoE suplimentar (peste 16 camere)', unit: 'buc', name: 'Switch PoE 16 porturi, gigabit uplink', price: 700 },
+  switch: { label: 'Switch PoE (8 / 16 porturi) — pentru camerele peste porturile NVR-ului', unit: 'buc', name: 'Switch PoE {s} porturi gigabit, uplink', p: { 8: 300, 16: 900 } },
   hdd: { label: 'HDD supraveghere (după TB)', unit: 'buc', name: 'HDD supraveghere video {t} TB, funcționare 24/7', p: { 1: 350, 2: 500, 4: 800, 6: 1200, 8: 1800, 10: 2300 } },
   cable: { label: 'Cablu FTP Cat5e (lei / m)', unit: 'm', name: 'Cablu FTP Cat5e cupru', price: 3 },
   doza: { label: 'Doză joncțiune (pe cameră)', unit: 'buc', name: 'Doză de joncțiune pentru cameră', price: 40 },
@@ -7370,9 +7370,9 @@ function ofStockRefresh(force) {
 }
 const OF_A2T = { 'cam_ext.2': 'IPC-B120HA-LU', 'cam_ext.4': 'IPC-B140HA-LU', 'cam_ext.8': 'IPC-B180HA-LU', 'cam_int.2': 'IPC-D120HA-LU', 'cam_int.4': 'IPC-D140HA-LU', 'cam_int.8': 'IPC-D180HA-LU',
   'nvr.4': 'NVR-104MH-C/4P(E)', 'nvr.8': 'NVR-108MH-C/8P(E)', 'nvr.16': 'NVR-216MH-K/16P', 'nvr.32': 'NVR-232MH-K/16P', 'hdd.1': 'WD11PURZ', 'hdd.2': 'ST2000VX017', 'hdd.4': 'ST4000VX016', 'hdd.6': 'ST6000VX009', 'hdd.8': 'ST8000VX010', 'hdd.10': 'ST10000VE001',
-  'switch': 'NS-0518P-125(B)', 'cable': 'SAF-FTP5S305-CU', 'doza': 'DS-1280ZJ-XS', 'ups': 'UPCSBLS665TRECG01B', 'rack': 'ASY-6U-6060W', 'mon': 'DH-LM22-A200Y' };
+  'switch.8': 'NS-0510P-80(B)', 'switch.16': 'NS-0518P-125(B)', 'cable': 'SAF-FTP5S305-CU', 'doza': 'DS-1280ZJ-XS', 'ups': 'UPCSBLS665TRECG01B', 'rack': 'ASY-6U-6060W', 'mon': 'DH-LM22-A200Y' };
 const OF_GB = { 2: 10, 4: 20, 8: 40 };   // GB pe zi / cameră (înregistrare continuă, H.265) — pentru calculul HDD-ului
-const ofCfgGet = () => { const c = JSON.parse(JSON.stringify(OF_DEF)); const u = ofCfg || {}; for (const k of Object.keys(c)) if (u[k] !== undefined) { if (typeof c[k] === 'object' && c[k] && typeof u[k] === 'object') { if (u[k].p) c[k].p = { ...c[k].p, ...u[k].p }; if (u[k].price !== undefined) c[k].price = u[k].price; if (u[k].name) c[k].name = u[k].name; } else c[k] = u[k]; } return c; };
+const ofCfgGet = () => { const c = JSON.parse(JSON.stringify(OF_DEF)); const u = ofCfg || {}; for (const k of Object.keys(c)) if (u[k] !== undefined) { if (k === 'switch' && u[k] && u[k].name && !String(u[k].name).includes('{s}')) u[k] = { ...u[k], name: '' }; if (typeof c[k] === 'object' && c[k] && typeof u[k] === 'object') { if (u[k].p) c[k].p = { ...c[k].p, ...u[k].p }; if (u[k].price !== undefined) c[k].price = u[k].price; if (u[k].name) c[k].name = u[k].name; } else c[k] = u[k]; } return c; };
 const ofN = v => { let x = String(v == null ? '' : v).trim().replace(/\s/g, ''); if (/,\d{1,2}$/.test(x)) x = x.replace(/\./g, '').replace(',', '.'); else x = x.replace(/,/g, ''); const n = parseFloat(x); return isFinite(n) ? n : 0; };
 const ofL = v => (Math.round((v || 0) * 100) / 100).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const OF_ST = { draft: ['Ciornă', ''], sent: ['Trimisă', 'sp'], accepted: ['Acceptată', 'ok'], rejected: ['Refuzată', 'bad'] };
@@ -7489,7 +7489,7 @@ function ofPickItems() {
   const C = ofCfgGet(), out = [];
   for (const s of ((typeof ops !== 'undefined' && ops && ops.stock) || [])) out.push({ src: 'Stoc · ' + s.qty + ' ' + (s.unit || 'buc'), name: s.name, unit: s.unit || 'buc', price: 0, cost: +s.price || 0, kind: s.cat === 'cablu' ? 'material' : 'echipament', stockId: s.id });
   for (const [k, d] of Object.entries(C)) { if (!d || typeof d !== 'object') continue;
-    if (d.p) for (const [v, pr] of Object.entries(d.p)) out.push({ src: 'Lista mea', name: d.name.replace('{r}', v + ' MP').replace('{t}', v).replace('{c}', v).replace('{pp}', v), unit: d.unit, price: +pr, cost: 0, kind: d.kind || 'echipament' });
+    if (d.p) for (const [v, pr] of Object.entries(d.p)) out.push({ src: 'Lista mea', name: d.name.replace('{r}', v + ' MP').replace('{t}', v).replace('{c}', v).replace('{pp}', v).replace('{s}', v), unit: d.unit, price: +pr, cost: 0, kind: d.kind || 'echipament' });
     else out.push({ src: 'Lista mea', name: d.name, unit: d.unit, price: +d.price, cost: 0, kind: d.kind || (k === 'cable' || k === 'cons' || k === 'doza' ? 'material' : 'echipament') }); }
   return out;
 }
@@ -7515,7 +7515,7 @@ function ofQuickCalc() {
 }
 function ofQuickInfo() {
   const k = ofQuickCalc();
-  qs('#oq-info').innerHTML = k.n ? `${k.n} camere → NVR ${k.ch} canale · ${k.days} zile × ${k.r} MP ≈ ${k.needTb.toFixed(1).replace('.', ',')} TB → ${k.disks > 1 ? k.disks + ' × ' : ''}HDD ${k.tb} TB${k.n > 16 ? ' · + switch PoE' : ''}` : 'Pune numărul de camere.';
+  qs('#oq-info').innerHTML = k.n ? `${k.n} camere → NVR ${k.ch} canale · ${k.days} zile × ${k.r} MP ≈ ${k.needTb.toFixed(1).replace('.', ',')} TB → ${k.disks > 1 ? k.disks + ' × ' : ''}HDD ${k.tb} TB${k.n > 16 ? ` · + switch PoE pentru ${k.n - 16} camere` : ''}` : 'Pune numărul de camere.';
 }
 ['#oq-ext', '#oq-int', '#oq-res', '#oq-days', '#oq-m'].forEach(id => qs(id).addEventListener('input', ofQuickInfo));
 qs('#oq-go').addEventListener('click', async () => {
@@ -7523,7 +7523,9 @@ qs('#oq-go').addEventListener('click', async () => {
   if (ofDraft.lines.length && !(await confirmDialog({ title: 'Înlocuiești lista?', html: 'Lista actuală de produse se înlocuiește cu cea generată.', okLabel: 'Înlocuiește', tone: 'watch' }))) return;
   const L = [], add = (d, qty, extra, key) => { if (qty > 0) L.push({ name: (d.name || '').replace('{r}', k.r + ' MP').replace('{c}', k.ch).replace('{pp}', k.pp).replace('{t}', k.tb), desc: '', unit: d.unit, qty, price: +(extra != null ? extra : d.price) || 0, cost: 0, kind: d.kind || 'echipament', sku: key ? ofSkuFor(key) : '' }); };
   add(C.cam_ext, k.ext, C.cam_ext.p[k.r], 'cam_ext.' + k.r); add(C.cam_int, k.int, C.cam_int.p[k.r], 'cam_int.' + k.r);
-  add(C.nvr, 1, C.nvr.p[k.ch], 'nvr.' + k.ch); if (k.n > 16) add(C.switch, Math.ceil((k.n - 16) / 16), null, 'switch');
+  add(C.nvr, 1, C.nvr.p[k.ch], 'nvr.' + k.ch);
+  if (k.n > 16) { const ex = k.n - 16, n16 = Math.floor(ex / 16) + (ex % 16 > 8 ? 1 : 0), n8 = ex % 16 > 0 && ex % 16 <= 8 ? 1 : 0;   // camerele peste cele 16 porturi PoE ale NVR-ului
+    const sw = sz => ({ ...C.switch, name: C.switch.name.replace('{s}', sz) }); add(sw(16), n16, C.switch.p[16], 'switch.16'); add(sw(8), n8, C.switch.p[8], 'switch.8'); }
   add(C.hdd, k.disks, C.hdd.p[k.tb], 'hdd.' + k.tb);
   if (qs('#oq-ups').checked) add(C.ups, 1, null, 'ups'); if (qs('#oq-rack').checked) add(C.rack, 1, null, 'rack'); if (qs('#oq-mon').checked) add(C.mon, 1, null, 'mon');
   const meters = Math.ceil(k.n * k.m / 5) * 5;
@@ -7641,7 +7643,7 @@ function ofcRender() {
     <div class="ofc-a2t-s">Ultima actualizare: <b>${escapeHtml(when)}</b>${A.err ? ` · <span class="bad">${escapeHtml(A.err)}</span>` : ''} <button type="button" class="btn" id="ofc-a2t-now">🔄 Actualizează acum</button></div>
     <div class="cm-hint">Preț în ofertă (fără TVA) = preț de pe a2t.ro (cu TVA) ÷ 1,21 + adaosul tău. Cablul se calculează pe metru din rola de 305 m. Sub fiecare preț e codul produsului A2T folosit ca reper — îl poți schimba; gol = prețul rămâne cel pus de tine. Montajul și consumabilele nu se actualizează.</div></div>`;
   for (const [k, d] of Object.entries(C)) { if (!d || typeof d !== 'object') continue;
-    if (d.p) { const unit = k === 'cam_ext' || k === 'cam_int' ? ' MP' : k === 'hdd' ? ' TB' : ' canale';
+    if (d.p) { const unit = k === 'cam_ext' || k === 'cam_int' ? ' MP' : k === 'hdd' ? ' TB' : k === 'switch' ? ' porturi' : ' canale';
       h += `<div class="ofc-g"><b>${escapeHtml(d.label)}</b><div class="ofc-p">${Object.entries(d.p).map(([v, p]) => row(k, v, v + unit, p)).join('')}</div>${d.name ? `<input class="form-input ofc-n" data-k="${k}" data-s="name" value="${escapeHtml(d.name)}" title="Denumirea din ofertă ({r}=rezoluție, {t}=TB, {c}=canale)">` : ''}</div>`; }
     else h += `<div class="ofc-g"><b>${escapeHtml(d.label)}</b><div class="ofc-p">${row(k, 'price', 'preț', d.price)}</div><input class="form-input ofc-n" data-k="${k}" data-s="name" value="${escapeHtml(d.name)}"></div>`; }
   h += `<div class="ofc-g"><b>Condiții implicite în ofertă</b><textarea class="form-input" id="ofc-notes" rows="4">${escapeHtml(C.notes)}</textarea><b>Text de început implicit</b><textarea class="form-input" id="ofc-intro" rows="2">${escapeHtml(C.intro)}</textarea></div>`;
