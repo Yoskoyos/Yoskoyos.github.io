@@ -1111,8 +1111,28 @@ html:not(.unlocked) .app{display:none}
 .of-g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 12px}.of-g4 .fg{margin:0}.of-span2{grid-column:span 2}.of-span3{grid-column:span 3}.of-span4{grid-column:1/-1}
 .of-g4 .form-input,.of-texts .form-input{width:100%}
 .of-checks{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;padding-top:18px}.of-checks label{display:flex;gap:6px;align-items:center;font-size:13px;font-weight:600;color:var(--fg-2)}
-.of-quick{border:1px solid var(--accent);background:var(--accent-dim);border-radius:12px;padding:10px 14px}.of-quick summary{cursor:pointer;font-weight:700;font-size:13.5px}
-.of-qfoot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;flex-wrap:wrap}
+.of-quick{border:1px solid var(--accent);background:var(--accent-dim);border-radius:14px;padding:0;overflow:hidden;flex-shrink:0}
+#of-modal .modal-body>*{flex-shrink:0}
+.of-quick summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:12px;padding:12px 16px}.of-quick summary::-webkit-details-marker{display:none}
+.of-quick summary::after{content:'▾';margin-left:auto;color:var(--accent);transition:transform .2s}.of-quick[open] summary::after{transform:rotate(180deg)}
+.oq-ic{width:34px;height:34px;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:17px;flex-shrink:0}
+.of-quick summary b{display:block;font-size:14px}.of-quick summary small{display:block;font-size:12px;color:var(--fg-3);font-weight:500}
+.oq{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;padding:4px 16px 14px}
+.oq-f{display:flex;flex-direction:column;gap:6px;min-width:0}.oq-f>label{font-size:12px;font-weight:700;color:var(--fg-2)}.oq-wide{grid-column:span 2}
+.oq-step{display:flex;align-items:stretch;background:var(--bg-1);border:1px solid var(--border);border-radius:10px;overflow:hidden;height:42px}
+.oq-step button{width:40px;border:0;background:transparent;color:var(--fg-2);font-size:18px;font-weight:700;cursor:pointer;flex-shrink:0}.oq-step button:hover{background:var(--accent-dim);color:var(--accent)}
+.oq-step input{flex:1;min-width:0;width:100%;border:0;background:transparent;text-align:center;font:inherit;font-size:16px;font-weight:800;color:var(--fg);outline:none;font-variant-numeric:tabular-nums;padding:0}
+.oq-seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--bg-1);border:1px solid var(--border);border-radius:10px;padding:3px}
+.oq-seg button{border:0;background:transparent;border-radius:8px;padding:6px 4px;font:inherit;font-size:13.5px;font-weight:800;color:var(--fg-2);cursor:pointer;line-height:1.15}.oq-seg button small{display:block;font-size:10.5px;font-weight:600;color:var(--fg-3)}
+.oq-seg button.on{background:var(--accent);color:#fff}.oq-seg button.on small{color:rgba(255,255,255,.85)}
+.oq-tgs{display:flex;flex-wrap:wrap;gap:6px}.oq-tg{position:relative;cursor:pointer}.oq-tg input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.oq-tg span{display:inline-flex;align-items:center;gap:5px;height:42px;padding:0 13px;border-radius:10px;border:1px solid var(--border);background:var(--bg-1);font-size:13px;font-weight:700;color:var(--fg-2);transition:all .15s;user-select:none}
+.oq-tg input:checked+span{border-color:var(--accent);background:var(--accent);color:#fff}.oq-tg input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.oq-foot{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--accent-soft,rgba(242,97,29,.2));background:var(--bg-1);flex-wrap:wrap}
+.oq-sum{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}.oq-sum span{font-size:12.5px;background:var(--bg-2);border-radius:999px;padding:5px 10px;color:var(--fg-2)}.oq-sum small{color:var(--fg-3)}
+.oq-foot .btn{flex:0 0 auto;width:auto;padding:10px 18px}
+@media (max-width:760px){.oq{grid-template-columns:1fr 1fr}.oq-wide{grid-column:1/-1}.oq-foot .btn{width:100%;flex:1 1 100%}}
+
 .of-tog{float:right;text-transform:none;letter-spacing:0;font-weight:500}.of-tog label{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--fg-3)}
 .of-row{display:grid;grid-template-columns:38px minmax(0,1fr) 112px 62px 70px 96px 96px 28px;gap:6px;align-items:start;padding:6px 0;border-bottom:1px solid var(--border)}
 .of-tbl.cost .of-row{grid-template-columns:38px minmax(0,1fr) 112px 62px 70px 96px 90px 96px 28px}
@@ -2432,16 +2452,20 @@ html:not(.unlocked) .app{display:none}
         <div class="fg of-span4"><label for="of-ca">Adresa lucrării</label><input class="form-input" id="of-ca"></div>
       </div>
       <details class="of-quick" id="of-quick">
-        <summary>⚡ Configurator rapid — generează lista din câteva întrebări</summary>
-        <div class="of-g4" style="margin-top:12px">
-          <div class="fg"><label for="oq-ext">Camere exterior</label><input class="form-input" id="oq-ext" inputmode="numeric" value="4"></div>
-          <div class="fg"><label for="oq-int">Camere interior</label><input class="form-input" id="oq-int" inputmode="numeric" value="0"></div>
-          <div class="fg"><label for="oq-res">Rezoluție</label><select class="form-input" id="oq-res"><option value="2">2 MP (Full HD)</option><option value="4" selected>4 MP (2K)</option><option value="8">8 MP (4K)</option></select></div>
-          <div class="fg"><label for="oq-days">Zile de înregistrare</label><input class="form-input" id="oq-days" inputmode="numeric" value="30"></div>
-          <div class="fg"><label for="oq-m">Metri cablu / cameră</label><input class="form-input" id="oq-m" inputmode="numeric" value="25"></div>
-          <div class="fg of-span3 of-checks"><label><input type="checkbox" id="oq-ups"> UPS</label><label><input type="checkbox" id="oq-rack"> Rack</label><label><input type="checkbox" id="oq-mon"> Monitor</label><label><input type="checkbox" id="oq-doz" checked> Doze joncțiune</label></div>
+        <summary><span class="oq-ic">⚡</span><span><b>Configurator rapid</b><small>Răspunde la câteva întrebări și primești lista completă</small></span></summary>
+        <div class="oq">
+          <div class="oq-f"><label for="oq-ext">Camere exterior</label><div class="oq-step"><button type="button" data-st="-1">−</button><input id="oq-ext" inputmode="numeric" value="4"><button type="button" data-st="1">+</button></div></div>
+          <div class="oq-f"><label for="oq-int">Camere interior</label><div class="oq-step"><button type="button" data-st="-1">−</button><input id="oq-int" inputmode="numeric" value="0"><button type="button" data-st="1">+</button></div></div>
+          <div class="oq-f"><label for="oq-days">Zile înregistrare</label><div class="oq-step"><button type="button" data-st="-7">−</button><input id="oq-days" inputmode="numeric" value="30"><button type="button" data-st="7">+</button></div></div>
+          <div class="oq-f"><label for="oq-m">Metri cablu / cameră</label><div class="oq-step"><button type="button" data-st="-5">−</button><input id="oq-m" inputmode="numeric" value="25"><button type="button" data-st="5">+</button></div></div>
+          <div class="oq-f oq-wide"><label>Rezoluție</label><input type="hidden" id="oq-res" value="4"><div class="oq-seg" id="oq-resseg"><button type="button" data-v="2">2 MP<small>Full HD</small></button><button type="button" data-v="4" class="on">4 MP<small>2K</small></button><button type="button" data-v="8">8 MP<small>4K</small></button></div></div>
+          <div class="oq-f oq-wide"><label>Extra</label><div class="oq-tgs">
+            <label class="oq-tg"><input type="checkbox" id="oq-ups"><span>🔋 UPS</span></label>
+            <label class="oq-tg"><input type="checkbox" id="oq-rack"><span>🗄 Rack</span></label>
+            <label class="oq-tg"><input type="checkbox" id="oq-mon"><span>🖥 Monitor</span></label>
+            <label class="oq-tg"><input type="checkbox" id="oq-doz" checked><span>⚪ Doze joncțiune</span></label></div></div>
         </div>
-        <div class="of-qfoot"><span class="cm-hint" id="oq-info"></span><button type="button" class="btn primary" id="oq-go">Generează lista</button></div>
+        <div class="oq-foot"><div class="oq-sum" id="oq-info"></div><button type="button" class="btn primary" id="oq-go">⚡ Generează lista</button></div>
       </details>
       <div class="cm-sec">Produse și servicii <span class="of-tog"><label><input type="checkbox" id="of-showcost"> arată costul meu (intern, nu apare în PDF)</label></span></div>
       <div class="of-tbl" id="of-lines"></div>
@@ -7515,9 +7539,13 @@ function ofQuickCalc() {
 }
 function ofQuickInfo() {
   const k = ofQuickCalc();
-  qs('#oq-info').innerHTML = k.n ? `${k.n} camere → NVR ${k.ch} canale · ${k.days} zile × ${k.r} MP ≈ ${k.needTb.toFixed(1).replace('.', ',')} TB → ${k.disks > 1 ? k.disks + ' × ' : ''}HDD ${k.tb} TB${k.n > 16 ? ` · + switch PoE pentru ${k.n - 16} camere` : ''}` : 'Pune numărul de camere.';
+  qs('#oq-info').innerHTML = k.n ? [`📷 <b>${k.n}</b> ${k.n === 1 ? 'cameră' : 'camere'}`, `📼 NVR <b>${k.ch}</b> canale`, `💾 ${k.disks > 1 ? k.disks + ' × ' : ''}HDD <b>${k.tb} TB</b> <small>(${k.needTb.toFixed(1).replace('.', ',')} TB pentru ${k.days} zile)</small>`, `🔌 <b>${Math.ceil(k.n * k.m / 5) * 5}</b> m cablu`].concat(k.n > 16 ? [`🔀 switch PoE pt. <b>${k.n - 16}</b> camere`] : []).map(x => `<span>${x}</span>`).join('') : '<span>Pune numărul de camere</span>';
 }
-['#oq-ext', '#oq-int', '#oq-res', '#oq-days', '#oq-m'].forEach(id => qs(id).addEventListener('input', ofQuickInfo));
+['#oq-ext', '#oq-int', '#oq-days', '#oq-m'].forEach(id => qs(id).addEventListener('input', ofQuickInfo));
+qs('#of-quick').addEventListener('click', e => {
+  const st = e.target.closest('[data-st]'); if (st) { const inp = st.parentElement.querySelector('input'); inp.value = Math.max(0, Math.round(ofN(inp.value)) + +st.dataset.st); if (inp.id === 'oq-days' && +inp.value < 1) inp.value = 1; ofQuickInfo(); return; }
+  const rb = e.target.closest('#oq-resseg button'); if (rb) { qs('#oq-res').value = rb.dataset.v; qs('#oq-resseg').querySelectorAll('button').forEach(b => b.classList.toggle('on', b === rb)); ofQuickInfo(); }
+});
 qs('#oq-go').addEventListener('click', async () => {
   const k = ofQuickCalc(), C = k.C; if (!k.n) return toast('Pune numărul de camere', 'warn');
   if (ofDraft.lines.length && !(await confirmDialog({ title: 'Înlocuiești lista?', html: 'Lista actuală de produse se înlocuiește cu cea generată.', okLabel: 'Înlocuiește', tone: 'watch' }))) return;
