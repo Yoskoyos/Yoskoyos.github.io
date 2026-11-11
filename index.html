@@ -6839,6 +6839,7 @@ function setLang(l) { try { localStorage.setItem('yca_lang', l === 'en' ? 'en' :
 let seap = null, spType = '', spSt = 'active', spPoll = null;
 const SP_SEEN_KEY = 'yca_seap_seen';
 function spSeen() { try { return +localStorage.getItem(SP_SEEN_KEY) || 0; } catch { return 0; } }
+let spSeenSnap = null;   // „NOU” rămâne pe ecran până ieși din tab, chiar dacă le marcăm văzute
 function spMarkSeen() { try { localStorage.setItem(SP_SEEN_KEY, String(Date.now())); } catch {} }
 const spLei = v => v ? Math.round(v).toLocaleString('ro-RO') + ' lei' : '—';
 function spDead(d) {
@@ -6872,7 +6873,12 @@ function spFiltered() {
     else if (spSt === 'over') { if (!over) return false; }
     else if (it.status !== spSt) return false;
     return !q || [it.title, it.ca, it.city, it.county, it.no, it.cpv].join(' ').toLowerCase().includes(q);
-  }).sort((a, b) => (spSt === 'active' ? Date.parse(a.deadline || 0) - Date.parse(b.deadline || 0) : b.firstSeen - a.firstSeen));
+  }).sort((a, b) => {
+    if (spSt !== 'active') return b.firstSeen - a.firstSeen;
+    const seen = spSeenSnap != null ? spSeenSnap : spSeen();
+    const na = a.firstSeen > seen && a.status === 'new' ? 0 : 1, nb = b.firstSeen > seen && b.status === 'new' ? 0 : 1;   // întâi cele noi
+    return na - nb || (Date.parse(a.deadline || 0) || 9e15) - (Date.parse(b.deadline || 0) || 9e15);                    // apoi după termen
+  });
 }
 function spAnBtn(it) {
   const a = it.analysis || {};
@@ -6884,7 +6890,7 @@ function spAnBtn(it) {
 }
 function renderSeap() {
   if (!seap) return;
-  const seen = spSeen();
+  const seen = spSeenSnap != null ? spSeenSnap : spSeen();
   const act = (seap.items || []).filter(it => (!it.exp || it.exp.status !== 'over') && it.status === 'new' && (!it.deadline || Date.parse(it.deadline) > Date.now()));
   const nNew = act.filter(it => it.firstSeen > seen).length;
   const b = qs('#sp-badge'); if (b) { b.textContent = nNew; b.style.display = nNew ? '' : 'none'; }
@@ -7044,7 +7050,7 @@ qs('#sp-refresh').addEventListener('click', async () => {
   try { await clApi('/seap/refresh', { method: 'POST' }); toast('Caut anunțuri noi pe SEAP… durează câteva minute', 'ok'); if (seap) seap.running = true; renderSeap(); clearTimeout(spPoll); spPoll = setTimeout(() => loadSeap(true), 6000); }
   catch (e) { toast(e.message, 'err'); }
 });
-document.querySelectorAll('.nav-tab[data-tab="seap"]').forEach(t => t.addEventListener('click', () => { let v0 = 'ann'; try { v0 = localStorage.getItem('yca_sp_view') || 'ann'; } catch {} showSpView(v0 === 'bids' ? 'bids' : 'ann'); loadSeap(true).then(() => setTimeout(spMarkSeen, 1500)); }));
+document.querySelectorAll('.nav-tab[data-tab="seap"]').forEach(t => t.addEventListener('click', () => { let v0 = 'ann'; try { v0 = localStorage.getItem('yca_sp_view') || 'ann'; } catch {} spSeenSnap = spSeen(); showSpView(v0 === 'bids' ? 'bids' : 'ann'); loadSeap(true).then(() => setTimeout(spMarkSeen, 1500)); }));
 
 
 /* ── Aspect pro: indicatorul animat din meniul lateral, data și contul din antet ── */
