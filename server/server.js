@@ -2550,6 +2550,144 @@ async function handleSeap(req, res, pathname, parsed) {
   }
   return sendJson(res, 405, { error: 'Operație necunoscută' });
 }
+/* ═════════════ Newsletter: campanii e-mail cu statistici (deschideri, clickuri pe site, dezabonări, cereri de ofertă) ═════════════
+   newsletter.json (doar pe server): { <owner>: { contacts: [], unsub: { email: ts }, campaigns: [] } }
+   Fiecare destinatar are un cod (token): pixel 1×1 → deschis · /nl/c/<token>?u= → click (și intrare pe site) · /nl/u/<token> → dezabonare (cu confirmare).
+   Trimitere prin mail.json (SMTP), câte un mesaj la ~4 secunde, cu antet List-Unsubscribe. */
+const NL_FILE = path.join(BASE_DIR, 'newsletter.json');
+const NL_GAP = +(process.env.NL_GAP_MS || 4000);
+function loadNl() { try { const d = JSON.parse(fs.readFileSync(NL_FILE, 'utf8')); return d && typeof d === 'object' ? d : {}; } catch { return {}; } }
+function saveNl(d) { const tmp = NL_FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(d), { mode: 0o600 }); fs.renameSync(tmp, NL_FILE); }
+const nlUser = (all, u) => { const x = all[u] = all[u] || {}; x.contacts = x.contacts || []; x.unsub = x.unsub || {}; x.campaigns = x.campaigns || []; return x; };
+const nlEmail = e => { const s = String(e || '').trim().toLowerCase(); return /^[^\s@<>,;]+@[^\s@<>,;]+\.[a-z]{2,}$/.test(s) ? s : ''; };
+const NL_HOSTS = /(^|\.)supraveghere24h\.ro$/i;
+function nlRender(c, r, base) {
+  const tok = encodeURIComponent(r.t);
+  let h = String(c.html || '');
+  h = h.replace(/\{\{NUME\}\}/g, escHtml(r.name || '')).replace(/\{\{ORG\}\}/g, escHtml(r.org || ''));
+  h = h.replace(/\{\{DEZABONARE\}\}/g, `${base}/nl/u/${tok}`);
+  h = h.replace(/href="(https?:\/\/[^"]+)"/gi, (m, u) => { try { const x = new URL(u.replace(/&amp;/g, '&')); if (!NL_HOSTS.test(x.hostname) || /^\/nl\//.test(x.pathname)) return m; } catch { return m; } return `href="${base}/nl/c/${tok}?u=${encodeURIComponent(u.replace(/&amp;/g, '&'))}"`; });
+  const px = `<img src="${base}/nl/o/${tok}.gif" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0;opacity:0">`;
+  h = /<\/body>/i.test(h) ? h.replace(/<\/body>/i, px + '</body>') : h + px;
+  return h;
+}
+const nlText = html => String(html).replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<(br|\/p|\/tr|\/h1|\/div)[^>]*>/gi, '\n').replace(/<a [^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, '$2 ($1)').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/[ \t]+/g, ' ').replace(/\n\s*\n\s*\n+/g, '\n\n').trim();
+async function nlSendOne(c, r, base) {
+  const cfg = loadMailCfg(); if (!cfg || !cfg.host) throw new Error('E-mailul nu e configurat pe server (mail.json)');
+  const nodemailer = require('nodemailer');
+  const port = parseInt(cfg.port || 465, 10);
+  const tr = nodemailer.createTransport({ host: cfg.host, port, secure: cfg.secure !== undefined ? !!cfg.secure : port === 465, auth: { user: cfg.user, pass: cfg.pass } });
+  const html = nlRender(c, r, base), unsub = `${base}/nl/u/${encodeURIComponent(r.t)}`;
+  await tr.sendMail({ from: c.from || cfg.from || cfg.user, to: r.name ? `"${String(r.name).replace(/["\r\n]/g, '')}" <${r.email}>` : r.email, subject: c.subject, html, text: nlText(html),
+    replyTo: c.replyTo || undefined, headers: { 'List-Unsubscribe': `<${unsub}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } });
+}
+const nlRun = new Set();
+async function nlSendLoop(owner, cid) {
+  if (nlRun.has(cid)) return; nlRun.add(cid);
+  try {
+    for (;;) {
+      const all = loadNl(), u = nlUser(all, owner), c = u.campaigns.find(x => x.id === cid); if (!c || c.status !== 'sending') break;
+      const r = c.recipients.find(x => x.st === 'queued'); if (!r) { c.status = 'sent'; c.doneAt = Date.now(); saveNl(all); break; }
+      if (u.unsub[r.email]) { r.st = 'skipped'; r.err = 'dezabonat'; saveNl(all); continue; }
+      let ok = true, err = '';
+      try { await nlSendOne(c, r, c.base); } catch (e) { ok = false; err = String(e.message || e).slice(0, 200); }
+      const all2 = loadNl(), c2 = nlUser(all2, owner).campaigns.find(x => x.id === cid); if (!c2) break;
+      const r2 = c2.recipients.find(x => x.t === r.t); if (r2) { r2.st = ok ? 'sent' : 'failed'; r2.sentAt = Date.now(); r2.err = err; }
+      if (!ok && /auth|login|credentials|invalid/i.test(err)) { c2.status = 'paused'; c2.err = err; }
+      saveNl(all2); await sleep(NL_GAP);
+    }
+  } finally { nlRun.delete(cid); }
+}
+function nlResume() { const all = loadNl(); for (const [owner, u] of Object.entries(all)) for (const c of (u.campaigns || [])) if (c.status === 'sending') nlSendLoop(owner, c.id).catch(e => console.error('[nl]', e.message)); }
+setTimeout(nlResume, 15000);
+function nlFind(tok) {
+  const all = loadNl(); const cid = String(tok).split('_')[0];
+  for (const [owner, u] of Object.entries(all)) for (const c of (u.campaigns || [])) if (c.id === cid) { const r = (c.recipients || []).find(x => x.t === tok); if (r) return { all, owner, u, c, r }; }
+  return null;
+}
+const NL_GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+async function handleNlPublic(req, res, pathname) {
+  const m = /^\/nl\/(o|c|u)\/([\w-]+?)(\.gif)?$/.exec(pathname); if (!m) { res.writeHead(404); return res.end(); }
+  const kind = m[1], tok = decodeURIComponent(m[2]), f = nlFind(tok), ua = String(req.headers['user-agent'] || '').slice(0, 160);
+  if (kind === 'o') {
+    if (f && f.r.t !== 'test') { f.r.opens = (f.r.opens || []).concat(Date.now()).slice(-30); saveNl(f.all); }
+    res.writeHead(200, { 'Content-Type': 'image/gif', 'Content-Length': NL_GIF.length, 'Cache-Control': 'no-store, no-cache, must-revalidate, private', Pragma: 'no-cache' }); return res.end(NL_GIF);
+  }
+  if (kind === 'c') {
+    let to = 'https://supraveghere24h.ro/'; try { const x = new URL(String(url.parse(req.url, true).query.u || '')); if (/^https?:$/.test(x.protocol) && NL_HOSTS.test(x.hostname)) to = x.href; } catch {}
+    if (f) { f.r.clicks = (f.r.clicks || []).concat({ t: Date.now(), u: to.slice(0, 300) }).slice(-30); if (!(f.r.opens || []).length) f.r.opens = [Date.now()]; saveNl(f.all); }
+    res.writeHead(302, { Location: to, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer-when-downgrade' }); return res.end();
+  }
+  // dezabonare: GET arată confirmarea (scannerele de linkuri nu dezabonează pe nimeni), POST confirmă
+  const page = (title, body) => sendHtml(res, 200, `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>body{margin:0;background:#eef2f7;font:16px/1.5 Arial,sans-serif;color:#1d2433;display:grid;place-items:center;min-height:100vh}.c{background:#fff;border-radius:16px;padding:32px 28px;max-width:420px;margin:16px;text-align:center;box-shadow:0 10px 30px -15px rgba(11,42,91,.4)}h1{color:#0b2a5b;font-size:22px;margin:0 0 10px}button{border:0;border-radius:999px;background:#F2611D;color:#fff;font:bold 15px Arial;padding:13px 26px;cursor:pointer;margin-top:10px}p{color:#5b6476}</style></head><body><div class="c">${body}</div></body></html>`);
+  if (!f) return page('Link invalid', '<h1>Link invalid</h1><p>Linkul de dezabonare nu mai este valabil. Ne puteți scrie la contact@supraveghere24h.ro.</p>');
+  if (req.method === 'POST') {
+    f.u.unsub[f.r.email] = Date.now(); f.r.unsubAt = Date.now(); saveNl(f.all);
+    return page('Dezabonat', `<h1>V-ați dezabonat</h1><p>Adresa <b>${escHtml(f.r.email)}</b> nu va mai primi mesaje de la SUPRAVEGHERE24h.</p>`);
+  }
+  return page('Dezabonare', `<h1>Dezabonare</h1><p>Nu mai doriți să primiți mesaje de la SUPRAVEGHERE24h la adresa <b>${escHtml(f.r.email)}</b>?</p><form method="post"><button type="submit">Da, dezabonează-mă</button></form>`);
+}
+function nlSummary(c, quotesList) {
+  const R = c.recipients || [], sent = R.filter(r => r.st === 'sent');
+  const leads = new Set(); if (c.sentAt) for (const q of quotesList) { const e = nlEmail(q.customer && q.customer.email); if (e && q.createdAt >= c.sentAt && R.some(r => r.email === e)) leads.add(e); }
+  for (const r of R) r.lead = leads.has(r.email);
+  return { total: R.length, sent: sent.length, queued: R.filter(r => r.st === 'queued').length, failed: R.filter(r => r.st === 'failed').length, skipped: R.filter(r => r.st === 'skipped').length,
+    opened: sent.filter(r => (r.opens || []).length).length, clicked: sent.filter(r => (r.clicks || []).length).length, unsub: R.filter(r => r.unsubAt).length, leads: leads.size };
+}
+async function handleNewsletter(req, res, pathname) {
+  const ctx = requireUser(req, res, 'quotes'); if (!ctx) return;
+  const parts = pathname.split('/').filter(Boolean);   // newsletter[/contacts[/id] | /campaigns[/id[/test|/send|/pause]]]
+  const all = loadNl(), u = nlUser(all, ctx.uname);
+  const out = () => { let ql = []; try { ql = (loadQuotes().list || []).filter(q => q.owner === ctx.uname); } catch {}
+    return { contacts: u.contacts, unsubCount: Object.keys(u.unsub).length, unsub: u.unsub, mail: mailReady(),
+      campaigns: u.campaigns.map(c => ({ ...c, html: undefined, stats: nlSummary(c, ql) })).sort((a, b) => b.createdAt - a.createdAt) }; };
+  if (parts.length === 1 && req.method === 'GET') return sendJson(res, 200, out());
+  if (parts[1] === 'contacts') {
+    if (parts.length === 2 && req.method === 'POST') {
+      const b = await readJson(req); let added = 0;
+      for (const x of (Array.isArray(b.list) ? b.list : []).slice(0, 2000)) { const e = nlEmail(x && x.email); if (!e) continue;
+        const ex = u.contacts.find(c => c.email === e); if (ex) { if (x.name && !ex.name) ex.name = str(x.name, 160); if (x.org && !ex.org) ex.org = str(x.org, 200); continue; }
+        u.contacts.push({ id: newId(), email: e, name: str(x.name, 160).trim(), org: str(x.org, 200).trim(), source: str(x.source, 40), createdAt: Date.now() }); added++; }
+      saveNl(all); return sendJson(res, 200, { added, ...out() });
+    }
+    if (parts.length === 3 && req.method === 'DELETE') { u.contacts = u.contacts.filter(c => c.id !== parts[2]); saveNl(all); return sendJson(res, 200, out()); }
+  }
+  if (parts[1] === 'campaigns') {
+    const c = parts[2] ? u.campaigns.find(x => x.id === parts[2]) : null;
+    if (parts[2] && !c) return sendJson(res, 404, { error: 'Campanie inexistentă' });
+    if (parts.length === 3 && req.method === 'GET') return sendJson(res, 200, { campaign: c });
+    if ((parts.length === 2 && req.method === 'POST') || (parts.length === 3 && req.method === 'PUT')) {
+      const b = await readJson(req);
+      if (c && c.status !== 'draft') return sendJson(res, 400, { error: 'Campania a fost trimisă — fă o copie ca s-o modifici' });
+      const subject = str(b.subject, 200).trim(), html = String(b.html || ''); if (!subject) return sendJson(res, 400, { error: 'Scrie subiectul e-mailului' });
+      if (html.length > 400000) return sendJson(res, 413, { error: 'Mesajul e prea mare' });
+      const id = c ? c.id : crypto.randomBytes(5).toString('hex'); const seen = new Set(), rec = [];
+      for (const x of (Array.isArray(b.recipients) ? b.recipients : []).slice(0, 2000)) { const e = nlEmail(x && x.email); if (!e || seen.has(e)) continue; seen.add(e);
+        const old = c && c.recipients.find(r => r.email === e); rec.push(old || { t: id + '_' + crypto.randomBytes(6).toString('hex'), email: e, name: str(x.name, 160).trim(), org: str(x.org, 200).trim(), st: 'queued' }); }
+      const nc = { ...(c || { id, createdAt: Date.now(), status: 'draft' }), subject, html, template: str(b.template, 60), recipients: rec, updatedAt: Date.now() };
+      if (c) u.campaigns[u.campaigns.indexOf(c)] = nc; else u.campaigns.push(nc);
+      saveNl(all); return sendJson(res, 200, { campaign: nc, ...out() });
+    }
+    if (parts.length === 3 && req.method === 'DELETE') { if (c.status === 'sending') return sendJson(res, 400, { error: 'Oprește întâi trimiterea' }); u.campaigns = u.campaigns.filter(x => x !== c); saveNl(all); return sendJson(res, 200, out()); }
+    if (parts[3] === 'test' && req.method === 'POST') {
+      const b = await readJson(req); const e = nlEmail(b.to); if (!e) return sendJson(res, 400, { error: 'Adresă de e-mail invalidă' });
+      if (!mailReady()) return sendJson(res, 400, { error: 'E-mailul nu e configurat pe server (mail.json)' });
+      try { await nlSendOne({ ...c, subject: '[TEST] ' + c.subject }, { t: 'test', email: e, name: '', org: '' }, publicBase(req)); return sendJson(res, 200, { ok: true }); }
+      catch (err) { return sendJson(res, 500, { error: 'Nu s-a trimis: ' + err.message }); }
+    }
+    if (parts[3] === 'send' && req.method === 'POST') {
+      if (ctx.user.role !== 'admin') return sendJson(res, 403, { error: 'Doar administratorul trimite campanii' });
+      if (!mailReady()) return sendJson(res, 400, { error: 'E-mailul nu e configurat pe server (mail.json)' });
+      if (!c.recipients.length) return sendJson(res, 400, { error: 'Adaugă destinatari' });
+      for (const r of c.recipients) if (r.st === 'failed') r.st = 'queued';
+      c.status = 'sending'; c.sentAt = c.sentAt || Date.now(); c.base = publicBase(req); c.err = ''; saveNl(all);
+      nlSendLoop(ctx.uname, c.id).catch(e => console.error('[nl]', e.message));
+      return sendJson(res, 200, out());
+    }
+    if (parts[3] === 'pause' && req.method === 'POST') { if (c.status === 'sending') c.status = 'paused'; saveNl(all); return sendJson(res, 200, out()); }
+  }
+  return sendJson(res, 405, { error: 'Operație necunoscută' });
+}
 // remindere de expirare — rulează din monitor; o dată pe zi după 09:00
 const cdocDaysLeft = exp => Math.round((Date.parse(exp + 'T00:00:00Z') - Date.parse(new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' }) + 'T00:00:00Z')) / 864e5);
 async function cdocReminders(db) {
@@ -3629,7 +3767,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 9.6, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 9.7, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
@@ -3658,6 +3796,8 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/public/reviews' && req.method === 'GET') return reviewsPublic(req, res);
     if (pathname === '/reviews/config') return await handleReviewsConfig(req, res);
     if ((pathname === '/public/catalog' || /^\/public\/catalog\/[\w-]+\/(photo|fisa)$/.test(pathname)) && req.method === 'GET') return catalogPublic(req, res, pathname);
+    if (pathname.startsWith('/nl/')) return await handleNlPublic(req, res, pathname);
+    if (pathname === '/newsletter' || pathname.startsWith('/newsletter/')) return await handleNewsletter(req, res, pathname);
     if (pathname.startsWith('/q/')) return await handleQuotePublic(req, res, pathname, parsed);
     if (pathname === '/quotes' || pathname.startsWith('/quotes/') || pathname === '/quote-settings') return await handleQuotesApi(req, res, pathname, parsed);
     if (pathname === '/company' && req.method === 'GET') return await handleCompany(req, res, parsed);

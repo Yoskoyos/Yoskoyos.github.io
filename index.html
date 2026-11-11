@@ -1173,6 +1173,30 @@ html:not(.unlocked) .app{display:none}
   .of-card{grid-template-columns:64px minmax(0,1fr) auto}.of-card .sp-tag{display:none}
   #of-modal .modal-foot{flex-wrap:wrap}#of-modal .modal-foot .btn{flex:1 1 30%;padding:10px 8px;font-size:13px}#of-modal .modal-foot>span{display:none}}
 
+.nl-list{display:flex;flex-direction:column;gap:10px}
+.nl-card{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r,12px);padding:14px;cursor:pointer;transition:border-color .15s}.nl-card:hover{border-color:#7C3AED}
+.nl-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.nl-top b{font-size:14.5px}.nl-top small{color:var(--fg-3);font-size:12px;margin-left:auto}
+.nl-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:12px}.nl-kpis span{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--fg-3)}
+.nl-kpis b{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}.nl-kpis small{font-size:12px;color:var(--fg-3);font-weight:600}
+.nl-bar{height:5px;border-radius:5px;background:var(--bg-2);overflow:hidden;margin-top:5px}.nl-bar i{display:block;height:100%;border-radius:5px;transition:width .6s cubic-bezier(.22,1,.36,1)}
+.nl-bar .b0{background:var(--fg-3)}.nl-bar .b1{background:#3b82f6}.nl-bar .b2{background:#7C3AED}.nl-bar .b3{background:var(--ok)}.nl-bar .b4{background:var(--err)}
+.nl-modal{max-width:1180px!important}.nl-modal .modal-body{max-height:80vh}.nl-modal .modal-body>*{flex-shrink:0}
+.nl-2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:18px;align-items:start}.nl-col{display:flex;flex-direction:column;gap:10px;min-width:0}.nl-col .form-input{width:100%;font-family:var(--sans)}
+.nl-rc{background:#7C3AED;color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;margin-left:6px}
+.nl-addbar{display:flex;flex-wrap:wrap;gap:6px}.nl-addbar .btn{width:auto;flex:0 0 auto;padding:7px 12px;font-size:12.5px}
+.nl-rlist{max-height:240px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:2px 10px}
+.nl-r{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}.nl-r:last-child{border-bottom:0}.nl-r>span{flex:1;min-width:0;display:flex;flex-direction:column}.nl-r small{color:var(--fg-3);font-size:11.5px;overflow:hidden;text-overflow:ellipsis}
+.nl-r em{font-style:normal;font-size:11px;color:var(--err)}.nl-r.off b{text-decoration:line-through;color:var(--fg-3)}.nl-r .of-x{padding-top:0}
+.nl-test{display:flex;gap:6px}.nl-test .btn{width:auto;flex:0 0 auto;white-space:nowrap}
+.nl-prevh{font-size:12px;font-weight:700;color:var(--fg-2)}.nl-prevh span{color:var(--fg-3);font-weight:500}
+#nlc-prev{width:100%;height:68vh;border:1px solid var(--border);border-radius:12px;background:#eef2f7}
+.nl-dhead{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--fg-3)}
+.nl-funnel{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.nl-f{position:relative;background:var(--bg-2);border-radius:12px;padding:12px 14px;overflow:hidden}
+.nl-f b{font-size:26px;font-weight:800;display:block;line-height:1.1;font-variant-numeric:tabular-nums}.nl-f span{font-size:12px;font-weight:700;color:var(--fg-2)}.nl-f small{display:block;font-size:12px;color:var(--fg-3);min-height:16px}
+.nl-f i{position:absolute;left:0;bottom:0;height:4px}.nl-f0 i{background:var(--fg-3)}.nl-f1 i{background:#3b82f6}.nl-f2 i{background:#7C3AED}.nl-f3 i{background:var(--ok)}
+.nl-t td{font-size:12.5px}
+@media (max-width:820px){.nl-2{grid-template-columns:1fr}#nlc-prev{height:60vh}.nl-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.nl-funnel{grid-template-columns:1fr 1fr}}
+
 .an-in{animation:anIn .55s cubic-bezier(.22,1,.36,1) both}
 @keyframes anIn{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:none}}
 .an-sumrow{display:flex;align-items:flex-end;gap:22px;flex-wrap:wrap;margin:-2px 0 12px}
@@ -1653,7 +1677,7 @@ html:not(.unlocked) .app{display:none}
 
     <!-- ── Cereri ofertă ── -->
     <div class="panel" id="panel-quotes">
-      <div class="seg" role="tablist" id="qt-seg"><button type="button" class="on" data-qv="site">Cereri de pe site</button><button type="button" data-qv="own">Oferte proprii · calculator</button></div>
+      <div class="seg" role="tablist" id="qt-seg"><button type="button" class="on" data-qv="site">Cereri de pe site</button><button type="button" data-qv="own">Oferte proprii · calculator</button><button type="button" data-qv="nl">Newsletter</button></div>
       <div id="cl-view-quotes">
       <div class="section">
         <div class="section-hdr">
@@ -1682,6 +1706,19 @@ html:not(.unlocked) .app{display:none}
       </div>
       </div>
 
+      <div id="nl-view" hidden>
+      <div class="section">
+        <div class="section-hdr">
+          <div class="section-title sec-t"><span class="intg-ic" style="background:#7C3AED"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M22 6l-10 7L2 6"/></svg></span>Newsletter</div>
+          <div class="section-action" id="nl-contacts-btn" style="margin-left:auto;margin-right:16px"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Contacte <span id="nl-ccount"></span></div>
+          <div class="section-action" id="nl-new-btn"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Campanie nouă</div>
+        </div>
+        <div id="nl-warn"></div>
+        <div class="qt-stats" id="nl-stats"></div>
+        <div class="nl-list" id="nl-list"><div class="cl-empty">Se încarcă…</div></div>
+        <div class="cm-hint" style="margin-top:10px">Vezi pentru fiecare destinatar dacă a deschis e-mailul, dacă a intrat pe site din el și dacă a cerut apoi ofertă. Mesajele pleacă unul câte unul (~15 pe minut), cu link de dezabonare.</div>
+      </div>
+      </div>
       <div id="of-view" hidden>
       <div class="section">
         <div class="section-hdr">
@@ -2433,6 +2470,45 @@ html:not(.unlocked) .app{display:none}
     <div class="modal-foot">
       <button class="btn" id="pur-cancel" type="button">Anulează</button>
       <button class="btn primary" id="pur-save" type="button">Adaugă în stoc</button>
+    </div>
+  </div>
+</div>
+<div class="overlay hidden" id="nlc-modal" role="dialog" aria-modal="true" aria-labelledby="nlc-title">
+  <div class="modal nl-modal">
+    <div class="modal-hdr"><div class="modal-title" id="nlc-title">Campanie nouă</div><div class="modal-x" id="nlc-x" role="button" aria-label="Închide">✕</div></div>
+    <div class="modal-body">
+      <div class="nl-2">
+        <div class="nl-col">
+          <div class="fg"><label for="nlc-subj">Subiectul e-mailului</label><input class="form-input" id="nlc-subj" placeholder="ex. Supraveghere video pentru bloc, fără costuri de investiție"></div>
+          <div class="fg"><label for="nlc-tpl">Conținut</label><select class="form-input" id="nlc-tpl"><option value="asociatii">Ofertă pentru asociații (newsletterul nostru)</option><option value="custom">Am HTML-ul meu (lipesc mai jos)</option></select></div>
+          <div class="fg" id="nlc-htmlw" hidden><label for="nlc-html">HTML</label><textarea class="form-input" id="nlc-html" rows="5" placeholder="<html>…"></textarea></div>
+          <div class="cm-sec" style="margin-top:4px">Destinatari <span class="nl-rc" id="nlc-rc">0</span></div>
+          <div class="nl-addbar"><button type="button" class="btn" id="nlc-allc">+ Toate contactele</button><button type="button" class="btn" id="nlc-clients">+ Clienții cu e-mail</button><button type="button" class="btn" id="nlc-clear">Golește</button></div>
+          <div class="fg"><label for="nlc-paste">Adaugă adrese (câte una pe rând: <i>email</i> sau <i>Nume; email</i>)</label><textarea class="form-input" id="nlc-paste" rows="3" placeholder="asoc.bloc12@gmail.com&#10;Asociația Bloc C1; presedinte.c1@yahoo.com"></textarea><button type="button" class="btn" id="nlc-paste-add" style="margin-top:6px">Adaugă în listă</button></div>
+          <div class="nl-rlist" id="nlc-list"></div>
+          <div class="nl-test"><input class="form-input" id="nlc-testto" placeholder="adresa ta, pentru test"><button type="button" class="btn" id="nlc-test">✉ Trimite-mi un test</button></div>
+        </div>
+        <div class="nl-col"><div class="nl-prevh">Previzualizare <span>(așa îl primesc)</span></div><iframe id="nlc-prev" title="Previzualizare newsletter" sandbox=""></iframe></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn cm-del" id="nlc-del" type="button">Șterge</button><span style="flex:1"></span><button class="btn" id="nlc-save" type="button">Salvează ciorna</button><button class="btn primary" id="nlc-send" type="button">🚀 Trimite campania</button></div>
+  </div>
+</div>
+<div class="overlay hidden" id="nld-modal" role="dialog" aria-modal="true" aria-labelledby="nld-title">
+  <div class="modal" style="max-width:980px">
+    <div class="modal-hdr"><div class="modal-title" id="nld-title">Campanie</div><div class="modal-x" id="nld-x" role="button" aria-label="Închide">✕</div></div>
+    <div class="modal-body"><div id="nld-body"></div></div>
+    <div class="modal-foot"><button class="btn" id="nld-pause" type="button">⏸ Oprește trimiterea</button><button class="btn" id="nld-copy" type="button">⧉ Fă o copie</button><span style="flex:1"></span><button class="btn" id="nld-refresh" type="button">🔄 Actualizează</button></div>
+  </div>
+</div>
+<div class="overlay hidden" id="nlk-modal" role="dialog" aria-modal="true" aria-labelledby="nlk-title">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-hdr"><div class="modal-title" id="nlk-title">Contacte newsletter</div><div class="modal-x" id="nlk-x" role="button" aria-label="Închide">✕</div></div>
+    <div class="modal-body">
+      <div class="fg"><label for="nlk-paste">Adaugă contacte (câte unul pe rând: <i>email</i>, <i>Nume; email</i> sau <i>Nume; email; adresa bloc</i>)</label><textarea class="form-input" id="nlk-paste" rows="4"></textarea>
+        <div class="nl-addbar" style="margin-top:6px"><button type="button" class="btn primary" id="nlk-add">Adaugă</button><button type="button" class="btn" id="nlk-clients">Importă clienții cu e-mail</button></div></div>
+      <input type="search" class="cl-search" id="nlk-q" placeholder="Caută…">
+      <div class="nl-rlist" id="nlk-list"></div>
     </div>
   </div>
 </div>
@@ -7441,12 +7517,12 @@ function renderOffers() {
 }
 function showQtView(v) {
   document.querySelectorAll('#qt-seg button').forEach(b => b.classList.toggle('on', b.dataset.qv === v));
-  qs('#cl-view-quotes').hidden = v !== 'site'; qs('#of-view').hidden = v !== 'own';
+  qs('#cl-view-quotes').hidden = v !== 'site'; qs('#of-view').hidden = v !== 'own'; qs('#nl-view').hidden = v !== 'nl';
   try { localStorage.setItem('yca_qt_view', v); } catch {}
-  if (v === 'own') loadOffers(true);
+  if (v === 'own') loadOffers(true); if (v === 'nl') loadNl(true);
 }
 document.querySelectorAll('#qt-seg button').forEach(b => b.addEventListener('click', () => showQtView(b.dataset.qv)));
-document.querySelectorAll('.nav-tab[data-tab="quotes"]').forEach(t => t.addEventListener('click', () => { let v = 'site'; try { v = localStorage.getItem('yca_qt_view') || 'site'; } catch {} showQtView(v === 'own' ? 'own' : 'site'); }));
+document.querySelectorAll('.nav-tab[data-tab="quotes"]').forEach(t => t.addEventListener('click', () => { let v = 'site'; try { v = localStorage.getItem('yca_qt_view') || 'site'; } catch {} showQtView(['own', 'nl'].includes(v) ? v : 'site'); }));
 qs('#of-search').addEventListener('input', renderOffers);
 qs('#of-list').addEventListener('click', e => { const c = e.target.closest('.of-card'); if (c) openOffer(offers.find(o => o.id === c.dataset.oid)); });
 qs('#of-list').addEventListener('keydown', e => { if (e.key === 'Enter') { const c = e.target.closest('.of-card'); if (c) openOffer(offers.find(o => o.id === c.dataset.oid)); } });
@@ -7789,6 +7865,167 @@ qs('#ofc-save').addEventListener('click', async () => {
   try { await ofcSaveCfg(); ofcClose(); toast('Prețurile tale au fost salvate', 'ok'); if (ofDraft) ofQuickInfo(); }
   catch (e) { toast(/HTTP 40[45]|necunoscut/i.test(e.message) ? 'Actualizează serverul (v9.3)' : e.message, 'err'); }
 });
+
+/* ═══ Newsletter: campanii cu statistici (deschis, click pe site, dezabonat, cerere de ofertă) ═══ */
+let nlData = null, nlDraft = null, nlTplCache = {};
+const nlE = e => { const s = String(e || '').trim().toLowerCase(); return /^[^\s@<>,;]+@[^\s@<>,;]+\.[a-z]{2,}$/.test(s) ? s : ''; };
+const nlPct = (a, b) => b ? Math.round(a / b * 100) + '%' : '—';
+const nlWhen = t => t ? new Date(t).toLocaleString('ro-RO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+function nlParse(txt) {
+  return String(txt || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => {
+    const m = /<([^>]+)>/.exec(l); if (m) return { email: nlE(m[1]), name: l.replace(m[0], '').replace(/["']/g, '').trim() };
+    const p = l.split(/[;\t,]/).map(x => x.trim()); const ei = p.findIndex(x => nlE(x)); if (ei < 0) return null;
+    return { email: nlE(p[ei]), name: p.filter((x, i) => i !== ei)[0] || '', org: p.filter((x, i) => i !== ei)[1] || '' };
+  }).filter(x => x && x.email);
+}
+async function loadNl(force) {
+  if (nlData && !force) return renderNl();
+  try { nlData = await clApi('/newsletter'); renderNl(); }
+  catch (e) { qs('#nl-list').innerHTML = `<div class="cl-empty">${escapeHtml(/HTTP 40[45]|necunoscut/i.test(e.message) ? 'Actualizează serverul (v9.7) ca să folosești newsletterul' : e.message)}</div>`; }
+}
+const NL_ST = { draft: ['Ciornă', ''], sending: ['Se trimite…', 'sp'], paused: ['Oprită', 'bad'], sent: ['Trimisă', 'ok'] };
+function renderNl() {
+  if (!nlData) return;
+  qs('#nl-ccount').textContent = nlData.contacts.length ? `(${nlData.contacts.length})` : '';
+  qs('#nl-warn').innerHTML = nlData.mail ? '' : '<div class="ofo-warn" style="margin-bottom:10px">⚠ E-mailul nu e configurat pe server (mail.json) — poți pregăti campanii, dar nu le poți trimite.</div>';
+  const C = nlData.campaigns, sent = C.reduce((t, c) => t + c.stats.sent, 0), op = C.reduce((t, c) => t + c.stats.opened, 0), cl = C.reduce((t, c) => t + c.stats.clicked, 0), ld = C.reduce((t, c) => t + c.stats.leads, 0);
+  qs('#nl-stats').innerHTML = [[C.length, 'campanii'], [sent, 'e-mailuri trimise'], [nlPct(op, sent), 'deschise'], [nlPct(cl, sent), 'au intrat pe site'], [ld, 'cereri de ofertă'], [nlData.unsubCount, 'dezabonați']].map(([n, l]) => `<div class="qt-stat"><b>${n}</b> ${l}</div>`).join('');
+  qs('#nl-list').innerHTML = C.length ? C.map(c => { const s = c.stats, st = NL_ST[c.status] || NL_ST.draft;
+    const bar = (n, cls) => `<div class="nl-bar"><i class="${cls}" style="width:${s.sent ? Math.round(n / s.sent * 100) : 0}%"></i></div>`;
+    return `<div class="nl-card" role="button" tabindex="0" data-cid="${escapeHtml(c.id)}"><div class="nl-top"><span class="sp-tag ${st[1]}">${st[0]}</span><b>${escapeHtml(c.subject)}</b><small>${c.sentAt ? 'trimisă ' + nlWhen(c.sentAt) : 'creată ' + nlWhen(c.createdAt)} · ${s.total} destinatari</small></div>
+      ${c.status === 'draft' ? '<div class="cm-hint">Ciornă — deschide-o ca s-o verifici și s-o trimiți.</div>' : `<div class="nl-kpis">
+        <div><span>Trimise</span><b>${s.sent}${s.queued ? `<small> / ${s.total}</small>` : ''}</b>${bar(s.sent, 'b0')}</div>
+        <div><span>Deschise</span><b>${s.opened} <small>${nlPct(s.opened, s.sent)}</small></b>${bar(s.opened, 'b1')}</div>
+        <div><span>Au intrat pe site</span><b>${s.clicked} <small>${nlPct(s.clicked, s.sent)}</small></b>${bar(s.clicked, 'b2')}</div>
+        <div><span>Cereri de ofertă</span><b>${s.leads}</b>${bar(s.leads, 'b3')}</div>
+        <div><span>Dezabonați</span><b>${s.unsub}</b>${bar(s.unsub, 'b4')}</div></div>`}</div>`; }).join('')
+    : '<div class="cl-empty">Nicio campanie încă.<br>Apasă <b>Campanie nouă</b>, alege destinatarii și trimite-ți întâi un test.</div>';
+  if (C.some(c => c.status === 'sending')) { clearTimeout(renderNl.t); renderNl.t = setTimeout(() => { if (!qs('#nl-view').hidden) loadNl(true); }, 8000); }
+}
+qs('#nl-list').addEventListener('click', e => { const c = e.target.closest('.nl-card'); if (!c) return; const x = nlData.campaigns.find(k => k.id === c.dataset.cid); if (!x) return; x.status === 'draft' ? openNlEditor(x.id) : openNlDetail(x.id); });
+qs('#nl-new-btn').addEventListener('click', () => openNlEditor(null));
+
+/* ── editor ── */
+async function nlTemplate(name) {
+  if (nlTplCache[name]) return nlTplCache[name];
+  const r = await fetch(new URL('tools/newsletter/' + name + '.html', location.href).href + '?v=' + Date.now()); if (!r.ok) throw new Error('Șablonul nu s-a încărcat');
+  return nlTplCache[name] = await r.text();
+}
+async function openNlEditor(cid) {
+  let c = null; if (cid) { try { c = (await clApi('/newsletter/campaigns/' + encodeURIComponent(cid))).campaign; } catch (e) { return toast(e.message, 'err'); } }
+  nlDraft = c ? { id: c.id, subject: c.subject, html: c.html, template: c.template || 'asociatii', recipients: c.recipients.map(r => ({ email: r.email, name: r.name, org: r.org })) }
+    : { id: '', subject: 'Supraveghere video pentru bloc, fără costuri de investiție', html: '', template: 'asociatii', recipients: [] };
+  qs('#nlc-title').textContent = c ? 'Ciornă: ' + c.subject : 'Campanie nouă';
+  qs('#nlc-subj').value = nlDraft.subject; qs('#nlc-tpl').value = nlDraft.template === 'custom' ? 'custom' : 'asociatii';
+  qs('#nlc-htmlw').style.display = qs('#nlc-tpl').value === 'custom' ? '' : 'none'; qs('#nlc-html').value = nlDraft.template === 'custom' ? nlDraft.html : '';
+  qs('#nlc-del').style.display = c ? '' : 'none';
+  try { const a = getAuth(); qs('#nlc-testto').value = localStorage.getItem('yca_nl_test') || ''; } catch {}
+  qs('#nlc-modal').classList.remove('hidden'); await nlLoadHtml(); nlRenderRec();
+}
+async function nlLoadHtml() {
+  if (qs('#nlc-tpl').value === 'custom') nlDraft.html = qs('#nlc-html').value;
+  else { try { nlDraft.html = nlDraft.template === 'asociatii' && nlDraft.html && nlDraft.id ? nlDraft.html : await nlTemplate('asociatii'); } catch (e) { toast(e.message, 'err'); } nlDraft.template = 'asociatii'; }
+  const f = qs('#nlc-prev'); f.srcdoc = (nlDraft.html || '<p style="font:14px Arial;color:#888;padding:20px">Lipește HTML-ul ca să vezi previzualizarea.</p>').replace(/\{\{DEZABONARE\}\}/g, '#');
+}
+qs('#nlc-tpl').addEventListener('change', () => { qs('#nlc-htmlw').style.display = qs('#nlc-tpl').value === 'custom' ? '' : 'none'; nlDraft.template = qs('#nlc-tpl').value; if (nlDraft.template === 'asociatii') nlDraft.html = ''; nlLoadHtml(); });
+qs('#nlc-html').addEventListener('input', () => { clearTimeout(nlLoadHtml.t); nlLoadHtml.t = setTimeout(nlLoadHtml, 500); });
+function nlUnsub(e) { return nlData && nlData.unsub && nlData.unsub[e]; }
+function nlRenderRec() {
+  const R = nlDraft.recipients; qs('#nlc-rc').textContent = R.length;
+  qs('#nlc-list').innerHTML = R.length ? R.map((r, i) => `<div class="nl-r${nlUnsub(r.email) ? ' off' : ''}"><span><b>${escapeHtml(r.name || r.org || r.email)}</b>${r.name || r.org ? `<small>${escapeHtml(r.email)}</small>` : ''}</span>${nlUnsub(r.email) ? '<em>dezabonat — nu primește</em>' : ''}<button type="button" class="of-x" data-ri="${i}" title="Scoate">✕</button></div>`).join('') : '<div class="cm-hint">Niciun destinatar încă.</div>';
+}
+function nlAddRec(list) { const have = new Set(nlDraft.recipients.map(r => r.email)); let n = 0; for (const x of list) { const e = nlE(x.email); if (!e || have.has(e)) continue; have.add(e); nlDraft.recipients.push({ email: e, name: x.name || '', org: x.org || '' }); n++; } nlRenderRec(); return n; }
+qs('#nlc-list').addEventListener('click', e => { const b = e.target.closest('[data-ri]'); if (!b) return; nlDraft.recipients.splice(+b.dataset.ri, 1); nlRenderRec(); });
+qs('#nlc-allc').addEventListener('click', () => { const n = nlAddRec((nlData && nlData.contacts) || []); toast(n ? `${n} contacte adăugate` : 'Nimic nou de adăugat', n ? 'ok' : 'info'); });
+async function nlClientsList() { try { if (!clients) clients = (await clApi('/clients')).clients || []; } catch {} return (clients || []).filter(c => nlE(c.email)).map(c => ({ email: c.email, name: c.contact || '', org: c.name, source: 'client' })); }
+qs('#nlc-clients').addEventListener('click', async () => { const n = nlAddRec(await nlClientsList()); toast(n ? `${n} clienți adăugați` : 'Niciun client nou cu e-mail', n ? 'ok' : 'info'); });
+qs('#nlc-clear').addEventListener('click', () => { nlDraft.recipients = []; nlRenderRec(); });
+qs('#nlc-paste-add').addEventListener('click', async () => {
+  const L = nlParse(qs('#nlc-paste').value); if (!L.length) return toast('Nu am găsit adrese de e-mail valide', 'warn');
+  const n = nlAddRec(L); qs('#nlc-paste').value = '';
+  try { const r = await clApi('/newsletter/contacts', jsonOpt('POST', { list: L.map(x => ({ ...x, source: 'manual' })) })); nlData = { ...nlData, ...r }; } catch {}
+  toast(`${n} adrese adăugate (și salvate în Contacte)`, 'ok');
+});
+async function nlSave(quiet) {
+  const subject = qs('#nlc-subj').value.trim(); if (!subject) { toast('Scrie subiectul e-mailului', 'warn'); qs('#nlc-subj').focus(); return null; }
+  if (qs('#nlc-tpl').value === 'custom') nlDraft.html = qs('#nlc-html').value;
+  if (!nlDraft.html) { toast('Mesajul e gol', 'warn'); return null; }
+  try { const r = await clApi('/newsletter/campaigns' + (nlDraft.id ? '/' + encodeURIComponent(nlDraft.id) : ''), jsonOpt(nlDraft.id ? 'PUT' : 'POST', { subject, html: nlDraft.html, template: nlDraft.template, recipients: nlDraft.recipients }));
+    nlDraft.id = r.campaign.id; nlData = { ...nlData, ...r }; renderNl(); qs('#nlc-del').style.display = ''; if (!quiet) toast('Ciorna a fost salvată', 'ok'); return r.campaign; }
+  catch (e) { toast(/HTTP 40[45]|necunoscut/i.test(e.message) ? 'Actualizează serverul (v9.7)' : e.message, 'err'); return null; }
+}
+qs('#nlc-save').addEventListener('click', () => nlSave());
+qs('#nlc-test').addEventListener('click', async () => {
+  const to = nlE(qs('#nlc-testto').value); if (!to) return toast('Scrie adresa ta de e-mail pentru test', 'warn');
+  try { localStorage.setItem('yca_nl_test', to); } catch {}
+  const c = await nlSave(true); if (!c) return; const b = qs('#nlc-test'); b.disabled = true;
+  try { await clApi('/newsletter/campaigns/' + encodeURIComponent(c.id) + '/test', jsonOpt('POST', { to })); toast('Test trimis la ' + to + ' — verifică și Spam/Promoții', 'ok'); }
+  catch (e) { toast(e.message, 'err'); } finally { b.disabled = false; }
+});
+qs('#nlc-send').addEventListener('click', async () => {
+  const n = nlDraft.recipients.filter(r => !nlUnsub(r.email)).length; if (!n) return toast('Adaugă destinatari', 'warn');
+  if (!(await confirmDialog({ title: `Trimiți campania la ${n} ${n === 1 ? 'destinatar' : 'destinatari'}?`, html: `Subiect: <b>${escapeHtml(qs('#nlc-subj').value)}</b><br>Mesajele pleacă unul câte unul (~${Math.max(1, Math.ceil(n / 15))} min). Poți opri trimiterea oricând.`, okLabel: 'Trimite', tone: 'watch' }))) return;
+  const c = await nlSave(true); if (!c) return;
+  try { const r = await clApi('/newsletter/campaigns/' + encodeURIComponent(c.id) + '/send', { method: 'POST' }); nlData = { ...nlData, ...r }; qs('#nlc-modal').classList.add('hidden'); renderNl(); toast('Trimiterea a pornit', 'ok'); openNlDetail(c.id); }
+  catch (e) { toast(e.message, 'err'); }
+});
+qs('#nlc-del').addEventListener('click', async () => {
+  if (!nlDraft.id || !(await confirmDialog({ title: 'Ștergi ciorna?', okLabel: 'Șterge' }))) return;
+  try { const r = await clApi('/newsletter/campaigns/' + encodeURIComponent(nlDraft.id), { method: 'DELETE' }); nlData = { ...nlData, ...r }; qs('#nlc-modal').classList.add('hidden'); renderNl(); } catch (e) { toast(e.message, 'err'); }
+});
+qs('#nlc-x').addEventListener('click', () => qs('#nlc-modal').classList.add('hidden'));
+
+/* ── detaliile unei campanii: cine a deschis, cine a intrat pe site ── */
+let nldCur = null, nldF = 'all';
+async function openNlDetail(cid) {
+  nldCur = cid; qs('#nld-modal').classList.remove('hidden'); qs('#nld-body').innerHTML = '<div class="cl-empty">Se încarcă…</div>';
+  await loadNl(true); nldRender();
+}
+function nldRender() {
+  const c = nlData && nlData.campaigns.find(x => x.id === nldCur); if (!c) return;
+  clearTimeout(nldRender.t); if (c.status === 'sending') nldRender.t = setTimeout(async () => { if (!qs('#nld-modal').classList.contains('hidden')) { await loadNl(true); nldRender(); } }, 8000);
+  const s = c.stats, st = NL_ST[c.status] || NL_ST.draft;
+  qs('#nld-title').textContent = c.subject; qs('#nld-pause').style.display = c.status === 'sending' ? '' : 'none';
+  const page = u => { try { const p = new URL(u).pathname.replace(/^\/|\.html$/g, ''); return p ? p.replace(/-/g, ' ') : 'prima pagină'; } catch { return 'site'; } };
+  const F = { all: r => true, opened: r => (r.opens || []).length, clicked: r => (r.clicks || []).length, lead: r => r.lead, not: r => r.st === 'sent' && !(r.opens || []).length, unsub: r => r.unsubAt, failed: r => r.st === 'failed' || r.st === 'skipped' };
+  const rows = (c.recipients || []).filter(F[nldF] || F.all).sort((a, b) => (+!!b.lead - +!!a.lead) || ((b.clicks || []).length - (a.clicks || []).length) || ((b.opens || []).length - (a.opens || []).length));
+  const fn = [['Trimise', s.sent, s.total], ['Deschise', s.opened, s.sent], ['Au intrat pe site', s.clicked, s.sent], ['Au cerut ofertă', s.leads, s.sent]];
+  qs('#nld-body').innerHTML = `<div class="nl-dhead"><span class="sp-tag ${st[1]}">${st[0]}</span>${c.sentAt ? 'Trimisă ' + nlWhen(c.sentAt) : ''}${c.err ? ` · <span class="bad">${escapeHtml(c.err)}</span>` : ''}</div>
+    <div class="nl-funnel">${fn.map(([l, n, of], i) => `<div class="nl-f nl-f${i}"><b>${n}</b><span>${l}</span><small>${i ? nlPct(n, of) : s.queued ? s.queued + ' în coadă' : ''}</small><i style="width:${of ? Math.max(4, Math.round(n / of * 100)) : 0}%"></i></div>`).join('')}</div>
+    <div class="sp-chips" id="nld-chips">${[['all', 'Toți'], ['opened', 'Au deschis'], ['clicked', 'Au intrat pe site'], ['lead', 'Au cerut ofertă'], ['not', 'N-au deschis'], ['unsub', 'Dezabonați'], ['failed', 'Netrimise']].map(([k, l]) => `<button class="sp-chip${nldF === k ? ' on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>
+    <table class="ofo-t nl-t" data-noi18n><thead><tr><th>Destinatar</th><th>Stare</th><th>Deschis</th><th>Pe site</th><th></th></tr></thead><tbody>${rows.map(r => {
+      const o = r.opens || [], k = r.clicks || [];
+      const sst = r.st === 'sent' ? `<span class="of-stk ok">trimis ${nlWhen(r.sentAt)}</span>` : r.st === 'queued' ? '<span class="of-stk wait">în coadă</span>' : `<span class="of-stk bad" title="${escapeHtml(r.err || '')}">${r.st === 'skipped' ? 'dezabonat' : 'eșuat'}</span>`;
+      return `<tr><td><b>${escapeHtml(r.org || r.name || r.email)}</b>${r.org || r.name ? `<div class="cm-hint">${escapeHtml(r.email)}</div>` : ''}</td><td>${sst}</td>
+        <td>${o.length ? `<span class="of-stk ok">✓ ${o.length > 1 ? o.length + '×' : ''}</span><div class="cm-hint">${nlWhen(o[o.length - 1])}</div>` : '<span class="cm-hint">—</span>'}</td>
+        <td>${k.length ? `<span class="of-stk ok">✓ ${k.length} click${k.length > 1 ? 'uri' : ''}</span><div class="cm-hint">${escapeHtml([...new Set(k.map(x => page(x.u)))].join(', '))}</div>` : '<span class="cm-hint">—</span>'}</td>
+        <td>${r.lead ? '<span class="of-stk ok">🎯 a cerut ofertă</span>' : ''}${r.unsubAt ? '<span class="of-stk bad">dezabonat</span>' : ''}</td></tr>`; }).join('') || '<tr><td colspan="5" class="cm-hint">Nimeni în această listă.</td></tr>'}</tbody></table>
+    <div class="cm-hint" style="margin-top:8px">„Deschis” se vede doar dacă programul de e-mail afișează pozele (Gmail da; unele programe le blochează, iar Apple Mail le poate deschide automat). „Pe site” = a apăsat un link din e-mail. „A cerut ofertă” = a trimis apoi o cerere de pe site cu aceeași adresă de e-mail.</div>`;
+}
+qs('#nld-body').addEventListener('click', e => { const b = e.target.closest('#nld-chips .sp-chip'); if (b) { nldF = b.dataset.f; nldRender(); } });
+qs('#nld-x').addEventListener('click', () => qs('#nld-modal').classList.add('hidden'));
+qs('#nld-refresh').addEventListener('click', async () => { await loadNl(true); nldRender(); });
+qs('#nld-pause').addEventListener('click', async () => { try { const r = await clApi('/newsletter/campaigns/' + encodeURIComponent(nldCur) + '/pause', { method: 'POST' }); nlData = { ...nlData, ...r }; nldRender(); renderNl(); } catch (e) { toast(e.message, 'err'); } });
+qs('#nld-copy').addEventListener('click', async () => {
+  try { const c = (await clApi('/newsletter/campaigns/' + encodeURIComponent(nldCur))).campaign; qs('#nld-modal').classList.add('hidden');
+    await openNlEditor(null); nlDraft.html = c.html; nlDraft.template = c.template || 'asociatii'; qs('#nlc-subj').value = c.subject; qs('#nlc-tpl').value = nlDraft.template === 'custom' ? 'custom' : 'asociatii';
+    qs('#nlc-htmlw').style.display = nlDraft.template === 'custom' ? '' : 'none'; if (nlDraft.template === 'custom') qs('#nlc-html').value = c.html;
+    nlDraft.id = ''; const f = qs('#nlc-prev'); f.srcdoc = c.html.replace(/\{\{DEZABONARE\}\}/g, '#'); toast('Copie făcută — adaugă destinatarii (ex. cei care n-au deschis)', 'info'); }
+  catch (e) { toast(e.message, 'err'); }
+});
+
+/* ── contacte ── */
+function nlkRender() {
+  const q = qs('#nlk-q').value.trim().toLowerCase(), L = ((nlData && nlData.contacts) || []).filter(c => !q || [c.email, c.name, c.org].join(' ').toLowerCase().includes(q));
+  qs('#nlk-list').innerHTML = L.length ? L.map(c => `<div class="nl-r${nlUnsub(c.email) ? ' off' : ''}"><span><b>${escapeHtml(c.org || c.name || c.email)}</b><small>${escapeHtml(c.email)}${c.name && c.org ? ' · ' + escapeHtml(c.name) : ''}</small></span>${nlUnsub(c.email) ? '<em>dezabonat</em>' : ''}<button type="button" class="of-x" data-kid="${escapeHtml(c.id)}" title="Șterge">✕</button></div>`).join('') : '<div class="cm-hint">Niciun contact.</div>';
+}
+qs('#nl-contacts-btn').addEventListener('click', async () => { await loadNl(true); qs('#nlk-modal').classList.remove('hidden'); nlkRender(); });
+qs('#nlk-x').addEventListener('click', () => qs('#nlk-modal').classList.add('hidden'));
+qs('#nlk-q').addEventListener('input', nlkRender);
+qs('#nlk-add').addEventListener('click', async () => { const L = nlParse(qs('#nlk-paste').value); if (!L.length) return toast('Nu am găsit adrese valide', 'warn');
+  try { const r = await clApi('/newsletter/contacts', jsonOpt('POST', { list: L.map(x => ({ ...x, source: 'manual' })) })); nlData = { ...nlData, ...r }; qs('#nlk-paste').value = ''; nlkRender(); renderNl(); toast(`${r.added} contacte noi`, 'ok'); } catch (e) { toast(e.message, 'err'); } });
+qs('#nlk-clients').addEventListener('click', async () => { try { const r = await clApi('/newsletter/contacts', jsonOpt('POST', { list: await nlClientsList() })); nlData = { ...nlData, ...r }; nlkRender(); renderNl(); toast(`${r.added} clienți importați`, 'ok'); } catch (e) { toast(e.message, 'err'); } });
+qs('#nlk-list').addEventListener('click', async e => { const b = e.target.closest('[data-kid]'); if (!b) return; try { const r = await clApi('/newsletter/contacts/' + encodeURIComponent(b.dataset.kid), { method: 'DELETE' }); nlData = { ...nlData, ...r }; nlkRender(); renderNl(); } catch (err) { toast(err.message, 'err'); } });
 
 /* ═══ Generează contract (Word) din fișa clientului — șablon contract-template.docx, completat local cu JSZip ═══ */
 const CTR_KEYS = ['NR','DATA','LICENTA','ASOC','SEDIU','CIF','IBAN','BANCA','PRES','HAG_NR','HAG_DATA','IMOBIL','PRET','EMAIL','VALOARE','AMPLASARE','M_NVR','M_HDD','Q_HDD','M_EXT','Q_EXT','M_INT','Q_INT','M_LIFT','Q_LIFT','M_RACK','Q_MON'];
