@@ -1171,7 +1171,8 @@ function cleanOp(coll, b, prev) {
       title: str(b.title, 200), clientId: str(b.clientId, 40), clientName: str(b.clientName, 200).trim(), clientCui: str(b.clientCui, 40), clientContact: str(b.clientContact, 200),
       clientPhone: str(b.clientPhone, 60), clientEmail: str(b.clientEmail, 200), clientAddress: str(b.clientAddress, 300), lines,
       discount: Math.min(100, Math.max(0, num(b.discount))), vat: [0, 5, 9, 11, 19, 21].includes(num(b.vat)) ? num(b.vat) : 0,
-      notes: str(b.notes, 4000), intro: str(b.intro, 2000), status: pick(b.status, ['draft', 'sent', 'accepted', 'rejected'], 'draft') };
+      notes: str(b.notes, 4000), intro: str(b.intro, 2000), status: pick(b.status, ['draft', 'sent', 'accepted', 'rejected'], 'draft'),
+      pubToken: prev ? prev.pubToken || '' : '', views: prev ? prev.views || [] : [], emailedAt: prev ? prev.emailedAt || 0 : 0, emailedTo: prev ? prev.emailedTo || '' : '' };
   }
   if (coll === 'catalog') {   // echipamentele prezentate pe site (pagina Echipamente)
     return { ...base, name: str(b.name, 160).trim(), brand: str(b.brand, 60), model: str(b.model, 120),
@@ -1481,6 +1482,38 @@ async function handleOps(req, res, pathname) {
     u[coll] = list.filter(x => x !== it); saveOps(all);
     try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
     return reply(200, { ok: true });
+  }
+  if (coll === 'offers' && parts[3] === 'page' && req.method === 'PUT') {   // pagina publică a ofertei (link pentru client)
+    let buf; try { buf = await readRaw(req, 3 * 1048576); } catch { return sendJson(res, 413, { error: 'Pagina e prea mare' }); }
+    const html = buf.toString('utf8'); if (!/^<!doctype html>/i.test(html.trim())) return sendJson(res, 400, { error: 'Conținut invalid' });
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 }); fs.writeFileSync(path.join(dir, 'page.html'), html, { mode: 0o600 });
+    if (!it.pubToken) it.pubToken = crypto.randomBytes(12).toString('hex');
+    it.updatedAt = Date.now(); saveOps(all);
+    return sendJson(res, 200, { token: it.pubToken, url: publicBase(req) + '/of/' + it.pubToken });
+  }
+  if (coll === 'offers' && parts[3] === 'email' && req.method === 'POST') {   // trimite clientului linkul ofertei pe e-mail
+    const b = await readJson(req); const to = String(b.to || '').trim();
+    if (!/^[^\s@<>,;]+@[^\s@<>,;]+\.[a-z]{2,}$/i.test(to)) return sendJson(res, 400, { error: 'Adresă de e-mail invalidă' });
+    if (!it.pubToken) return sendJson(res, 400, { error: 'Pagina ofertei nu e publicată' });
+    if (!mailReady()) return sendJson(res, 400, { error: 'E-mailul nu e configurat pe server (mail.json)' });
+    const link = publicBase(req) + '/of/' + it.pubToken, tot = (() => { const ls = it.lines || [], g = ls.reduce((t, l) => t + (+l.qty || 0) * (+l.price || 0), 0), n = g - g * (+it.discount || 0) / 100; return n + n * (+it.vat || 0) / 100; })();
+    const lei = v => v.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' lei';
+    const hi = it.clientContact ? ', ' + escHtml(String(it.clientContact).split(' ')[0]) : '';
+    const html = `<!doctype html><html lang="ro"><body style="margin:0;background:#eef2f7;font-family:Arial,Helvetica,sans-serif;color:#1d2433"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef2f7"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:560px;max-width:100%;background:#fff;border-radius:14px;overflow:hidden">
+<tr><td style="height:5px;background:#0b2a5b;background-image:linear-gradient(90deg,#0b2a5b,#1e6fd9 60%,#F2611D);font-size:0">&nbsp;</td></tr>
+<tr><td style="padding:22px 30px 6px"><img src="https://app.supraveghere24h.ro/tools/contract/logo-antet.png" width="210" alt="SUPRAVEGHERE24h" style="display:block;border:0;width:210px;height:auto"></td></tr>
+<tr><td style="padding:14px 30px 4px;font-size:15px;line-height:24px;color:#3b4456">Bună ziua${hi},<br><br>Vă transmitem oferta noastră <b>nr. OF-${it.no}</b>${it.title ? ` – ${escHtml(it.title)}` : ''}.</td></tr>
+<tr><td style="padding:14px 30px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7fa;border-radius:10px"><tr><td style="padding:14px 16px;font-size:13px;color:#6b7487">Valoare totală${it.vat ? ' (cu TVA)' : ''}<br><b style="font-size:22px;color:#0b2a5b">${lei(tot)}</b></td><td align="right" style="padding:14px 16px;font-size:13px;color:#6b7487">Valabilă<br><b style="color:#0b2a5b">${it.validDays} zile</b></td></tr></table></td></tr>
+<tr><td align="center" style="padding:8px 30px 6px"><a href="${link}" style="display:inline-block;background:#F2611D;color:#fff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 30px;border-radius:999px">Vezi oferta completă →</a></td></tr>
+<tr><td align="center" style="padding:4px 30px 18px;font-size:12px;color:#8a93a3">Din pagina ofertei o puteți descărca și ca PDF.</td></tr>
+<tr><td style="padding:6px 30px 22px;font-size:14px;line-height:22px;color:#3b4456">Pentru întrebări sau programarea montajului ne găsiți la <a href="tel:+40763354355" style="color:#F2611D;font-weight:bold;text-decoration:none">0763 354 355</a>.<br><br><b style="color:#0b2a5b">SUPRAVEGHERE24h</b><br><a href="mailto:contact@supraveghere24h.ro" style="color:#0b2a5b;text-decoration:none">contact@supraveghere24h.ro</a></td></tr>
+<tr><td style="padding:14px 30px;background:#0b2a5b;font-size:11px;line-height:17px;color:#b9c6dc">YCA SOLUTIONS S.R.L. · CUI 45211628 · J40/19754/2021 · Licență IGPR nr. 6310/T</td></tr></table></td></tr></table></body></html>`;
+    const text = `Bună ziua${it.clientContact ? ', ' + String(it.clientContact).split(' ')[0] : ''},\n\nVă transmitem oferta noastră nr. OF-${it.no}${it.title ? ' – ' + it.title : ''}, valoare totală ${lei(tot)}${it.vat ? ' cu TVA' : ''}.\nO găsiți aici: ${link}\n\nPentru întrebări: 0763 354 355\nSUPRAVEGHERE24h · contact@supraveghere24h.ro`;
+    const ok = await sendMail(to, `Oferta SUPRAVEGHERE24h nr. OF-${it.no}${it.title ? ' – ' + str(it.title, 80) : ''}`, text, html);
+    if (!ok) return sendJson(res, 500, { error: 'E-mailul nu a putut fi trimis — verifică setările de e-mail ale serverului' });
+    it.emailedAt = Date.now(); it.emailedTo = to; if (it.status === 'draft') it.status = 'sent'; saveOps(all);
+    return sendJson(res, 200, { ok: true, item: it });
   }
   if (parts[3] === 'files') {
     if (parts.length === 4 && req.method === 'POST') {
@@ -3767,7 +3800,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 9.9, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 10.0, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
@@ -3796,6 +3829,16 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/public/reviews' && req.method === 'GET') return reviewsPublic(req, res);
     if (pathname === '/reviews/config') return await handleReviewsConfig(req, res);
     if ((pathname === '/public/catalog' || /^\/public\/catalog\/[\w-]+\/(photo|fisa)$/.test(pathname)) && req.method === 'GET') return catalogPublic(req, res, pathname);
+    if (/^\/of\/[a-f0-9]{24}$/.test(pathname) && req.method === 'GET') {   // oferta trimisă clientului (link public)
+      const tok = pathname.slice(4), all = loadOps(); let hit = null;
+      for (const [un, u] of Object.entries(all)) { const o = (u.offers || []).find(x => x.pubToken === tok); if (o) { hit = { un, o }; break; } }
+      let html = null; if (hit) try { html = fs.readFileSync(path.join(OPS_DIR, hit.un.replace(/[^\w.-]/g, '_'), 'offers', hit.o.id, 'page.html'), 'utf8'); } catch {}
+      if (!html) return sendHtml(res, 404, '<!doctype html><meta charset="utf-8"><title>Ofertă indisponibilă</title><p style="font:16px Arial;padding:40px;text-align:center">Oferta nu mai este disponibilă. Ne găsiți la 0763 354 355.</p>');
+      const ua = String(req.headers['user-agent'] || '');
+      if (!/bot|crawl|spider|preview|whatsapp|facebookexternalhit|telegram|slack|skype|google|bing|curl|wget|python|headless/i.test(ua)) { const first = !(hit.o.views || []).length; hit.o.views = (hit.o.views || []).concat(Date.now()).slice(-50); saveOps(all);
+        if (first) { try { const db = loadDb(), ow = (db.users || []).find(u => u.username === hit.un); if (ow) notifyOwner(db, ow, `👁 <b>${escHtml(hit.o.clientName || 'Clientul')}</b> a deschis oferta OF-${hit.o.no}${hit.o.title ? ' – ' + escHtml(hit.o.title) : ''}`, '/?tab=quotes').catch(() => {}); } catch {} } }
+      return sendHtml(res, 200, html);
+    }
     if (pathname.startsWith('/nl/')) return await handleNlPublic(req, res, pathname);
     if (pathname === '/newsletter' || pathname.startsWith('/newsletter/')) return await handleNewsletter(req, res, pathname);
     if (pathname.startsWith('/q/')) return await handleQuotePublic(req, res, pathname, parsed);
