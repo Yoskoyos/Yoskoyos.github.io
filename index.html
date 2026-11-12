@@ -7801,7 +7801,7 @@ tr{page-break-inside:avoid}thead{display:table-header-group}
 @media print{html{background:#fff}.bar{display:none}.sheet{width:auto;min-height:0;margin:0;padding:0;box-shadow:none;overflow:visible}.sheet:before{display:none}.hd{border-top:5px solid var(--or);padding-top:8px}}
 @media screen and (max-width:820px){.sheet{width:auto;margin:0;padding:18px 14px}.parties,.sum,.sig{grid-template-columns:1fr}.hl{grid-template-columns:1fr 1fr}.hero{flex-direction:column;align-items:flex-start}.meta{justify-content:flex-start}}
 </style></head><body>
-<div class="bar"><span>Oferta OF-${o.no} · ${esc(o.clientName)}</span><button onclick="window.print()">⬇ Salvează ca PDF / Tipărește</button></div>
+<div class="bar"><span>Oferta OF-${o.no} · ${esc(o.clientName)}</span>${web ? '<a href="{{PDF_URL}}" style="border-radius:999px;padding:9px 18px;font:600 13px Inter,Arial;background:#F2611D;color:#fff;text-decoration:none">⬇ Descarcă oferta PDF</a>' : '<button onclick="window.print()">⬇ Salvează ca PDF / Tipărește</button>'}</div>
 <div class="sheet">
 <div class="hd"><img src="${logo}" alt="SUPRAVEGHERE24h"><div class="co"><b>YCA SOLUTIONS S.R.L.</b><br>CUI 45211628 · J40/19754/2021 · Licență IGPR nr. 6310/T<br>București, Str. Aviator Mircea Petre nr. 10, Sector 1<br>0763 354 355 · contact@supraveghere24h.ro · supraveghere24h.ro</div></div>
 <div class="hero"><div><span class="kick">Ofertă de preț</span><h1>${esc(o.title || 'Sistem de supraveghere video')}</h1><div class="ttl">pentru ${esc(o.clientName)}</div></div>
@@ -7863,11 +7863,12 @@ const ofBlobB64 = b => new Promise((ok, ko) => { const r = new FileReader(); r.o
 /* ── trimitere către client: PDF + link public cu oferta (WhatsApp / e-mail) ── */
 async function ofPublish() {
   const o = await ofSave(true); if (!o) return null;
-  const r = await clApi('/ops/offers/' + encodeURIComponent(o.id) + '/page', { method: 'PUT', headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: ofPageHtml(o, true) });
-  ofDraft.pubToken = r.token; return { o, url: r.url };
+  let pdf = null; try { pdf = await ofBlobB64(await ofMakePdf(o)); } catch (e) { console.warn('PDF', e); }
+  const r = await clApi('/ops/offers/' + encodeURIComponent(o.id) + '/page', jsonOpt('PUT', { html: ofPageHtml(o, true), pdf }));
+  ofDraft.pubToken = r.token; return { o, url: r.url, pdfUrl: r.pdfUrl || '' };
 }
 const ofWaPhone = p => { let d = String(p || '').replace(/\D/g, ''); if (d.startsWith('00')) d = d.slice(2); if (d.startsWith('0')) d = '40' + d.slice(1); return d.length >= 10 ? d : ''; };
-const ofMsg = (o, url) => `Bună ziua${o.clientContact ? ', ' + o.clientContact.split(' ')[0] : ''}! Vă trimit oferta SUPRAVEGHERE24h nr. OF-${o.no}${o.title ? ' – ' + o.title : ''}, în valoare de ${ofL(ofTotals(o).total)} lei${o.vat ? ' cu TVA' : ''}:\n${url}\n\nO puteți descărca și ca PDF din pagină. Pentru întrebări: 0763 354 355.`;
+const ofMsg = (o, url, pdfUrl) => `Bună ziua${o.clientContact ? ', ' + o.clientContact.split(' ')[0] : ''}! Vă trimit oferta SUPRAVEGHERE24h nr. OF-${o.no}${o.title ? ' – ' + o.title : ''}, în valoare de ${ofL(ofTotals(o).total)} lei${o.vat ? ' cu TVA' : ''}.\n\n📄 Oferta în PDF: ${pdfUrl || url}\n\nPentru întrebări: 0763 354 355.`;
 qs('#of-tot').addEventListener('click', async e => {
   const wa = e.target.closest('#of-send-wa'), em = e.target.closest('#of-send-em'); if (!wa && !em) return;
   const b = wa || em; b.disabled = true;
@@ -7879,17 +7880,15 @@ qs('#of-tot').addEventListener('click', async e => {
       const w = window.open('', '_blank');   // fereastra se deschide imediat, altfel browserul o blochează
       b.innerHTML = '⏳ Pregătesc…';
       const p = await ofPublish(); if (!p) { if (w) w.close(); return; }
-      const link = 'https://wa.me/' + ph + '?text=' + encodeURIComponent(ofMsg(p.o, p.url));
+      const link = 'https://wa.me/' + ph + '?text=' + encodeURIComponent(ofMsg(p.o, p.url, p.pdfUrl));
       if (w) w.location = link; else window.open(link, '_blank');
-      try { const blob = await ofMakePdf(p.o); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = ofPdfName(p.o); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000);
-        toast('Conversația cu clientul e deschisă. PDF-ul s-a descărcat — trage-l în conversație dacă vrei să-l trimiți și ca fișier', 'info'); } catch {}
+      if (!p.pdfUrl) toast('PDF-ul nu s-a putut face — clientul primește linkul paginii ofertei', 'warn');
       if (qs('#of-st').value === 'draft') { qs('#of-st').value = 'sent'; ofDraft.status = 'sent'; ofSave(true); }
     } else {
       let to = qs('#of-ce').value.trim(); if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(to)) { to = (prompt('Adresa de e-mail a clientului:', to) || '').trim(); if (!to) return; qs('#of-ce').value = to; }
-      const p = await ofPublish(); if (!p) return;
       b.innerHTML = '⏳ Pregătesc PDF-ul…';
-      let pdf = null; try { pdf = await ofBlobB64(await ofMakePdf(p.o)); } catch {}
-      await clApi('/ops/offers/' + encodeURIComponent(p.o.id) + '/email', jsonOpt('POST', { to, url: p.url, pdf, pdfName: ofPdfName(p.o) }));
+      const p = await ofPublish(); if (!p) return;
+      await clApi('/ops/offers/' + encodeURIComponent(p.o.id) + '/email', jsonOpt('POST', { to, url: p.url }));
       qs('#of-st').value = 'sent'; ofDraft.status = 'sent'; await ofSave(true); renderOffers(); toast('Oferta a fost trimisă pe e-mail la ' + to, 'ok');
     }
   } catch (err) { toast(/HTTP 40[45]|necunoscut/i.test(err.message) ? 'Actualizează serverul (v10.0)' : err.message, 'err'); }

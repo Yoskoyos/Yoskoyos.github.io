@@ -1484,12 +1484,15 @@ async function handleOps(req, res, pathname) {
     return reply(200, { ok: true });
   }
   if (coll === 'offers' && parts[3] === 'page' && req.method === 'PUT') {   // pagina publică a ofertei (link pentru client)
-    let buf; try { buf = await readRaw(req, 3 * 1048576); } catch { return sendJson(res, 413, { error: 'Pagina e prea mare' }); }
-    const html = buf.toString('utf8'); if (!/^<!doctype html>/i.test(html.trim())) return sendJson(res, 400, { error: 'Conținut invalid' });
-    fs.mkdirSync(dir, { recursive: true, mode: 0o700 }); fs.writeFileSync(path.join(dir, 'page.html'), html, { mode: 0o600 });
+    let buf; try { buf = await readRaw(req, 20 * 1048576); } catch { return sendJson(res, 413, { error: 'Pagina e prea mare' }); }
+    let html = buf.toString('utf8'), pdf = null;
+    if (/^\s*\{/.test(html)) { try { const j = JSON.parse(html); html = String(j.html || ''); if (typeof j.pdf === 'string' && j.pdf.length > 100) { const pb = Buffer.from(j.pdf, 'base64'); if (pb.slice(0, 5).toString('latin1') === '%PDF-') pdf = pb; } } catch { return sendJson(res, 400, { error: 'Conținut invalid' }); } }
+    if (!/^<!doctype html>/i.test(html.trim())) return sendJson(res, 400, { error: 'Conținut invalid' });
     if (!it.pubToken) it.pubToken = crypto.randomBytes(12).toString('hex');
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 }); fs.writeFileSync(path.join(dir, 'page.html'), html.replace(/\{\{PDF_URL\}\}/g, '/of/' + it.pubToken + '.pdf'), { mode: 0o600 });
+    if (pdf) fs.writeFileSync(path.join(dir, 'oferta.pdf'), pdf, { mode: 0o600 });
     it.updatedAt = Date.now(); saveOps(all);
-    return sendJson(res, 200, { token: it.pubToken, url: publicBase(req) + '/of/' + it.pubToken });
+    return sendJson(res, 200, { token: it.pubToken, url: publicBase(req) + '/of/' + it.pubToken, pdfUrl: pdf || fs.existsSync(path.join(dir, 'oferta.pdf')) ? publicBase(req) + '/of/' + it.pubToken + '.pdf' : '' });
   }
   if (coll === 'offers' && parts[3] === 'email' && req.method === 'POST') {   // trimite clientului linkul ofertei pe e-mail
     let b = {}; try { b = JSON.parse((await readRaw(req, 16 * 1048576)).toString('utf8') || '{}'); } catch { return sendJson(res, 413, { error: 'PDF-ul e prea mare' }); } const to = String(b.to || '').trim();
@@ -1510,7 +1513,7 @@ async function handleOps(req, res, pathname) {
 <tr><td style="padding:6px 30px 22px;font-size:14px;line-height:22px;color:#3b4456">Pentru întrebări sau programarea montajului ne găsiți la <a href="tel:+40763354355" style="color:#F2611D;font-weight:bold;text-decoration:none">0763 354 355</a>.<br><br><b style="color:#0b2a5b">SUPRAVEGHERE24h</b><br><a href="mailto:contact@supraveghere24h.ro" style="color:#0b2a5b;text-decoration:none">contact@supraveghere24h.ro</a></td></tr>
 <tr><td style="padding:14px 30px;background:#0b2a5b;font-size:11px;line-height:17px;color:#b9c6dc">YCA SOLUTIONS S.R.L. · CUI 45211628 · J40/19754/2021 · Licență IGPR nr. 6310/T</td></tr></table></td></tr></table></body></html>`;
     const text = `Bună ziua${it.clientContact ? ', ' + String(it.clientContact).split(' ')[0] : ''},\n\nVă transmitem oferta noastră nr. OF-${it.no}${it.title ? ' – ' + it.title : ''}, valoare totală ${lei(tot)}${it.vat ? ' cu TVA' : ''}.\nO găsiți aici: ${link}\n\nPentru întrebări: 0763 354 355\nSUPRAVEGHERE24h · contact@supraveghere24h.ro`;
-    const att = []; if (typeof b.pdf === 'string' && b.pdf.length > 100 && b.pdf.length < 14e6) { const pb = Buffer.from(b.pdf, 'base64'); if (pb.slice(0, 5).toString('latin1') === '%PDF-') att.push({ filename: str(b.pdfName, 120).replace(/[^\w.-]/g, '_') || `Oferta-OF-${it.no}.pdf`, content: pb, contentType: 'application/pdf' }); }
+    const att = []; if (!b.pdf) { try { const pb = fs.readFileSync(path.join(dir, 'oferta.pdf')); att.push({ filename: `Oferta-OF-${it.no}-SUPRAVEGHERE24h.pdf`, content: pb, contentType: 'application/pdf' }); } catch {} } if (typeof b.pdf === 'string' && b.pdf.length > 100 && b.pdf.length < 14e6) { const pb = Buffer.from(b.pdf, 'base64'); if (pb.slice(0, 5).toString('latin1') === '%PDF-') att.push({ filename: str(b.pdfName, 120).replace(/[^\w.-]/g, '_') || `Oferta-OF-${it.no}.pdf`, content: pb, contentType: 'application/pdf' }); }
     const ok = await sendMail(to, `Oferta SUPRAVEGHERE24h nr. OF-${it.no}${it.title ? ' – ' + str(it.title, 80) : ''}`, text.replace('O găsiți aici:', att.length ? 'O găsiți atașată (PDF) și online:' : 'O găsiți aici:'), att.length ? html.replace('Din pagina ofertei o puteți descărca și ca PDF.', 'Oferta este atașată și ca PDF la acest e-mail.') : html, att);
     if (!ok) return sendJson(res, 500, { error: 'E-mailul nu a putut fi trimis — verifică setările de e-mail ale serverului' });
     it.emailedAt = Date.now(); it.emailedTo = to; if (it.status === 'draft') it.status = 'sent'; saveOps(all);
@@ -3801,7 +3804,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 10.1, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 10.2, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
@@ -3830,14 +3833,15 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/public/reviews' && req.method === 'GET') return reviewsPublic(req, res);
     if (pathname === '/reviews/config') return await handleReviewsConfig(req, res);
     if ((pathname === '/public/catalog' || /^\/public\/catalog\/[\w-]+\/(photo|fisa)$/.test(pathname)) && req.method === 'GET') return catalogPublic(req, res, pathname);
-    if (/^\/of\/[a-f0-9]{24}$/.test(pathname) && req.method === 'GET') {   // oferta trimisă clientului (link public)
-      const tok = pathname.slice(4), all = loadOps(); let hit = null;
+    if (/^\/of\/[a-f0-9]{24}(\.pdf)?$/.test(pathname) && req.method === 'GET') {   // oferta trimisă clientului (link public: pagină sau PDF)
+      const isPdf = pathname.endsWith('.pdf'), tok = pathname.slice(4, 28), all = loadOps(); let hit = null;
       for (const [un, u] of Object.entries(all)) { const o = (u.offers || []).find(x => x.pubToken === tok); if (o) { hit = { un, o }; break; } }
-      let html = null; if (hit) try { html = fs.readFileSync(path.join(OPS_DIR, hit.un.replace(/[^\w.-]/g, '_'), 'offers', hit.o.id, 'page.html'), 'utf8'); } catch {}
+      let html = null; if (hit) try { html = fs.readFileSync(path.join(OPS_DIR, hit.un.replace(/[^\w.-]/g, '_'), 'offers', hit.o.id, isPdf ? 'oferta.pdf' : 'page.html'), isPdf ? undefined : 'utf8'); } catch {}
       if (!html) return sendHtml(res, 404, '<!doctype html><meta charset="utf-8"><title>Ofertă indisponibilă</title><p style="font:16px Arial;padding:40px;text-align:center">Oferta nu mai este disponibilă. Ne găsiți la 0763 354 355.</p>');
       const ua = String(req.headers['user-agent'] || '');
       if (!/bot|crawl|spider|preview|whatsapp|facebookexternalhit|telegram|slack|skype|google|bing|curl|wget|python|headless/i.test(ua)) { const first = !(hit.o.views || []).length; hit.o.views = (hit.o.views || []).concat(Date.now()).slice(-50); saveOps(all);
         if (first) { try { const db = loadDb(), ow = (db.users || []).find(u => u.username === hit.un); if (ow) notifyOwner(db, ow, `👁 <b>${escHtml(hit.o.clientName || 'Clientul')}</b> a deschis oferta OF-${hit.o.no}${hit.o.title ? ' – ' + escHtml(hit.o.title) : ''}`, '/?tab=quotes').catch(() => {}); } catch {} } }
+      if (isPdf) { const nm = `Oferta-OF-${hit.o.no}-SUPRAVEGHERE24h.pdf`; res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Length': html.length, 'Content-Disposition': `inline; filename="${nm}"`, 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' }); return res.end(html); }
       return sendHtml(res, 200, html);
     }
     if (pathname.startsWith('/nl/')) return await handleNlPublic(req, res, pathname);
