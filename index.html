@@ -1204,6 +1204,19 @@ html:not(.unlocked) .app{display:none}
 .section-action:hover{background:var(--accent-dim);opacity:1}
 .section-action svg{width:15px;height:15px}
 .sp-lots{display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 2px}.sp-lots span{font-size:12px;background:var(--bg-2);border-radius:8px;padding:4px 9px;color:var(--fg-2)}.sp-lots b{color:var(--fg)}
+.ag-new{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}.ag-new textarea{width:100%;font-family:var(--sans);font-size:14px}
+.ag-newf{display:flex;justify-content:space-between;align-items:center;gap:8px}.ag-newf .btn{width:auto;flex:0 0 auto;padding:10px 18px}.ag-newf .oq-tg span{height:36px}
+.ag-setup{border:1px dashed #D97757;background:rgba(217,119,87,.08);border-radius:12px;padding:12px 14px;font-size:13.5px;margin-bottom:12px}.ag-setup ol{margin:6px 0 10px;padding-left:20px;line-height:1.6}.ag-setup .btn{width:auto}
+.ag-on{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fg-3);margin-bottom:12px}.ag-on .linkbtn{margin-left:auto}
+.ag-dot{width:9px;height:9px;border-radius:50%;background:var(--fg-3)}.ag-on.ok .ag-dot{background:var(--ok);box-shadow:0 0 0 4px rgba(34,197,94,.15)}.ag-on.ok{color:var(--fg-2)}
+.ag-key{margin-top:10px;display:flex;flex-direction:column;gap:6px;font-size:13px}.ag-key code{display:block;background:var(--bg-2);border-radius:8px;padding:9px 10px;font-size:12.5px;word-break:break-all;user-select:all}.ag-key .btn{width:auto;align-self:flex-start}
+.ag-card{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r,12px);padding:12px 14px;margin-bottom:10px;display:flex;flex-direction:column;gap:6px}
+.ag-top{display:flex;gap:6px;align-items:center}.ag-top small{margin-left:auto;color:var(--fg-3);font-size:11.5px}.sp-tag.warn{background:rgba(245,158,11,.14);color:var(--warn)}
+.ag-text{font-size:14px;white-space:pre-wrap}.ag-note{font-size:12.5px;color:var(--fg-2);background:var(--bg-2);border-radius:8px;padding:7px 10px;white-space:pre-wrap}
+.ag-res summary{cursor:pointer;font-weight:700;font-size:13px;color:var(--accent-tx)}.ag-res .sa-md{margin-top:8px;font-size:13.5px;line-height:1.55}
+.ag-reply{display:flex;gap:6px}.ag-reply .form-input{flex:1;width:auto;font-family:var(--sans)}.ag-reply .btn{width:auto;flex:0 0 auto}
+.ag-acts{display:flex;gap:14px;justify-content:flex-end}
+
 .an-in{animation:anIn .55s cubic-bezier(.22,1,.36,1) both}
 @keyframes anIn{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:none}}
 .an-sumrow{display:flex;align-items:flex-end;gap:22px;flex-wrap:wrap;margin:-2px 0 12px}
@@ -1400,6 +1413,7 @@ html:not(.unlocked) .app{display:none}
     <div class="nav-tab" data-tab="seap"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M4 10h16"/><path d="M12 3l9 5H3z"/><path d="M6 10v8M10 10v8M14 10v8M18 10v8"/></svg><span class="lbl-l">SEAP</span><span class="lbl-s">SEAP</span> <span class="badge" id="sp-badge" style="display:none">0</span></div>
     <div class="nav-tab nav-desk" data-tab="stats"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg><span class="lbl-l">Statistici site</span><span class="lbl-s">Statistici site</span></div>
     <div class="nav-sec">Firmă</div>
+    <div class="nav-tab" data-tab="agent"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9 16h6"/></svg><span class="lbl-l">Agent</span><span class="lbl-s">Agent</span> <span class="badge" id="ag-badge" style="display:none">0</span></div>
     <div class="nav-tab" data-tab="docs"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><span class="lbl-l">Acte firmă</span><span class="lbl-s">Acte</span> <span class="badge" id="cd-badge" style="display:none">0</span></div>
     <div class="nav-tab" data-tab="settings"><svg class="nav-ic" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span class="lbl-l">Setări</span><span class="lbl-s">Setări</span></div>
    </nav>
@@ -1579,6 +1593,22 @@ html:not(.unlocked) .app{display:none}
     </div>
 
     <!-- ── Acte firmă ── -->
+    <div class="panel" id="panel-agent">
+      <div class="section">
+        <div class="section-hdr">
+          <div class="section-title sec-t"><span class="intg-ic" style="background:#D97757"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9 16h6"/></svg></span>Agent · sarcini cât lipsești</div>
+          <div class="section-action" id="ag-refresh" style="margin-left:auto"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>Reîmprospătează</div>
+        </div>
+        <div id="ag-status"></div>
+        <div class="ag-new">
+          <textarea class="form-input" id="ag-text" rows="3" placeholder="Ce să facă agentul? ex. „Analizează licitațiile noi din SEAP și spune-mi care merită” · „Fă o ofertă pentru Popescu, 6 camere 4 MP, Snagov” · „Caută prețuri pentru un NVR 32 canale cu 16 PoE”"></textarea>
+          <div class="ag-newf"><label class="oq-tg"><input type="checkbox" id="ag-urgent"><span>⚡ Urgent</span></label><button type="button" class="btn primary" id="ag-add">Trimite agentului</button></div>
+        </div>
+        <div class="sp-chips" id="ag-f"><button class="sp-chip on" data-f="">Toate</button><button class="sp-chip" data-f="open">De făcut</button><button class="sp-chip" data-f="needs-input">Au întrebări</button><button class="sp-chip" data-f="done">Terminate</button></div>
+        <div id="ag-list"><div class="cl-empty">Se încarcă…</div></div>
+      </div>
+    </div>
+
     <div class="panel" id="panel-docs">
       <div id="cl-view-docs">
       <div class="section">
@@ -6855,7 +6885,7 @@ qs('#gr-del').addEventListener('click', async () => { if (!(await confirmDialog(
   try { await clApi('/reviews/config', { method: 'DELETE' }); toast('Deconectat', 'ok'); grLoad(); } catch (e) { toast(e.message, 'err'); } });
 document.querySelectorAll('.nav-tab[data-tab="settings"]').forEach(t => t.addEventListener('click', grLoad));
 /* ═══ Roluri: admin (tot) · angajat (secțiunile bifate de admin) · client (doar „Camerele mele”) ═══ */
-const TAB_PERM = { dashboard: 'nvr', nvrs: 'nvr', snapshots: 'nvr', alerts: 'nvr', clients: 'clients', quotes: 'quotes', stats: 'stats', works: 'works', catalog: 'catalog', docs: 'docs', seap: 'seap' };
+const TAB_PERM = { dashboard: 'nvr', nvrs: 'nvr', snapshots: 'nvr', alerts: 'nvr', clients: 'clients', quotes: 'quotes', stats: 'stats', works: 'works', catalog: 'catalog', docs: 'docs', seap: 'seap', agent: 'agent-admin' };
 const PERM_LBL = { nvr: 'NVR-uri, camere și alerte', clients: 'Clienți, încasări și GDPR', quotes: 'Cereri de ofertă', works: 'Lucrări și stoc', catalog: 'Echipamente (site)', docs: 'Acte firmă', stats: 'Statistici site', seap: 'Licitații SEAP' };
 function myRole() { const a = getAuth(); return (a && a.role) || 'admin'; }
 function roleLevel(p) { const a = getAuth() || {}; const r = a.role || 'admin'; if (r === 'admin') return 'edit'; if (r !== 'staff') return '';
@@ -8109,6 +8139,58 @@ qs('#nlk-add').addEventListener('click', async () => { const L = nlParse(qs('#nl
   try { const r = await clApi('/newsletter/contacts', jsonOpt('POST', { list: L.map(x => ({ ...x, source: 'manual' })) })); nlData = { ...nlData, ...r }; qs('#nlk-paste').value = ''; nlkRender(); renderNl(); toast(`${r.added} contacte noi`, 'ok'); } catch (e) { toast(e.message, 'err'); } });
 qs('#nlk-clients').addEventListener('click', async () => { try { const r = await clApi('/newsletter/contacts', jsonOpt('POST', { list: await nlClientsList() })); nlData = { ...nlData, ...r }; nlkRender(); renderNl(); toast(`${r.added} clienți importați`, 'ok'); } catch (e) { toast(e.message, 'err'); } });
 qs('#nlk-list').addEventListener('click', async e => { const b = e.target.closest('[data-kid]'); if (!b) return; try { const r = await clApi('/newsletter/contacts/' + encodeURIComponent(b.dataset.kid), { method: 'DELETE' }); nlData = { ...nlData, ...r }; nlkRender(); renderNl(); } catch (err) { toast(err.message, 'err'); } });
+
+/* ═══ Agent: sarcini pentru Claude, preluate automat cât lipsești; rezultatul apare aici + notificare ═══ */
+let agData = null, agF = '';
+const AG_ST = { new: ['De făcut', ''], working: ['Lucrează…', 'sp'], done: ['Gata', 'ok'], 'needs-input': ['Are o întrebare', 'warn'], failed: ['Nu a reușit', 'bad'], cancelled: ['Anulată', ''] };
+const agWhen = t => t ? new Date(t).toLocaleString('ro-RO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+async function loadAgentTasks() {
+  try { agData = await clApi('/agent/tasks'); renderAgent(); }
+  catch (e) { qs('#ag-list').innerHTML = `<div class="cl-empty">${escapeHtml(/HTTP 40[45]|necunoscut/i.test(e.message) ? 'Actualizează serverul (v10.4) ca să folosești agentul' : e.message)}</div>`; }
+}
+function renderAgent() {
+  if (!agData) return; const A = agData.agent || {}, seen = A.lastSeen, alive = seen && Date.now() - seen < 4 * 3600e3;
+  qs('#ag-status').innerHTML = !A.configured
+    ? `<div class="ag-setup"><b>🔧 Agentul nu e conectat încă</b><ol><li>Apasă <b>Generează cheia agentului</b> și copiaz-o (se arată o singură dată).</li><li>În Claude (claude.ai/code) → setările mediului → <b>Environment variables</b>, adaugă <code>AGENT_KEY=</code> + cheia. La <b>Network access</b> adaugă domeniile <code>proxy.supraveghere24h.ro</code>, <code>e-licitatie.ro</code>, <code>www.e-licitatie.ro</code>, <code>www.a2t.ro</code>.</li><li>Spune-mi „gata” în conversație și pornesc agentul (verifică sarcinile de aici la 2 ore, 08–22).</li></ol><button type="button" class="btn primary" id="ag-key">🔑 Generează cheia agentului</button><div id="ag-keyout"></div></div>`
+    : `<div class="ag-on ${alive ? 'ok' : ''}"><span class="ag-dot"></span>${alive ? `Agentul e activ · ultima verificare ${agWhen(seen)}` : seen ? `Agentul n-a mai verificat din ${agWhen(seen)}` : 'Cheie generată · agentul încă n-a verificat'}<button type="button" class="linkbtn" id="ag-key">generează altă cheie</button></div><div id="ag-keyout"></div>`;
+  const T = (agData.tasks || []).filter(t => !agF || (agF === 'open' ? ['new', 'working'].includes(t.status) : t.status === agF));
+  qs('#ag-list').innerHTML = T.length ? T.map(t => { const st = AG_ST[t.status] || AG_ST.new;
+    return `<div class="ag-card" data-id="${escapeHtml(t.id)}"><div class="ag-top"><span class="sp-tag ${st[1]}">${st[0]}</span>${t.priority === 'urgent' ? '<span class="sp-tag bad">⚡ urgent</span>' : ''}<small>${agWhen(t.createdAt)}${t.doneAt ? ' → ' + agWhen(t.doneAt) : ''}</small></div>
+      <div class="ag-text">${escapeHtml(t.text)}</div>
+      ${t.note ? `<div class="ag-note">${escapeHtml(t.note)}</div>` : ''}
+      ${t.result ? `<details class="ag-res"${t.status === 'done' && Date.now() - (t.doneAt || 0) < 3 * 864e5 ? ' open' : ''}><summary>Rezultatul</summary><div class="sa-md">${mdLite(t.result)}</div></details>` : ''}
+      ${t.reply ? `<div class="ag-note">Răspunsul tău: ${escapeHtml(t.reply)}</div>` : ''}
+      ${t.status === 'needs-input' ? `<div class="ag-reply"><input class="form-input" placeholder="Răspunsul tău pentru agent…" data-reply><button type="button" class="btn primary" data-act="reply">Răspunde</button></div>` : ''}
+      <div class="ag-acts">${['done', 'failed', 'cancelled'].includes(t.status) ? '<button type="button" class="linkbtn" data-act="redo">refă</button>' : ''}${['new'].includes(t.status) ? '<button type="button" class="linkbtn" data-act="cancel">anulează</button>' : ''}<button type="button" class="linkbtn" data-act="del" style="color:var(--err)">șterge</button></div></div>`; }).join('')
+    : `<div class="cl-empty">${(agData.tasks || []).length ? 'Nimic în această listă.' : 'Nicio sarcină încă. Scrie mai sus ce vrei să facă agentul cât ești plecat.'}</div>`;
+  const nOpen = (agData.tasks || []).filter(t => t.status === 'needs-input' || (t.status === 'done' && !t.seenAt)).length, bd = qs('#ag-badge'); if (bd) { bd.style.display = nOpen ? '' : 'none'; bd.textContent = nOpen; }
+}
+qs('#ag-add').addEventListener('click', async () => {
+  const text = qs('#ag-text').value.trim(); if (!text) return toast('Scrie ce trebuie făcut', 'warn');
+  try { await clApi('/agent/tasks', jsonOpt('POST', { text, priority: qs('#ag-urgent').checked ? 'urgent' : 'normal' })); qs('#ag-text').value = ''; qs('#ag-urgent').checked = false; await loadAgentTasks(); toast('Sarcina a fost trimisă agentului', 'ok'); }
+  catch (e) { toast(e.message, 'err'); }
+});
+qs('#ag-f').addEventListener('click', e => { const b = e.target.closest('.sp-chip'); if (!b) return; qs('#ag-f').querySelectorAll('.sp-chip').forEach(x => x.classList.toggle('on', x === b)); agF = b.dataset.f; renderAgent(); });
+qs('#ag-refresh').addEventListener('click', loadAgentTasks);
+qs('#panel-agent').addEventListener('click', async e => {
+  if (e.target.closest('#ag-key')) {
+    if (agData && agData.agent && agData.agent.configured && !(await confirmDialog({ title: 'Generezi o cheie nouă?', html: 'Cheia veche nu va mai funcționa — va trebui pusă cea nouă în setările agentului.', okLabel: 'Generează' }))) return;
+    try { const r = await clApi('/agent/key', { method: 'POST' }); agData.agent = r; renderAgent();
+      qs('#ag-keyout').innerHTML = `<div class="ag-key"><b>Cheia agentului</b> (copiaz-o acum — nu se mai afișează):<code>${escapeHtml(r.key)}</code><button type="button" class="btn" id="ag-copy">📋 Copiază</button></div>`;
+      qs('#ag-copy').onclick = async () => { try { await navigator.clipboard.writeText(r.key); toast('Cheia a fost copiată', 'ok'); } catch { prompt('Copiază cheia:', r.key); } }; }
+    catch (err) { toast(err.message, 'err'); }
+    return;
+  }
+  const card = e.target.closest('.ag-card'), act = e.target.closest('[data-act]'); if (!card || !act) return; const id = card.dataset.id;
+  try {
+    if (act.dataset.act === 'del') { if (!(await confirmDialog({ title: 'Ștergi sarcina?', okLabel: 'Șterge' }))) return; await clApi('/agent/tasks/' + encodeURIComponent(id), { method: 'DELETE' }); }
+    if (act.dataset.act === 'cancel') await clApi('/agent/tasks/' + encodeURIComponent(id), jsonOpt('PUT', { status: 'cancelled' }));
+    if (act.dataset.act === 'redo') await clApi('/agent/tasks/' + encodeURIComponent(id), jsonOpt('PUT', { status: 'new' }));
+    if (act.dataset.act === 'reply') { const v = card.querySelector('[data-reply]').value.trim(); if (!v) return toast('Scrie răspunsul', 'warn'); await clApi('/agent/tasks/' + encodeURIComponent(id), jsonOpt('PUT', { reply: v })); toast('Răspuns trimis — agentul continuă la următoarea verificare', 'ok'); }
+    await loadAgentTasks();
+  } catch (err) { toast(err.message, 'err'); }
+});
+document.querySelectorAll('.nav-tab[data-tab="agent"]').forEach(t => t.addEventListener('click', loadAgentTasks));
 
 /* ═══ Generează contract (Word) din fișa clientului — șablon contract-template.docx, completat local cu JSZip ═══ */
 const CTR_KEYS = ['NR','DATA','LICENTA','ASOC','SEDIU','CIF','IBAN','BANCA','PRES','HAG_NR','HAG_DATA','IMOBIL','PRET','EMAIL','VALOARE','AMPLASARE','M_NVR','M_HDD','Q_HDD','M_EXT','Q_EXT','M_INT','Q_INT','M_LIFT','Q_LIFT','M_RACK','Q_MON'];

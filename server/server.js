@@ -204,7 +204,7 @@ function getAuth(req) {
       if (tokOk && q.query.token) tok = String(q.query.token);
     } catch {}
   }
-  if (!tok) return null;
+  if (!tok) return req.headers['x-agent-key'] ? agentAuth(req) : null;
   try { return jwt.verify(tok, JWT_SECRET); } catch { return null; }
 }
 // verifică tokenul și că utilizatorul încă există
@@ -219,6 +219,8 @@ function requireUser(req, res, perm) {
     sendJson(res, 401, { error: 'Parola a fost schimbată. Autentifică-te din nou.' }); return null;
   }
   if (u.disabled) { sendJson(res, 401, { error: 'Contul este dezactivat' }); return null; }
+  // agentul (cheie X-Agent-Key): poate citi tot, dar scrie doar în /agent/*
+  if (p.agent && !['GET', 'HEAD'].includes(req.method) && !/^\/agent\//.test(url.parse(req.url).pathname || '')) { sendJson(res, 403, { error: 'Agentul are doar drept de citire aici' }); return null; }
   // perm: secțiunea cerută ('nvr', 'clients'…); 'admin' = doar proprietarul; 'client' = rutele pentru clienți; fără perm = rute de cont (oricine)
   if (perm) {
     const ok = perm === 'admin' ? u.role === 'admin' : perm === 'client' ? u.role === 'client' : perm === 'snap' ? (u.role !== 'staff' || userCan(u, 'nvr')) : userCan(u, perm);
@@ -2741,6 +2743,61 @@ async function handleNewsletter(req, res, pathname) {
   }
   return sendJson(res, 405, { error: 'Operație necunoscută' });
 }
+/* ═════════════ Agentul (Claude) care lucrează cât lipsești: sarcini scrise în aplicație, preluate de o rutină programată ═════════════
+   agent.json (doar pe server): { keyHash, keyAt, lastSeen, tasks: [{ id, text, status, result, createdAt, startedAt, doneAt, updatedAt }] }
+   Agentul se autentifică cu antetul X-Agent-Key (cheia se generează din aplicație, se vede o singură dată și se pune în setările mediului Claude).
+   Cu cheia: citire (GET) peste tot în API ca proprietarul + scriere doar în /agent/*. */
+const AGENT_FILE = path.join(BASE_DIR, 'agent.json');
+function loadAgent() { try { const d = JSON.parse(fs.readFileSync(AGENT_FILE, 'utf8')); d.tasks = d.tasks || []; return d; } catch { return { tasks: [] }; } }
+function saveAgent(d) { const tmp = AGENT_FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(d, null, 1), { mode: 0o600 }); fs.renameSync(tmp, AGENT_FILE); }
+const agentHash = k => crypto.createHash('sha256').update(String(k)).digest('hex');
+function agentAuth(req) {   // → { id: proprietar, pwv } sau null
+  const k = String(req.headers['x-agent-key'] || ''); if (k.length < 30) return null;
+  const a = loadAgent(); if (!a.keyHash || !crypto.timingSafeEqual(Buffer.from(agentHash(k)), Buffer.from(a.keyHash))) return null;
+  const db = loadDb(); const u = (db.users || []).find(x => x.username === a.owner && x.role === 'admin') || (db.users || []).find(x => x.role === 'admin'); if (!u) return null;
+  if (Date.now() - (a.lastSeen || 0) > 60e3) { a.lastSeen = Date.now(); saveAgent(a); }
+  return { id: u.username, pwv: u.pwv || 0, agent: true };
+}
+const AGENT_ST = ['new', 'working', 'done', 'needs-input', 'failed', 'cancelled'];
+async function handleAgent(req, res, pathname) {
+  const isAgent = !!agentAuth(req);
+  const ctx = requireUser(req, res, 'admin'); if (!ctx) return;
+  const parts = pathname.split('/').filter(Boolean);   // agent/key · agent/tasks[/id]
+  const a = loadAgent(); const pub = () => ({ configured: !!a.keyHash, keyAt: a.keyAt || 0, lastSeen: a.lastSeen || 0 });
+  if (parts[1] === 'key') {
+    if (isAgent) return sendJson(res, 403, { error: 'Nu' });
+    if (req.method === 'GET') return sendJson(res, 200, pub());
+    if (req.method === 'POST') { const k = 'yca_ag_' + crypto.randomBytes(24).toString('hex'); a.keyHash = agentHash(k); a.keyAt = Date.now(); a.owner = ctx.uname; saveAgent(a); return sendJson(res, 200, { key: k, ...pub() }); }
+    if (req.method === 'DELETE') { delete a.keyHash; a.keyAt = 0; saveAgent(a); return sendJson(res, 200, pub()); }
+  }
+  if (parts[1] === 'tasks') {
+    const t = parts[2] ? a.tasks.find(x => x.id === parts[2]) : null;
+    if (parts[2] && !t) return sendJson(res, 404, { error: 'Sarcină inexistentă' });
+    if (parts.length === 2 && req.method === 'GET') return sendJson(res, 200, { tasks: a.tasks.slice().sort((x, y) => y.createdAt - x.createdAt), agent: pub() });
+    if (parts.length === 2 && req.method === 'POST' && !isAgent) {
+      const b = await readJson(req); const text = str(b.text, 4000).trim(); if (!text) return sendJson(res, 400, { error: 'Scrie ce trebuie făcut' });
+      const x = { id: newId(), text, status: 'new', result: '', createdAt: Date.now(), updatedAt: Date.now(), priority: b.priority === 'urgent' ? 'urgent' : 'normal' };
+      a.tasks.push(x); saveAgent(a); return sendJson(res, 200, { task: x, tasks: a.tasks });
+    }
+    if (parts.length === 3 && req.method === 'PUT') {
+      const b = await readJson(req); const prev = t.status;
+      if (b.status && AGENT_ST.includes(b.status)) t.status = b.status;
+      if (b.result !== undefined) t.result = str(b.result, 60000);
+      if (b.note !== undefined) t.note = str(b.note, 2000);
+      if (!isAgent && b.text !== undefined) t.text = str(b.text, 4000).trim() || t.text;
+      if (!isAgent && b.reply !== undefined) { t.reply = str(b.reply, 4000); if (t.status === 'needs-input') t.status = 'new'; }
+      if (t.status === 'working' && prev !== 'working') t.startedAt = Date.now();
+      if (['done', 'failed', 'needs-input'].includes(t.status) && prev !== t.status) {
+        t.doneAt = Date.now();
+        if (isAgent) { const db = ctx.db; const L = { done: '✅ Agentul a terminat', failed: '⚠️ Agentul nu a reușit', 'needs-input': '❓ Agentul are o întrebare' }[t.status];
+          notifyOwner(db, ctx.user, `${L}:\n<b>${escHtml(t.text.slice(0, 120))}</b>${t.note ? '\n' + escHtml(t.note.slice(0, 300)) : ''}`, '/?tab=agent').catch(() => {}); }
+      }
+      t.updatedAt = Date.now(); saveAgent(a); return sendJson(res, 200, { task: t });
+    }
+    if (parts.length === 3 && req.method === 'DELETE' && !isAgent) { a.tasks = a.tasks.filter(x => x !== t); saveAgent(a); return sendJson(res, 200, { tasks: a.tasks }); }
+  }
+  return sendJson(res, 405, { error: 'Operație necunoscută' });
+}
 // remindere de expirare — rulează din monitor; o dată pe zi după 09:00
 const cdocDaysLeft = exp => Math.round((Date.parse(exp + 'T00:00:00Z') - Date.parse(new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' }) + 'T00:00:00Z')) / 864e5);
 async function cdocReminders(db) {
@@ -3820,7 +3877,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 10.3, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 10.4, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
@@ -3861,6 +3918,7 @@ const server = http.createServer(async (req, res) => {
       return sendHtml(res, 200, html);
     }
     if (pathname.startsWith('/nl/')) return await handleNlPublic(req, res, pathname);
+    if (pathname === '/agent' || pathname.startsWith('/agent/')) return await handleAgent(req, res, pathname);
     if (pathname === '/newsletter' || pathname.startsWith('/newsletter/')) return await handleNewsletter(req, res, pathname);
     if (pathname.startsWith('/q/')) return await handleQuotePublic(req, res, pathname, parsed);
     if (pathname === '/quotes' || pathname.startsWith('/quotes/') || pathname === '/quote-settings') return await handleQuotesApi(req, res, pathname, parsed);
