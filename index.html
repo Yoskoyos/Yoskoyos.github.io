@@ -7869,19 +7869,16 @@ qs('#of-tot').addEventListener('click', async e => {
   const b = wa || em; b.disabled = true;
   try {
     if (wa) {
-      b.innerHTML = '⏳ Pregătesc PDF-ul…';
-      const p = await ofPublish(); if (!p) return;
-      const blob = await ofMakePdf(p.o), file = new File([blob], ofPdfName(p.o), { type: 'application/pdf' });
-      const txt = ofMsg(p.o, p.url), ph = ofWaPhone(qs('#of-cp').value);
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        // telefon (și Windows): fereastra de partajare → alegi WhatsApp și clientul; PDF-ul pleacă atașat
-        try { await navigator.share({ files: [file], title: `Oferta OF-${p.o.no}`, text: txt }); } catch (er) { if (er && er.name === 'AbortError') return; throw er; }
-      } else {
-        // calculator fără partajare: descarcă PDF-ul și deschide WhatsApp cu mesajul; atașezi PDF-ul descărcat (trage-l în conversație)
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000);
-        window.open((ph ? 'https://wa.me/' + ph : 'https://wa.me/') + '?text=' + encodeURIComponent(txt), '_blank');
-        toast('PDF-ul s-a descărcat — trage-l în conversația WhatsApp ca să-l atașezi', 'info');
-      }
+      // direct în conversația clientului (numărul din ofertă), cu mesajul și linkul ofertei scrise; PDF-ul se descarcă alături, de tras în conversație
+      const ph = ofWaPhone(qs('#of-cp').value);
+      if (!ph) { toast('Completează telefonul clientului în ofertă', 'warn'); qs('#of-cp').focus(); return; }
+      const w = window.open('', '_blank');   // fereastra se deschide imediat, altfel browserul o blochează
+      b.innerHTML = '⏳ Pregătesc…';
+      const p = await ofPublish(); if (!p) { if (w) w.close(); return; }
+      const link = 'https://wa.me/' + ph + '?text=' + encodeURIComponent(ofMsg(p.o, p.url));
+      if (w) w.location = link; else window.open(link, '_blank');
+      try { const blob = await ofMakePdf(p.o); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = ofPdfName(p.o); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+        toast('Conversația cu clientul e deschisă. PDF-ul s-a descărcat — trage-l în conversație dacă vrei să-l trimiți și ca fișier', 'info'); } catch {}
       if (qs('#of-st').value === 'draft') { qs('#of-st').value = 'sent'; ofDraft.status = 'sent'; ofSave(true); }
     } else {
       let to = qs('#of-ce').value.trim(); if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(to)) { to = (prompt('Adresa de e-mail a clientului:', to) || '').trim(); if (!to) return; qs('#of-ce').value = to; }
