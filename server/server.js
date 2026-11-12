@@ -205,6 +205,7 @@ function getAuth(req) {
     } catch {}
   }
   if (!tok) return req.headers['x-agent-key'] ? agentAuth(req) : null;
+  if (tok.startsWith('yca_ag_')) return agentAuth(req, tok);   // cheia agentului poate veni și ca Authorization: Bearer
   try { return jwt.verify(tok, JWT_SECRET); } catch { return null; }
 }
 // verifică tokenul și că utilizatorul încă există
@@ -2751,8 +2752,8 @@ const AGENT_FILE = path.join(BASE_DIR, 'agent.json');
 function loadAgent() { try { const d = JSON.parse(fs.readFileSync(AGENT_FILE, 'utf8')); d.tasks = d.tasks || []; return d; } catch { return { tasks: [] }; } }
 function saveAgent(d) { const tmp = AGENT_FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(d, null, 1), { mode: 0o600 }); fs.renameSync(tmp, AGENT_FILE); }
 const agentHash = k => crypto.createHash('sha256').update(String(k)).digest('hex');
-function agentAuth(req) {   // → { id: proprietar, pwv } sau null
-  const k = String(req.headers['x-agent-key'] || ''); if (k.length < 30) return null;
+function agentAuth(req, key) {   // → { id: proprietar, pwv } sau null
+  const k = String(key || req.headers['x-agent-key'] || ''); if (k.length < 30) return null;
   const a = loadAgent(); if (!a.keyHash || !crypto.timingSafeEqual(Buffer.from(agentHash(k)), Buffer.from(a.keyHash))) return null;
   const db = loadDb(); const u = (db.users || []).find(x => x.username === a.owner && x.role === 'admin') || (db.users || []).find(x => x.role === 'admin'); if (!u) return null;
   if (Date.now() - (a.lastSeen || 0) > 60e3) { a.lastSeen = Date.now(); saveAgent(a); }
@@ -2760,7 +2761,7 @@ function agentAuth(req) {   // → { id: proprietar, pwv } sau null
 }
 const AGENT_ST = ['new', 'working', 'done', 'needs-input', 'failed', 'cancelled'];
 async function handleAgent(req, res, pathname) {
-  const isAgent = !!agentAuth(req);
+  const isAgent = !!getAuth(req)?.agent;
   const ctx = requireUser(req, res, 'admin'); if (!ctx) return;
   const parts = pathname.split('/').filter(Boolean);   // agent/key · agent/tasks[/id]
   const a = loadAgent(); const pub = () => ({ configured: !!a.keyHash, keyAt: a.keyAt || 0, lastSeen: a.lastSeen || 0 });
@@ -3877,7 +3878,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 10.4, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 10.5, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
