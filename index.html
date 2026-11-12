@@ -2536,8 +2536,9 @@ html:not(.unlocked) .app{display:none}
         <div class="oq">
           <div class="oq-f"><label for="oq-ext">Camere exterior</label><div class="oq-step"><button type="button" data-st="-1">−</button><input id="oq-ext" inputmode="numeric" value="4"><button type="button" data-st="1">+</button></div></div>
           <div class="oq-f"><label for="oq-int">Camere interior</label><div class="oq-step"><button type="button" data-st="-1">−</button><input id="oq-int" inputmode="numeric" value="0"><button type="button" data-st="1">+</button></div></div>
-          <div class="oq-f"><label for="oq-days">Zile înregistrare</label><div class="oq-step"><button type="button" data-st="-7">−</button><input id="oq-days" inputmode="numeric" value="30"><button type="button" data-st="7">+</button></div></div>
+          <div class="oq-f"><label for="oq-hddn">Număr HDD</label><div class="oq-step"><button type="button" data-st="-1">−</button><input id="oq-hddn" inputmode="numeric" value="1"><button type="button" data-st="1">+</button></div></div>
           <div class="oq-f"><label for="oq-m">Metri cablu / cameră</label><div class="oq-step"><button type="button" data-st="-5">−</button><input id="oq-m" inputmode="numeric" value="25"><button type="button" data-st="5">+</button></div></div>
+          <div class="oq-f oq-wide"><label>HDD</label><input type="hidden" id="oq-hdd" value="2"><div class="oq-seg" id="oq-hddseg"><button type="button" data-v="1">1 TB</button><button type="button" data-v="2" class="on">2 TB</button><button type="button" data-v="4">4 TB</button></div></div>
           <div class="oq-f oq-wide"><label>Rezoluție</label><input type="hidden" id="oq-res" value="4"><div class="oq-seg" id="oq-resseg"><button type="button" data-v="2">2 MP<small>Full HD</small></button><button type="button" data-v="4" class="on">4 MP<small>2K</small></button><button type="button" data-v="8">8 MP<small>4K</small></button></div></div>
           <div class="oq-f oq-wide"><label>Extra</label><div class="oq-tgs">
             <label class="oq-tg"><input type="checkbox" id="oq-ups"><span>🔋 UPS</span></label>
@@ -7623,21 +7624,21 @@ qs('#of-pick-res').addEventListener('click', e => { const b = e.target.closest('
 /* ── configuratorul rapid ── */
 function ofQuickCalc() {
   const C = ofCfgGet(), ext = Math.max(0, Math.round(ofN(qs('#oq-ext').value))), int = Math.max(0, Math.round(ofN(qs('#oq-int').value))), n = ext + int;
-  const r = qs('#oq-res').value, days = Math.max(1, Math.round(ofN(qs('#oq-days').value)) || 30), m = Math.max(0, ofN(qs('#oq-m').value));
-  const ch = [4, 8, 16, 32].find(c => c >= n) || 32, pp = Math.min(ch, 16);
-  const needTb = n * (OF_GB[r] || 20) * days / 1000 * 1.1, sizes = Object.keys(C.hdd.p).map(Number).sort((a, b) => a - b);
-  let disks = 1, tb = sizes.find(s => s >= needTb); if (!tb) { tb = sizes[sizes.length - 1]; disks = Math.ceil(needTb / tb); }
-  const bays = ch >= 16 ? 2 : 1;   // câte HDD-uri încap în NVR
-  return { C, ext, int, n, r, days, m, ch, pp, needTb, tb, disks, bays };
+  const r = qs('#oq-res').value, m = Math.max(0, ofN(qs('#oq-m').value));
+  const ch = [4, 8, 16, 32].find(c => c >= n) || 32, pp = Math.min(ch, 16), bays = ch >= 16 ? 2 : 1;   // câte HDD-uri încap în NVR
+  const tb = +qs('#oq-hdd').value || 2, disks = Math.max(1, Math.round(ofN(qs('#oq-hddn').value)) || 1);
+  const days = n ? Math.floor(tb * disks * 1000 / (n * (OF_GB[r] || 20) * 1.1)) : 0;   // zile de înregistrare continuă estimate
+  return { C, ext, int, n, r, days, m, ch, pp, tb, disks, bays };
 }
 function ofQuickInfo() {
   const k = ofQuickCalc();
-  qs('#oq-info').innerHTML = k.n ? [`📷 <b>${k.n}</b> ${k.n === 1 ? 'cameră' : 'camere'}`, `📼 NVR <b>${k.ch}</b> canale`, `💾 ${k.disks > 1 ? k.disks + ' × ' : ''}HDD <b>${k.tb} TB</b> <small>(${k.needTb.toFixed(1).replace('.', ',')} TB pentru ${k.days} zile)</small>${k.disks > k.bays ? ` <b style="color:var(--err)">⚠ NVR-ul are doar ${k.bays} ${k.bays === 1 ? 'loc' : 'locuri'} de HDD — scade zilele de înregistrare</b>` : ''}`, `🔌 <b>${Math.ceil(k.n * k.m / 5) * 5}</b> m cablu`].concat(k.n > 16 ? [`🔀 switch PoE pt. <b>${k.n - 16}</b> camere`] : []).map(x => `<span>${x}</span>`).join('') : '<span>Pune numărul de camere</span>';
+  qs('#oq-info').innerHTML = k.n ? [`📷 <b>${k.n}</b> ${k.n === 1 ? 'cameră' : 'camere'}`, `📼 NVR <b>${k.ch}</b> canale`, `💾 ${k.disks > 1 ? k.disks + ' × ' : ''}HDD <b>${k.tb} TB</b> <small>≈ ${k.days} ${k.days === 1 ? 'zi' : 'zile'} de înregistrare</small>${k.disks > k.bays ? ` <b style="color:var(--err)">⚠ NVR-ul de ${k.ch} canale are doar ${k.bays} ${k.bays === 1 ? 'loc' : 'locuri'} de HDD</b>` : ''}`, `🔌 <b>${Math.ceil(k.n * k.m / 5) * 5}</b> m cablu`].concat(k.n > 16 ? [`🔀 switch PoE pt. <b>${k.n - 16}</b> camere`] : []).map(x => `<span>${x}</span>`).join('') : '<span>Pune numărul de camere</span>';
 }
-['#oq-ext', '#oq-int', '#oq-days', '#oq-m'].forEach(id => qs(id).addEventListener('input', ofQuickInfo));
+['#oq-ext', '#oq-int', '#oq-hddn', '#oq-m'].forEach(id => qs(id).addEventListener('input', ofQuickInfo));
 qs('#of-quick').addEventListener('click', e => {
-  const st = e.target.closest('[data-st]'); if (st) { const inp = st.parentElement.querySelector('input'); inp.value = Math.max(0, Math.round(ofN(inp.value)) + +st.dataset.st); if (inp.id === 'oq-days' && +inp.value < 1) inp.value = 1; ofQuickInfo(); return; }
+  const st = e.target.closest('[data-st]'); if (st) { const inp = st.parentElement.querySelector('input'); inp.value = Math.max(0, Math.round(ofN(inp.value)) + +st.dataset.st); if (inp.id === 'oq-hddn' && +inp.value < 1) inp.value = 1; ofQuickInfo(); return; }
   const rb = e.target.closest('#oq-resseg button'); if (rb) { qs('#oq-res').value = rb.dataset.v; qs('#oq-resseg').querySelectorAll('button').forEach(b => b.classList.toggle('on', b === rb)); ofQuickInfo(); }
+  const hb = e.target.closest('#oq-hddseg button'); if (hb) { qs('#oq-hdd').value = hb.dataset.v; qs('#oq-hddseg').querySelectorAll('button').forEach(b => b.classList.toggle('on', b === hb)); ofQuickInfo(); }
 });
 qs('#oq-go').addEventListener('click', async () => {
   const k = ofQuickCalc(), C = k.C; if (!k.n) return toast('Pune numărul de camere', 'warn');
