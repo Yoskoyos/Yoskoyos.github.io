@@ -561,6 +561,7 @@ select.qpill option{background:var(--bg-1,#fff);color:var(--fg-1,#111)}
 .cl-kind{font-size:9px;font-weight:700;letter-spacing:.05em;border:1px solid var(--border-2);color:var(--fg-3);border-radius:4px;padding:1px 4px;flex-shrink:0}
 .cl-sub{font-size:12px;color:var(--fg-3);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap}
 .cl-sub a{color:var(--accent-tx);text-decoration:none}
+.cl-delbtn{flex-shrink:0;width:34px;height:34px;border-radius:10px;border:1px solid transparent;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer;padding:0;margin-left:2px;transition:background .15s,color .15s}.cl-delbtn:hover,.cl-delbtn:focus-visible{background:rgba(229,72,77,.1);color:var(--err);border-color:rgba(229,72,77,.25)}.cl-delbtn svg{width:17px;height:17px}html[data-ro-clients] .cl-delbtn{display:none}
 .cl-pay{font-size:11px;font-weight:700;border-radius:999px;padding:5px 9px;white-space:nowrap;flex-shrink:0;border:1px solid transparent}
 .cl-pay.ok{background:var(--ok-dim);color:var(--ok)}
 .cl-pay.soon{background:var(--warn-dim);color:var(--warn);border-color:var(--warn)}
@@ -4346,7 +4347,7 @@ function renderClients() {
     return `<div class="cl-card" role="button" tabindex="0" data-cid="${escapeHtml(c.id)}">
       <div class="cl-av">${escapeHtml(ini || '?')}</div>
       <div class="cl-main"><div class="cl-name"><span>${escapeHtml(c.name)}</span><em class="cl-kind">${c.kind === 'pj' ? 'PJ' : 'PF'}</em></div>${sub ? `<div class="cl-sub">${sub}</div>` : ''}</div>
-      ${pay}</div>`;
+      ${pay}<button type="button" class="cl-delbtn" data-del="${escapeHtml(c.id)}" title="Șterge clientul" aria-label="Șterge ${escapeHtml(c.name)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg></button></div>`;
   }).join('');
 }
 
@@ -4546,11 +4547,23 @@ qs('#cl-search').addEventListener('input', renderClients);
 document.querySelectorAll('.cl-chip').forEach(b => b.addEventListener('click', () => {
   clFilter = b.dataset.f; document.querySelectorAll('.cl-chip').forEach(x => x.classList.toggle('on', x === b)); renderClients();
 }));
+async function clDelete(c) {
+  const n = (c.contracts || []).length;
+  const ok = await confirmDialog({ title: 'Ștergi clientul?', html: `<b>${escapeHtml(c.name)}</b> va fi șters definitiv${n ? `, împreună cu <b>${n} ${n === 1 ? 'document' : 'documente'}</b> (contracte și garanții)` : ''}. Nu se poate anula.`, okLabel: 'Șterge' });
+  if (!ok) return false;
+  try {
+    await clApi('/clients/' + encodeURIComponent(c.id), { method: 'DELETE' });
+    clients = clients.filter(x => x.id !== c.id); renderClients(); toast('Client șters', 'ok'); return true;
+  } catch (e) { toast(e.message, 'err'); return false; }
+}
 qs('#cl-list').addEventListener('click', e => {
+  const del = e.target.closest('.cl-delbtn');
+  if (del) { e.stopPropagation(); const c = (clients || []).find(x => x.id === del.dataset.del); if (c) clDelete(c); return; }
   const card = e.target.closest('.cl-card'); if (!card) return;
   const c = (clients || []).find(x => x.id === card.dataset.cid); if (c) openClientModal(c);
 });
 qs('#cl-list').addEventListener('keydown', e => {
+  if (e.target.closest('.cl-delbtn')) return;
   if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('cl-card')) { e.preventDefault(); e.target.click(); }
 });
 qs('#cm-kind').addEventListener('change', cmKindUi);
