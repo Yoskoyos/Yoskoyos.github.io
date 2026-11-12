@@ -7823,7 +7823,40 @@ qs('#of-pdf').addEventListener('click', async () => {
   const w = window.open('', '_blank'); if (!w) return toast('Permite ferestrele pop-up ca să descarci PDF-ul', 'warn');
   w.document.write(ofPageHtml(o, false)); w.document.close();
 });
-/* ── trimitere către client: link public cu oferta (WhatsApp / e-mail) ── */
+/* ── PDF-ul ofertei, făcut în browser (pagina ofertei → imagini A4 → PDF), tăiat între rânduri ── */
+async function ofMakePdf(o) {
+  await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+  await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  const fr = document.createElement('iframe'); fr.setAttribute('aria-hidden', 'true');
+  fr.style.cssText = 'position:fixed;left:-12000px;top:0;width:900px;height:1400px;border:0;visibility:hidden';
+  document.body.appendChild(fr);
+  try {
+    const doc = fr.contentDocument; doc.open(); doc.write(ofPageHtml(o, true).replace('<div class="bar">', '<div class="bar" style="display:none">')); doc.close();
+    await new Promise(r => { if (doc.readyState === 'complete') r(); else fr.onload = r; setTimeout(r, 4000); });
+    try { await doc.fonts.ready; } catch {}
+    await Promise.all([...doc.images].map(im => im.complete ? 0 : new Promise(r => { im.onload = im.onerror = r; setTimeout(r, 3000); })));
+    const sheet = doc.querySelector('.sheet'); sheet.style.margin = '0'; sheet.style.boxShadow = 'none'; sheet.style.minHeight = '0';
+    const top0 = sheet.getBoundingClientRect().top;
+    const safe = [...doc.querySelectorAll('tr, .hero, .parties, .hl, .intro, .sum, .sig, .ft, table')].map(el => el.getBoundingClientRect().bottom - top0).filter(y => y > 0).sort((a, b) => a - b);
+    const sc = 2, cv = await html2canvas(sheet, { scale: sc, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    const { jsPDF } = window.jspdf, pdf = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
+    const pxW = sheet.offsetWidth, pageH = pxW * 297 / 210, H = sheet.offsetHeight; let y = 0, first = true;
+    while (y < H - 2) {
+      let end = Math.min(H, y + pageH);
+      if (end < H) { const cand = safe.filter(v => v > y + 80 && v <= end); if (cand.length) end = cand[cand.length - 1] + 2; }
+      const part = document.createElement('canvas'); part.width = cv.width; part.height = Math.ceil((end - y) * sc);
+      const ctx = part.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, part.width, part.height); ctx.drawImage(cv, 0, Math.floor(y * sc), cv.width, part.height, 0, 0, cv.width, part.height);
+      if (!first) pdf.addPage(); first = false;
+      pdf.addImage(part.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, (end - y) * 210 / pxW);
+      y = end;
+    }
+    pdf.setProperties({ title: `Oferta OF-${o.no} – ${o.clientName}`, author: 'YCA SOLUTIONS S.R.L.' });
+    return pdf.output('blob');
+  } finally { fr.remove(); }
+}
+const ofPdfName = o => `Oferta-OF-${o.no}-${String(o.clientName || 'client').normalize('NFD').replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)}.pdf`;
+const ofBlobB64 = b => new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = ko; r.readAsDataURL(b); });
+/* ── trimitere către client: PDF + link public cu oferta (WhatsApp / e-mail) ── */
 async function ofPublish() {
   const o = await ofSave(true); if (!o) return null;
   const r = await clApi('/ops/offers/' + encodeURIComponent(o.id) + '/page', { method: 'PUT', headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: ofPageHtml(o, true) });
@@ -7836,20 +7869,30 @@ qs('#of-tot').addEventListener('click', async e => {
   const b = wa || em; b.disabled = true;
   try {
     if (wa) {
-      const w = window.open('', '_blank');   // deschidem fereastra imediat (altfel browserul o blochează după așteptare)
-      const p = await ofPublish(); if (!p) { if (w) w.close(); return; }
-      const ph = ofWaPhone(qs('#of-cp').value), link = (ph ? 'https://wa.me/' + ph : 'https://wa.me/') + '?text=' + encodeURIComponent(ofMsg(p.o, p.url));
-      if (w) w.location = link; else location.href = link;
-      if (!ph) toast('Telefonul clientului lipsește — alege contactul în WhatsApp', 'info');
+      b.innerHTML = '⏳ Pregătesc PDF-ul…';
+      const p = await ofPublish(); if (!p) return;
+      const blob = await ofMakePdf(p.o), file = new File([blob], ofPdfName(p.o), { type: 'application/pdf' });
+      const txt = ofMsg(p.o, p.url), ph = ofWaPhone(qs('#of-cp').value);
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        // telefon (și Windows): fereastra de partajare → alegi WhatsApp și clientul; PDF-ul pleacă atașat
+        try { await navigator.share({ files: [file], title: `Oferta OF-${p.o.no}`, text: txt }); } catch (er) { if (er && er.name === 'AbortError') return; throw er; }
+      } else {
+        // calculator fără partajare: descarcă PDF-ul și deschide WhatsApp cu mesajul; atașezi PDF-ul descărcat (trage-l în conversație)
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+        window.open((ph ? 'https://wa.me/' + ph : 'https://wa.me/') + '?text=' + encodeURIComponent(txt), '_blank');
+        toast('PDF-ul s-a descărcat — trage-l în conversația WhatsApp ca să-l atașezi', 'info');
+      }
       if (qs('#of-st').value === 'draft') { qs('#of-st').value = 'sent'; ofDraft.status = 'sent'; ofSave(true); }
     } else {
       let to = qs('#of-ce').value.trim(); if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(to)) { to = (prompt('Adresa de e-mail a clientului:', to) || '').trim(); if (!to) return; qs('#of-ce').value = to; }
       const p = await ofPublish(); if (!p) return;
-      await clApi('/ops/offers/' + encodeURIComponent(p.o.id) + '/email', jsonOpt('POST', { to, url: p.url }));
+      b.innerHTML = '⏳ Pregătesc PDF-ul…';
+      let pdf = null; try { pdf = await ofBlobB64(await ofMakePdf(p.o)); } catch {}
+      await clApi('/ops/offers/' + encodeURIComponent(p.o.id) + '/email', jsonOpt('POST', { to, url: p.url, pdf, pdfName: ofPdfName(p.o) }));
       qs('#of-st').value = 'sent'; ofDraft.status = 'sent'; await ofSave(true); renderOffers(); toast('Oferta a fost trimisă pe e-mail la ' + to, 'ok');
     }
   } catch (err) { toast(/HTTP 40[45]|necunoscut/i.test(err.message) ? 'Actualizează serverul (v10.0)' : err.message, 'err'); }
-  finally { b.disabled = false; }
+  finally { b.disabled = false; ofRenderTot(); }
 });
 
 /* ── Prețurile mele ── */

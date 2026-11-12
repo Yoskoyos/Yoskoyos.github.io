@@ -1492,7 +1492,7 @@ async function handleOps(req, res, pathname) {
     return sendJson(res, 200, { token: it.pubToken, url: publicBase(req) + '/of/' + it.pubToken });
   }
   if (coll === 'offers' && parts[3] === 'email' && req.method === 'POST') {   // trimite clientului linkul ofertei pe e-mail
-    const b = await readJson(req); const to = String(b.to || '').trim();
+    let b = {}; try { b = JSON.parse((await readRaw(req, 16 * 1048576)).toString('utf8') || '{}'); } catch { return sendJson(res, 413, { error: 'PDF-ul e prea mare' }); } const to = String(b.to || '').trim();
     if (!/^[^\s@<>,;]+@[^\s@<>,;]+\.[a-z]{2,}$/i.test(to)) return sendJson(res, 400, { error: 'Adresă de e-mail invalidă' });
     if (!it.pubToken) return sendJson(res, 400, { error: 'Pagina ofertei nu e publicată' });
     if (!mailReady()) return sendJson(res, 400, { error: 'E-mailul nu e configurat pe server (mail.json)' });
@@ -1510,7 +1510,8 @@ async function handleOps(req, res, pathname) {
 <tr><td style="padding:6px 30px 22px;font-size:14px;line-height:22px;color:#3b4456">Pentru întrebări sau programarea montajului ne găsiți la <a href="tel:+40763354355" style="color:#F2611D;font-weight:bold;text-decoration:none">0763 354 355</a>.<br><br><b style="color:#0b2a5b">SUPRAVEGHERE24h</b><br><a href="mailto:contact@supraveghere24h.ro" style="color:#0b2a5b;text-decoration:none">contact@supraveghere24h.ro</a></td></tr>
 <tr><td style="padding:14px 30px;background:#0b2a5b;font-size:11px;line-height:17px;color:#b9c6dc">YCA SOLUTIONS S.R.L. · CUI 45211628 · J40/19754/2021 · Licență IGPR nr. 6310/T</td></tr></table></td></tr></table></body></html>`;
     const text = `Bună ziua${it.clientContact ? ', ' + String(it.clientContact).split(' ')[0] : ''},\n\nVă transmitem oferta noastră nr. OF-${it.no}${it.title ? ' – ' + it.title : ''}, valoare totală ${lei(tot)}${it.vat ? ' cu TVA' : ''}.\nO găsiți aici: ${link}\n\nPentru întrebări: 0763 354 355\nSUPRAVEGHERE24h · contact@supraveghere24h.ro`;
-    const ok = await sendMail(to, `Oferta SUPRAVEGHERE24h nr. OF-${it.no}${it.title ? ' – ' + str(it.title, 80) : ''}`, text, html);
+    const att = []; if (typeof b.pdf === 'string' && b.pdf.length > 100 && b.pdf.length < 14e6) { const pb = Buffer.from(b.pdf, 'base64'); if (pb.slice(0, 5).toString('latin1') === '%PDF-') att.push({ filename: str(b.pdfName, 120).replace(/[^\w.-]/g, '_') || `Oferta-OF-${it.no}.pdf`, content: pb, contentType: 'application/pdf' }); }
+    const ok = await sendMail(to, `Oferta SUPRAVEGHERE24h nr. OF-${it.no}${it.title ? ' – ' + str(it.title, 80) : ''}`, text.replace('O găsiți aici:', att.length ? 'O găsiți atașată (PDF) și online:' : 'O găsiți aici:'), att.length ? html.replace('Din pagina ofertei o puteți descărca și ca PDF.', 'Oferta este atașată și ca PDF la acest e-mail.') : html, att);
     if (!ok) return sendJson(res, 500, { error: 'E-mailul nu a putut fi trimis — verifică setările de e-mail ale serverului' });
     it.emailedAt = Date.now(); it.emailedTo = to; if (it.status === 'draft') it.status = 'sent'; saveOps(all);
     return sendJson(res, 200, { ok: true, item: it });
@@ -3800,7 +3801,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 10.0, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 10.1, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
