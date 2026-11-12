@@ -7532,7 +7532,7 @@ qs('#of-new-btn').addEventListener('click', () => openOffer(null));
 /* ── editorul ── */
 async function openOffer(o) {
   const C = ofCfgGet();
-  ofDraft = o ? JSON.parse(JSON.stringify(o)) : { id: '', no: 0, date: new Date().toISOString().slice(0, 10), validDays: 15, title: '', lines: [], discount: 0, vat: 21, notes: C.notes, intro: C.intro, status: 'draft' };
+  ofDraft = o ? JSON.parse(JSON.stringify(o)) : { id: '', no: 0, date: new Date().toISOString().slice(0, 10), validDays: 15, title: '', lines: [], discount: 0, vat: 0, notes: C.notes, intro: C.intro, status: 'draft' };
   qs('#of-title').textContent = o ? `Oferta OF-${o.no} · ${o.clientName}` : 'Ofertă nouă';
   const set = (id, v) => { qs(id).value = v == null ? '' : v; };
   set('#of-t', ofDraft.title); set('#of-date', ofDraft.date); set('#of-valid', ofDraft.validDays); set('#of-cn', ofDraft.clientName); set('#of-cui', ofDraft.clientCui); set('#of-cc', ofDraft.clientContact);
@@ -7575,7 +7575,7 @@ function ofRenderTot() {
   qs('#of-tot').innerHTML = `<div><span>Echipamente și materiale</span><b>${ofL(t.eq)}</b></div><div><span>Manoperă</span><b>${ofL(t.lab)}</b></div>
     <div><span>Discount <input class="form-input of-sm" id="of-disc" inputmode="decimal" value="${ofDraft.discount || 0}"> %</span><b>${t.disc ? '−' + ofL(t.disc) : '0,00'}</b></div>
     <div class="of-line"><span>Total fără TVA</span><b>${ofL(t.net)}</b></div>
-    <div><span>TVA <select class="form-input of-sm" id="of-vat">${[21, 19, 11, 9, 0].map(v => `<option value="${v}"${+ofDraft.vat === v ? ' selected' : ''}>${v}%</option>`).join('')}</select></span><b>${ofL(t.vat)}</b></div>
+    <div><span>TVA <select class="form-input of-sm" id="of-vat">${[0, 21].map(v => `<option value="${v}"${+ofDraft.vat === v ? ' selected' : ''}>${v}%</option>`).join('')}</select></span><b>${ofL(t.vat)}</b></div>
     <div class="of-grand"><span>TOTAL</span><b>${ofL(t.total)} lei</b></div>
     ${showCost ? `<div class="of-int"><span>Costul meu</span><b>${t.hasCost ? ofL(t.cost) : '—'}</b></div><div class="of-int"><span>Marjă</span><b>${t.hasCost ? ofL(t.margin) + ' (' + (t.net ? Math.round(t.margin / t.net * 100) : 0) + '%)' : 'completează costurile'}</b></div>` : ''}`;
 }
@@ -7806,8 +7806,8 @@ ${o.intro ? `<p class="intro">${esc(o.intro)}</p>` : ''}
 ${grp(['echipament', 'material'], 'Echipamente și materiale', '📦')}${grp(['manopera'], 'Manoperă și servicii', '🛠')}</table>
 <div class="sum"><div>${o.notes ? `<div class="cond"><b>Condiții comerciale</b>${esc(o.notes)}</div>` : ''}</div>
   <div class="tot">${t.disc ? `<div><span>Subtotal</span><b>${ofL(t.gross)} lei</b></div><div><span>Discount ${String(o.discount).replace('.', ',')}%</span><b>−${ofL(t.disc)} lei</b></div>` : ''}
-  <div><span>Total fără TVA</span><b>${ofL(t.net)} lei</b></div><div><span>TVA ${o.vat}%</span><b>${ofL(t.vat)} lei</b></div>
-  <div class="gr"><span>TOTAL DE PLATĂ</span><b>${ofL(t.total)} lei</b></div>${o.vat ? '' : '<div class="note">Prețurile nu includ TVA.</div>'}</div></div>
+  ${o.vat ? `<div><span>Total fără TVA</span><b>${ofL(t.net)} lei</b></div><div><span>TVA ${o.vat}%</span><b>${ofL(t.vat)} lei</b></div>` : ''}
+  <div class="gr"><span>TOTAL DE PLATĂ</span><b>${ofL(t.total)} lei</b></div></div></div>
 <div class="sig"><div>Ofertant<br><b>YCA SOLUTIONS S.R.L.</b><div class="ln"></div>Dima Florin, Administrator</div><div>Acceptat de beneficiar<br><b>${esc(o.clientName)}</b><div class="ln"></div>Nume, semnătură și dată</div></div>
 <div class="ft"><span><b>SUPRAVEGHERE24h</b> · securitate rezidențială non-stop</span><span>Întrebări? 0763 354 355 · contact@supraveghere24h.ro</span></div>
 </div>
