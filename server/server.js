@@ -1990,6 +1990,19 @@ function seapText(buf, name) {
   return '';
 }
 // experiență similară: caută fraza și o sumă în lei în apropiere
+// loturile unei proceduri, din fișa de date: „II.2.1 - Denumire lot / 1 - Laptop … II.2.6 … Valoarea estimata fara TVA : 235341,82”
+function seapLotsFrom(text) {
+  const t = String(text || ''), out = [], re = /II\.2\.1\)?\s*-?\s*Denumire lot\s*\n\s*(\d+)\s*-\s*([^\n]+)/gi; let m;
+  const idx = []; while ((m = re.exec(t))) idx.push({ at: m.index, no: +m[1], name: m[2].trim() });
+  for (let i = 0; i < idx.length; i++) { const seg = t.slice(idx[i].at, i + 1 < idx.length ? idx[i + 1].at : idx[i].at + 20000);
+    const v = /Valoarea estimata fara TVA\s*:\s*([\d.,]+)/i.exec(seg); out.push({ no: idx[i].no, name: idx[i].name.slice(0, 160), value: v ? Math.round(num(v[1].replace(/\.(?=\d{3}(\D|$))/g, '')) * 100) / 100 : null }); }
+  return out.length > 1 ? out : [];
+}
+async function seapFisaText(it) {
+  const { docs } = await seapDocs(it); let text = '';
+  for (const d of docs.filter(d => /fisa|fișa|instructiuni|instrucțiuni/i.test(d.name)).slice(0, 2)) { try { const f = await seapReq('GET', d.url, null, true); text += '\n' + seapText(f.buf, d.name); } catch {} await sleep(300); }
+  return text;
+}
 function seapExp(text) {
   const t = String(text || '').replace(/\s+/g, ' ');
   if (t.length < 200) return { status: 'unknown' };
@@ -2027,7 +2040,7 @@ async function seapRun(db, reason) {
         for (const x of (da && da.items) || []) if (!/^anulare/i.test(x.contractObject || '')) found.set('da:' + x.advNoticeId, { key: 'da:' + x.advNoticeId, type: 'da', id: x.advNoticeId, no: x.noticeNo, title: x.contractObject, ca: String(x.contractingAuthority || '').replace(/^(RO\s*)?\d+\s*/, ''), cpv: x.cpvCode, value: x.estimatedValue || x.maxEstimatedValue || null, deadline: x.tenderReceiptDeadline, published: x.publicationDate, kind: x.sysAcquisitionContractType || '' });
         await sleep(400);
         const sp = await seapReq('POST', 'api-pub/NoticeCommon/GetCNoticeList/', { sysNoticeTypeIds: [17], sortProperties: [], pageSize: 100, pageIndex: 0, startPublicationDate: since, sysProcedureStateId: 2, cPVId: +cid });
-        for (const x of (sp && sp.items) || []) found.set('sp:' + x.cNoticeId, { key: 'sp:' + x.cNoticeId, type: 'sp', id: x.cNoticeId, no: x.noticeNo, title: x.contractTitle, caFN: x.contractingAuthorityNameAndFN, ca: String(x.contractingAuthorityNameAndFN || '').replace(/^(RO\s*)?\d+\s*-\s*/, ''), cpv: x.cpvCodeAndName, value: x.estimatedValueRon || null, deadline: x.maxTenderReceiptDeadline || x.minTenderReceiptDeadline, published: x.noticeStateDate, kind: (x.sysAcquisitionContractType || {}).text || '' });
+        for (const x of (sp && sp.items) || []) found.set('sp:' + x.cNoticeId, { key: 'sp:' + x.cNoticeId, type: 'sp', id: x.cNoticeId, no: x.noticeNo, title: x.contractTitle, caFN: x.contractingAuthorityNameAndFN, ca: String(x.contractingAuthorityNameAndFN || '').replace(/^(RO\s*)?\d+\s*-\s*/, ''), cpv: x.cpvCodeAndName, value: x.estimatedValueRon || null, deadline: x.maxTenderReceiptDeadline || x.minTenderReceiptDeadline, published: x.noticeStateDate, kind: (x.sysAcquisitionContractType || {}).text || '', hasLots: !!x.hasLots });
         await sleep(400);
       } catch (e) { errs++; console.error('[seap]', code, e.message); }
     }
@@ -2035,7 +2048,9 @@ async function seapRun(db, reason) {
     for (const [k, x] of found) {
       let old = st.items[k];
       if (old && !old.inArea && seapIsSupply(x.kind || old.kind)) { delete st.items[k]; old = null; }   // furnizare din afara zonei, găsită înainte de regula nouă → o procesăm din nou
-      if (old) { Object.assign(old, { title: x.title, value: x.value, deadline: x.deadline }); continue; }
+      if (old) { Object.assign(old, { title: x.title, value: x.value, deadline: x.deadline, hasLots: x.hasLots });
+        if (x.type === 'sp' && x.hasLots && !old.lots && !old.lotsTried && old.inArea) { old.lotsTried = Date.now(); try { old.lots = seapLotsFrom(await seapFisaText(old)); } catch {} }
+        continue; }
       if (x.deadline && Date.parse(x.deadline) < now) continue;
       const it = { ...x, firstSeen: now, status: 'new', url: x.type === 'da' ? `https://www.e-licitatie.ro/pub/notices/adv-notices/view/${x.id}` : `https://www.e-licitatie.ro/pub/notices/simplified-notice/v1/view/${x.id}` };
       const { v, docs } = await seapDocs(it); it.docs = docs;
@@ -2047,6 +2062,7 @@ async function seapRun(db, reason) {
         const pick = docs.filter(d => x.type === 'da' || /fisa|fișa|instructiuni|instrucțiuni|caiet|documentatie|documentație/i.test(d.name)).slice(0, 3);
         for (const d of pick) { try { const f = await seapReq('GET', d.url, null, true); text += '\n' + seapText(f.buf, d.name); } catch {} await sleep(300); }
         it.exp = seapExp(text);
+        if (x.type === 'sp' && x.hasLots) it.lots = seapLotsFrom(text);
       } else it.exp = { status: 'unknown' };
       st.items[k] = it; added++;
       await sleep(300);
@@ -3804,7 +3820,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 10.2, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 10.3, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);

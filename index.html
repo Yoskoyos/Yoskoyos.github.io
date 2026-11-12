@@ -1203,6 +1203,7 @@ html:not(.unlocked) .app{display:none}
 .section-action{font-size:14px!important;gap:6px!important;padding:6px 10px;border-radius:9px;transition:background .15s}
 .section-action:hover{background:var(--accent-dim);opacity:1}
 .section-action svg{width:15px;height:15px}
+.sp-lots{display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 2px}.sp-lots span{font-size:12px;background:var(--bg-2);border-radius:8px;padding:4px 9px;color:var(--fg-2)}.sp-lots b{color:var(--fg)}
 .an-in{animation:anIn .55s cubic-bezier(.22,1,.36,1) both}
 @keyframes anIn{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:none}}
 .an-sumrow{display:flex;align-items:flex-end;gap:22px;flex-wrap:wrap;margin:-2px 0 12px}
@@ -7198,7 +7199,8 @@ function renderSeap() {
       <div class="sp-top">${isNew ? '<span class="sp-tag new">NOU</span>' : ''}<span class="sp-tag ${it.type}">${it.type === 'da' ? 'Achiziție directă' : 'Procedură simplificată'}</span>${spExpTag(it.exp)}${it.analysis && it.analysis.verdict ? `<span class="sp-tag v-${it.analysis.verdict}">${it.analysis.verdict === 'yes' ? '✅ Merită' : it.analysis.verdict === 'maybe' ? '🟡 Merită cu condiții' : '⛔ Nu merită'}</span>` : ''}${it.kind ? `<span class="sp-tag">${escapeHtml(it.kind)}</span>` : ''}</div>
       <div class="sp-title">${escapeHtml(it.title || '—')}</div>
       <div class="sp-ca">${escapeHtml(it.ca || '')}${it.city || it.county ? ' · ' + escapeHtml([it.city, it.county].filter(Boolean).join(', ')) : ''}</div>
-      <div class="sp-row"><span>Valoare: <b>${escapeHtml(spLei(it.value))}</b></span><span>Termen: <b${d.late ? ' style="color:var(--err)"' : ''}>${escapeHtml(d.txt)}</b></span><span>${escapeHtml(it.no || '')}</span></div>
+      <div class="sp-row"><span>${(it.lots || []).length ? `Valoare totală (${it.lots.length} loturi)` : it.hasLots ? 'Valoare totală (pe loturi)' : 'Valoare'}: <b>${escapeHtml(spLei(it.value))}</b></span><span>Termen: <b${d.late ? ' style="color:var(--err)"' : ''}>${escapeHtml(d.txt)}</b></span><span>${escapeHtml(it.no || '')}</span></div>
+      ${(it.lots || []).length ? `<div class="sp-lots">${it.lots.map(l => `<span><b>Lot ${l.no}</b> ${escapeHtml(l.name)} · <b>${escapeHtml(spLei(l.value))}</b></span>`).join('')}</div>` : ''}
       ${it.cpv ? `<div class="sp-ca" style="font-size:11px;color:var(--fg-3)">CPV ${escapeHtml(String(it.cpv).slice(0, 110))}</div>` : ''}
       ${it.exp && it.exp.snippet ? `<div class="sp-exp">„…${escapeHtml(it.exp.snippet.trim())}…”</div>` : ''}
       <div class="sp-acts">
