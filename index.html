@@ -7440,7 +7440,7 @@ const OF_DEF = {
   cam_int: { label: 'Cameră interior', unit: 'buc', name: 'Cameră IP interior dome {r}, IR / color noaptea, PoE', p: { 2: 200, 4: 300, 8: 480 } },
   nvr: { label: 'NVR (după nr. de canale)', unit: 'buc', name: 'NVR {c} canale, {pp} porturi PoE, H.265+, acces de pe telefon', p: { 4: 600, 8: 900, 16: 1500, 32: 2600 } },
   switch: { label: 'Switch PoE (8 / 16 porturi) — pentru camerele peste porturile NVR-ului', unit: 'buc', name: 'Switch PoE {s} porturi gigabit, uplink', p: { 8: 300, 16: 900 } },
-  hdd: { label: 'HDD supraveghere (după TB)', unit: 'buc', name: 'HDD supraveghere video {t} TB, funcționare 24/7', p: { 1: 350, 2: 500, 4: 800, 6: 1200, 8: 1800, 10: 2300 } },
+  hdd: { label: 'HDD supraveghere (după TB)', unit: 'buc', name: 'HDD supraveghere video {t} TB, funcționare 24/7', p: { 1: 350, 2: 500, 4: 800 } },
   cable: { label: 'Cablu FTP Cat5e (lei / m)', unit: 'm', name: 'Cablu FTP Cat5e cupru', price: 3 },
   doza: { label: 'Doză joncțiune (pe cameră)', unit: 'buc', name: 'Doză de joncțiune pentru cameră', price: 40 },
   cons: { label: 'Consumabile (pe cameră)', unit: 'set', name: 'Consumabile montaj (mufe RJ45, dibluri, coliere, tub/canal)', price: 25 },
@@ -7484,10 +7484,10 @@ function ofStockRefresh(force) {
   }, force ? 0 : 450);
 }
 const OF_A2T = { 'cam_ext.2': 'IPC-B120HA-LU', 'cam_ext.4': 'IPC-B140HA-LU', 'cam_ext.8': 'IPC-B180HA-LU', 'cam_int.2': 'IPC-D120HA-LU', 'cam_int.4': 'IPC-D140HA-LU', 'cam_int.8': 'IPC-D180HA-LU',
-  'nvr.4': 'NVR-104MH-C/4P(E)', 'nvr.8': 'NVR-108MH-C/8P(E)', 'nvr.16': 'NVR-216MH-K/16P', 'nvr.32': 'NVR-232MH-K/16P', 'hdd.1': 'WD11PURZ', 'hdd.2': 'ST2000VX017', 'hdd.4': 'ST4000VX016', 'hdd.6': 'ST6000VX009', 'hdd.8': 'ST8000VX010', 'hdd.10': 'ST10000VE001',
+  'nvr.4': 'NVR-104MH-C/4P(E)', 'nvr.8': 'NVR-108MH-C/8P(E)', 'nvr.16': 'NVR-216MH-K/16P', 'nvr.32': 'NVR-232MH-K/16P', 'hdd.1': 'WD11PURZ', 'hdd.2': 'ST2000VX017', 'hdd.4': 'ST4000VX016',
   'switch.8': 'NS-0510P-80(B)', 'switch.16': 'NS-0518P-125(B)', 'cable': 'SAF-FTP5S305-CU', 'doza': 'DS-1280ZJ-XS', 'ups': 'UPCSBLS665TRECG01B', 'rack': 'ASY-6U-6060W', 'mon': 'DH-LM22-A200Y' };
 const OF_GB = { 2: 10, 4: 20, 8: 40 };   // GB pe zi / cameră (înregistrare continuă, H.265) — pentru calculul HDD-ului
-const ofCfgGet = () => { const c = JSON.parse(JSON.stringify(OF_DEF)); const u = ofCfg || {}; for (const k of Object.keys(c)) if (u[k] !== undefined) { if (k === 'switch' && u[k] && u[k].name && !String(u[k].name).includes('{s}')) u[k] = { ...u[k], name: '' }; if (typeof c[k] === 'object' && c[k] && typeof u[k] === 'object') { if (u[k].p) c[k].p = { ...c[k].p, ...u[k].p }; if (u[k].price !== undefined) c[k].price = u[k].price; if (u[k].name) c[k].name = u[k].name; } else c[k] = u[k]; } return c; };
+const ofCfgGet = () => { const c = JSON.parse(JSON.stringify(OF_DEF)); const u = ofCfg || {}; for (const k of Object.keys(c)) if (u[k] !== undefined) { if (k === 'switch' && u[k] && u[k].name && !String(u[k].name).includes('{s}')) u[k] = { ...u[k], name: '' }; if (typeof c[k] === 'object' && c[k] && typeof u[k] === 'object') { if (u[k].p) for (const v of Object.keys(c[k].p)) if (u[k].p[v] !== undefined) c[k].p[v] = u[k].p[v]; if (u[k].price !== undefined) c[k].price = u[k].price; if (u[k].name) c[k].name = u[k].name; } else c[k] = u[k]; } return c; };
 const ofN = v => { let x = String(v == null ? '' : v).trim().replace(/\s/g, ''); if (/,\d{1,2}$/.test(x)) x = x.replace(/\./g, '').replace(',', '.'); else x = x.replace(/,/g, ''); const n = parseFloat(x); return isFinite(n) ? n : 0; };
 const ofL = v => (Math.round((v || 0) * 100) / 100).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const OF_ST = { draft: ['Ciornă', ''], sent: ['Trimisă', 'sp'], accepted: ['Acceptată', 'ok'], rejected: ['Refuzată', 'bad'] };
@@ -7627,11 +7627,12 @@ function ofQuickCalc() {
   const ch = [4, 8, 16, 32].find(c => c >= n) || 32, pp = Math.min(ch, 16);
   const needTb = n * (OF_GB[r] || 20) * days / 1000 * 1.1, sizes = Object.keys(C.hdd.p).map(Number).sort((a, b) => a - b);
   let disks = 1, tb = sizes.find(s => s >= needTb); if (!tb) { tb = sizes[sizes.length - 1]; disks = Math.ceil(needTb / tb); }
-  return { C, ext, int, n, r, days, m, ch, pp, needTb, tb, disks };
+  const bays = ch >= 16 ? 2 : 1;   // câte HDD-uri încap în NVR
+  return { C, ext, int, n, r, days, m, ch, pp, needTb, tb, disks, bays };
 }
 function ofQuickInfo() {
   const k = ofQuickCalc();
-  qs('#oq-info').innerHTML = k.n ? [`📷 <b>${k.n}</b> ${k.n === 1 ? 'cameră' : 'camere'}`, `📼 NVR <b>${k.ch}</b> canale`, `💾 ${k.disks > 1 ? k.disks + ' × ' : ''}HDD <b>${k.tb} TB</b> <small>(${k.needTb.toFixed(1).replace('.', ',')} TB pentru ${k.days} zile)</small>`, `🔌 <b>${Math.ceil(k.n * k.m / 5) * 5}</b> m cablu`].concat(k.n > 16 ? [`🔀 switch PoE pt. <b>${k.n - 16}</b> camere`] : []).map(x => `<span>${x}</span>`).join('') : '<span>Pune numărul de camere</span>';
+  qs('#oq-info').innerHTML = k.n ? [`📷 <b>${k.n}</b> ${k.n === 1 ? 'cameră' : 'camere'}`, `📼 NVR <b>${k.ch}</b> canale`, `💾 ${k.disks > 1 ? k.disks + ' × ' : ''}HDD <b>${k.tb} TB</b> <small>(${k.needTb.toFixed(1).replace('.', ',')} TB pentru ${k.days} zile)</small>${k.disks > k.bays ? ` <b style="color:var(--err)">⚠ NVR-ul are doar ${k.bays} ${k.bays === 1 ? 'loc' : 'locuri'} de HDD — scade zilele de înregistrare</b>` : ''}`, `🔌 <b>${Math.ceil(k.n * k.m / 5) * 5}</b> m cablu`].concat(k.n > 16 ? [`🔀 switch PoE pt. <b>${k.n - 16}</b> camere`] : []).map(x => `<span>${x}</span>`).join('') : '<span>Pune numărul de camere</span>';
 }
 ['#oq-ext', '#oq-int', '#oq-days', '#oq-m'].forEach(id => qs(id).addEventListener('input', ofQuickInfo));
 qs('#of-quick').addEventListener('click', e => {

@@ -1272,7 +1272,7 @@ function purchParse(buf, name) {
    cheia = <poziție>.<variantă> (ex. cam_ext.4 = cameră exterior 4MP) · preț ofertă (fără TVA) = preț site (cu TVA) / 1,21 × (1 + adaos%) */
 const A2T_MAP = { 'cam_ext.2': 'IPC-B120HA-LU', 'cam_ext.4': 'IPC-B140HA-LU', 'cam_ext.8': 'IPC-B180HA-LU', 'cam_int.2': 'IPC-D120HA-LU', 'cam_int.4': 'IPC-D140HA-LU', 'cam_int.8': 'IPC-D180HA-LU',
   'nvr.4': 'NVR-104MH-C/4P(E)', 'nvr.8': 'NVR-108MH-C/8P(E)', 'nvr.16': 'NVR-216MH-K/16P', 'nvr.32': 'NVR-232MH-K/16P',
-  'hdd.1': 'WD11PURZ', 'hdd.2': 'ST2000VX017', 'hdd.4': 'ST4000VX016', 'hdd.6': 'ST6000VX009', 'hdd.8': 'ST8000VX010', 'hdd.10': 'ST10000VE001',
+  'hdd.1': 'WD11PURZ', 'hdd.2': 'ST2000VX017', 'hdd.4': 'ST4000VX016',
   'switch.8': 'NS-0510P-80(B)', 'switch.16': 'NS-0518P-125(B)', 'cable': 'SAF-FTP5S305-CU', 'doza': 'DS-1280ZJ-XS', 'ups': 'UPCSBLS665TRECG01B', 'rack': 'ASY-6U-6060W', 'mon': 'DH-LM22-A200Y' };
 const A2T_PER = { cable: 305 };   // rola de 305 m → preț pe metru
 const A2T_EVERY = 7 * 864e5;
@@ -3767,7 +3767,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 9.7, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 9.8, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
