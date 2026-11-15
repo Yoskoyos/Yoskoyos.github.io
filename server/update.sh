@@ -36,6 +36,12 @@ if [ -n "$NG" ] && ! grep -q "X-Forwarded-For" "$NG"; then
   sed -i '0,/proxy_set_header Host \$host;/s//&\n        proxy_set_header X-Forwarded-For $remote_addr;/' "$NG"
   if nginx -t >/dev/null 2>&1; then systemctl reload nginx; echo "nginx: IP real vizitatori"; else cp /root/nginx-nvr-proxy.conf.bak2 "$NG"; echo "ATENȚIE: nu am putut adăuga X-Forwarded-For (restaurat)"; fi
 fi
+# înregistrări (redare / descărcare MP4): pornesc în până la 1–2 minute și curg mult timp → timeout mai mare, fără buffer (o singură dată)
+if [ -n "$NG" ] && ! grep -q "proxy_read_timeout" "$NG"; then
+  cp "$NG" /root/nginx-nvr-proxy.conf.bak3
+  sed -i '0,/proxy_set_header Host \$host;/s//&\n        proxy_read_timeout 900s;\n        proxy_send_timeout 900s;\n        proxy_buffering off;/' "$NG"
+  if nginx -t >/dev/null 2>&1; then systemctl reload nginx; echo "nginx: timeout 15 min pentru înregistrări"; else cp /root/nginx-nvr-proxy.conf.bak3 "$NG"; echo "ATENȚIE: nu am putut mări timeout-ul nginx (restaurat)"; fi
+fi
 [ -d node_modules/nodemailer ] || npm install --silent nodemailer@latest >/dev/null 2>&1 || true
 [ -d node_modules/web-push ] || { echo "Instalez modulul pentru notificări push..."; npm install --silent web-push@latest >/dev/null 2>&1 || echo "ATENȚIE: web-push nu s-a instalat — notificările push nu vor merge"; }
 # portul 8443: interfața web a NVR-urilor deschisă din aplicație (deja logată)

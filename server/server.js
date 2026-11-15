@@ -920,6 +920,7 @@ async function handleSnap(req, res, parsed) {
    Sursa: întâi RTSP playback (portul RTSP), altfel descărcare ISAPI pe portul HTTP al NVR-ului. H.265 → transcodat H.264 dacă browserul nu-l suportă. */
 const REC_PLAY_MAX = 3, REC_TC_MAX = 1;
 let recPlaying = 0, recTranscoding = 0;
+const recNoIsapi = new Map();   // NVR → până când nu mai încercăm descărcarea ISAPI (n-a mers)
 function recNvrCtx(ctx, q) {
   const conf = ctx.db.configs[ctx.uname] || {};
   if (ctx.user.role === 'client' && !(ctx.user.nvrIds || []).map(String).includes(String(q.nvr))) return { err: [403, 'Nu ai acces la acest NVR'] };
@@ -998,6 +999,7 @@ async function handleRecPlay(req, res, parsed) {
   const auth = `${encodeURIComponent(c.cred.user || 'admin')}:${encodeURIComponent(c.cred.pass || '')}@`;
   const track = `/Streaming/tracks/${c.ch}01/?starttime=${rtspT(start)}&endtime=${rtspT(end)}`;
   const hevcOk = dl || q.hevc === '1';
+  const nkey = ctx.uname + ':' + c.nvr.id;
   const fname = `${String(c.nvr.name || 'NVR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w-]+/g, '_').slice(0, 40)}_CH${c.ch}_${String(q.start).replace(/[^\dT]/g, '').replace('T', '_')}.mp4`;
   console.log(`[rec] ${ctx.uname} → ${c.nvr.name || c.nvr.ip} CH${c.ch} ${q.start} (${dur}s)`);
   // o încercare: sursa (rtsp | isapi), cu copiere sau transcodare → {ok} după primul fragment trimis, sau {err, hevc}
@@ -1007,10 +1009,11 @@ async function handleRecPlay(req, res, parsed) {
     else {
       if (src) { try { src.req.destroy(); } catch {} src = null; }
       const uri = `rtsp://${host}:${port}${track}`;
-      src = await nvrStream(c.nvr, c.cred, '/ISAPI/ContentMgmt/download?playbackURI=' + encodeURIComponent(uri), 20000);
-      if (!src && !closed) src = await nvrStream(c.nvr, c.cred, '/ISAPI/ContentMgmt/download', 20000, 'POST',
+      if ((recNoIsapi.get(nkey) || 0) > Date.now()) return resolve({ err: 'descărcarea ISAPI nu e disponibilă pe acest NVR' });
+      src = await nvrStream(c.nvr, c.cred, '/ISAPI/ContentMgmt/download?playbackURI=' + encodeURIComponent(uri), 10000);
+      if (!src && !closed) src = await nvrStream(c.nvr, c.cred, '/ISAPI/ContentMgmt/download', 10000, 'POST',
         `<?xml version="1.0" encoding="UTF-8"?><downloadRequest version="1.0" xmlns="http://www.isapi.org/ver20/XMLSchema"><playbackURI>${uri.replace(/&/g, '&amp;')}</playbackURI></downloadRequest>`);
-      if (!src || closed) return resolve({ err: 'descărcarea ISAPI nu e disponibilă' });
+      if (!src || closed) { if (!closed) recNoIsapi.set(nkey, Date.now() + 6 * 3600e3); return resolve({ err: 'descărcarea ISAPI nu e disponibilă' }); }
       input = ['-probesize', '5000000', '-analyzeduration', '5000000', '-i', 'pipe:0'];
     }
     const vcodec = tc ? ['-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency', '-crf', '27', '-vf', 'scale=-2:min(720\\,ih)', '-pix_fmt', 'yuv420p'] : ['-c:v', 'copy', ...(hvc ? ['-tag:v', 'hvc1'] : [])];
@@ -4030,7 +4033,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 10.9, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.0, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
