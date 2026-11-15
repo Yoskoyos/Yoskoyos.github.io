@@ -1377,6 +1377,7 @@ html:not(.unlocked) .app{display:none}
 .rec-tl .sg.m{background:var(--accent,#FF8A1F)}
 .rec-tl .nd{position:absolute;top:0;bottom:0;width:2px;background:#ef4444;box-shadow:0 0 0 1px rgba(255,255,255,.6);pointer-events:none}
 .rec-tl .hov{position:absolute;top:-2px;transform:translateX(-50%);font:700 10px var(--mono);background:var(--fg,#111);color:var(--bg,#fff);padding:2px 5px;border-radius:5px;pointer-events:none;white-space:nowrap}
+.rec-zoom{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}.rec-zl{font-size:12px;color:var(--fg-3)}.rec-zseg{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}.rec-zseg button{border:0;background:transparent;color:var(--fg-2);font:600 12px var(--sans,inherit);padding:7px 11px;cursor:pointer}.rec-zseg button+button{border-left:1px solid var(--border)}.rec-zseg button.on{background:var(--accent-soft);color:var(--accent-tx,var(--accent))}.rec-pan{display:inline-flex;align-items:center;gap:6px;margin-left:auto}@media(max-width:600px){.rec-zl{display:none}.rec-zseg{flex:1 1 100%}.rec-zseg button{flex:1;padding:8px 4px}.rec-pan{flex:1 1 100%;justify-content:space-between}}.rec-win{font:700 12px var(--mono);color:var(--fg-2);min-width:96px;text-align:center}
 .rec-ticks{display:flex;justify-content:space-between;font:10px var(--mono);color:var(--fg-3);padding:4px 1px 0}
 .rec-leg{display:flex;gap:14px;align-items:center;font-size:11.5px;color:var(--fg-2);padding:6px 14px 0;flex-wrap:wrap}
 .rec-leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
@@ -2801,8 +2802,10 @@ html:not(.unlocked) .app{display:none}
       <div class="rec-ov" id="rec-ov" hidden></div>
     </div>
     <div class="rec-tl-wrap">
+      <div class="rec-zoom"><span class="rec-zl">Perioadă afișată:</span><div class="rec-zseg" id="rec-zseg"><button type="button" data-z="86400">24 h</button><button type="button" data-z="21600">6 h</button><button type="button" data-z="3600" class="on">1 h</button><button type="button" data-z="900">15 min</button><button type="button" data-z="300">5 min</button></div>
+        <span class="rec-pan"><button type="button" class="btn sm" id="rec-pl" title="Mai devreme">‹</button><span class="rec-win" id="rec-win">—</span><button type="button" class="btn sm" id="rec-pr" title="Mai târziu">›</button></span></div>
       <div class="rec-tl" id="rec-tl" title="Apasă pe bară ca să redai de la ora aleasă"></div>
-      <div class="rec-ticks"><span>00</span><span>03</span><span>06</span><span>09</span><span>12</span><span>15</span><span>18</span><span>21</span><span>24</span></div>
+      <div class="rec-ticks" id="rec-ticks"></div>
     </div>
     <div class="rec-leg"><span><i style="background:#3B82F6"></i>Continuu / program</span><span><i style="background:var(--accent,#FF8A1F)"></i>Mișcare / eveniment</span><span id="rec-sum"></span></div>
     <div class="rec-segs" id="rec-segs"></div>
@@ -5536,7 +5539,7 @@ function recStopVideo() { const v = qs('#rec-video'); try { v.pause(); } catch {
 function openRecModal(nvrId, ch) {
   const n = nvrs.find(x => x.id === nvrId); if (!n) return;
   stopModalLive(); qs('#snap-modal').classList.add('hidden');
-  recSt = { nvrId, ch, date: recTodayRo(), segs: [], start: null, tries: 0 };
+  recSt = { nvrId, ch, date: recTodayRo(), segs: [], start: null, tries: 0, zoom: (recSt && recSt.zoom) || 3600, v0: 0 };
   qs('#rec-title').textContent = `Înregistrări · ${n.name}`;
   const chs = Array.from({ length: n.channels || 16 }, (_, i) => i + 1).filter(c => !Array.isArray(n.cams) || (n.cams[c - 1] && n.cams[c - 1] !== 'free'));
   if (!chs.includes(ch)) chs.unshift(ch);
@@ -5559,6 +5562,7 @@ async function recLoadDay(autoplay) {
     if (!r.ok) return recOv(escapeHtml(d.error || 'Eroare ' + r.status), true);
     my.segs = d.segs || [];
   } catch (e) { if (recSt === my) recOv('Nu pot contacta serverul: ' + escapeHtml(e.message), true); return; }
+  const lastSeg = my.segs[my.segs.length - 1]; recFocus(lastSeg ? Math.max(lastSeg.s, lastSeg.e - 300) : 0);
   recDrawTl();
   const tot = my.segs.reduce((t, s) => t + (s.e - s.s), 0);
   qs('#rec-sum').textContent = my.segs.length ? `${my.segs.length} ${my.segs.length === 1 ? 'segment' : 'segmente'} · ${Math.round(tot / 60)} min înregistrate` : '';
@@ -5569,9 +5573,20 @@ async function recLoadDay(autoplay) {
   if (autoplay) { const l = my.segs[my.segs.length - 1]; recPlayAt(Math.max(l.s, l.e - 300)); }
   else recOv('Apasă pe bară sau pe un interval ca să pornești redarea.');
 }
+function recFocus(sec) {   // pune fereastra afișată în jurul orei date
+  const z = recSt.zoom; recSt.v0 = Math.max(0, Math.min(86400 - z, Math.floor((sec - z * 0.25) / 60) * 60));
+}
 function recDrawTl() {
-  const tl = qs('#rec-tl'); if (!recSt) return;
-  tl.innerHTML = recSt.segs.map(s => `<span class="sg${recIsMot(s.t) ? ' m' : ''}" style="left:${s.s / 864}%;width:${Math.max(0.15, (s.e - s.s) / 864)}%"></span>`).join('') + '<span class="nd" id="rec-nd" style="display:none"></span>';
+  const tl = qs('#rec-tl'); if (!recSt) return; const z = recSt.zoom, v0 = recSt.v0, v1 = v0 + z;
+  const pc = x => (x - v0) / z * 100;
+  tl.innerHTML = recSt.segs.filter(s => s.e > v0 && s.s < v1).map(s => { const a = Math.max(s.s, v0), b = Math.min(s.e, v1);
+    return `<span class="sg${recIsMot(s.t) ? ' m' : ''}" style="left:${pc(a)}%;width:${Math.max(0.3, pc(b) - pc(a))}%" title="${recHms(s.s)}–${recHms(s.e)}"></span>`; }).join('') + '<span class="nd" id="rec-nd" style="display:none"></span>';
+  const n = 6, step = z / n, fmt = x => z >= 3600 * 6 ? recHms(x).slice(0, 2) === '24' ? '24' : recHms(x).slice(0, 5) : recHms(x).slice(0, z <= 900 ? 8 : 5);
+  qs('#rec-ticks').innerHTML = Array.from({ length: n + 1 }, (_, i) => `<span>${v0 + i * step >= 86400 ? '24:00' : fmt(v0 + i * step)}</span>`).join('');
+  qs('#rec-win').textContent = `${recHms(v0).slice(0, 5)} – ${v1 >= 86400 ? '24:00' : recHms(v1).slice(0, 5)}`;
+  qs('#rec-zseg').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.z === z));
+  qs('#rec-pl').disabled = v0 <= 0; qs('#rec-pr').disabled = v1 >= 86400;
+  if (recSt.start != null) recNeedle(recSt.start + (qs('#rec-video').currentTime || 0));
 }
 function recPlayAt(sec, keepTries) {
   if (!recSt) return; const my = recSt;
@@ -5579,7 +5594,7 @@ function recPlayAt(sec, keepTries) {
     const inside = my.segs.find(s => sec >= s.s && sec < s.e);
     if (!inside) { const nx = my.segs.find(s => s.s > sec); sec = nx ? nx.s : my.segs[my.segs.length - 1].s; }
   }
-  sec = Math.floor(sec); my.start = sec; if (!keepTries) my.tries = 0;
+  sec = Math.floor(sec); my.start = sec; my.panUntil = 0; if (!keepTries) my.tries = 0;
   const auth = getAuth(); if (!auth) return;
   const hevc = my.tries === 0 && recHevcOk() ? 1 : 0;
   const v = qs('#rec-video');
@@ -5590,7 +5605,14 @@ function recPlayAt(sec, keepTries) {
   v.play().catch(() => {});
   recNeedle(sec);
 }
-function recNeedle(sec) { const nd = qs('#rec-nd'); if (nd) { nd.style.display = ''; nd.style.left = (sec / 864) + '%'; } }
+function recNeedle(sec) {
+  if (!recSt) return; const z = recSt.zoom; sec = Math.max(0, Math.min(86400, sec));
+  if (sec < recSt.v0 || sec > recSt.v0 + z) {
+    if (Date.now() < (recSt.panUntil || 0)) { const nd = qs('#rec-nd'); if (nd) nd.style.display = 'none'; return; }   // utilizatorul răsfoiește bara
+    recFocus(sec); return recDrawTl();
+  }   // indicatorul iese din fereastră → o mutăm
+  const nd = qs('#rec-nd'); if (nd) { nd.style.display = ''; nd.style.left = ((sec - recSt.v0) / z * 100) + '%'; }
+}
 qs('#rec-video').addEventListener('playing', () => { if (recSt) recOv(''); });
 qs('#rec-video').addEventListener('timeupdate', () => {
   if (!recSt || recSt.start == null) return; const cur = recSt.start + (qs('#rec-video').currentTime || 0);
@@ -5613,13 +5635,18 @@ qs('#rec-video').addEventListener('error', async () => {
     recOv(`<b>Nu pot reda înregistrarea</b>${escapeHtml(d.error || 'Eroare ' + r.status)}${d.hint ? `<small style="opacity:.8">${escapeHtml(d.hint)}</small>` : ''}`.replace('</b>', '</b><br>'), true);
   } catch (e) { if (recSt === my) recOv('Nu pot reda înregistrarea: ' + escapeHtml(e.message), true); }
 });
-function recTlSec(e) { const r = qs('#rec-tl').getBoundingClientRect(); return Math.max(0, Math.min(86399, (e.clientX - r.left) / r.width * 86400)); }
+function recTlSec(e) { const r = qs('#rec-tl').getBoundingClientRect(); return Math.max(0, Math.min(86399, recSt.v0 + (e.clientX - r.left) / r.width * recSt.zoom)); }
 qs('#rec-tl').addEventListener('click', e => { if (recSt && recSt.segs.length) recPlayAt(recTlSec(e)); });
 qs('#rec-tl').addEventListener('mousemove', e => {
   let h = qs('#rec-tl .hov'); if (!h) { h = document.createElement('span'); h.className = 'hov'; qs('#rec-tl').appendChild(h); }
-  const s = recTlSec(e); h.textContent = recHms(s).slice(0, 5); h.style.left = (s / 864) + '%';
+  if (!recSt) return; const s = recTlSec(e); h.textContent = recHms(s).slice(0, recSt.zoom <= 900 ? 8 : 5); h.style.left = ((s - recSt.v0) / recSt.zoom * 100) + '%';
 });
 qs('#rec-tl').addEventListener('mouseleave', () => { const h = qs('#rec-tl .hov'); if (h) h.remove(); });
+qs('#rec-zseg').addEventListener('click', e => { const b = e.target.closest('button[data-z]'); if (!b || !recSt) return;
+  const mid = recSt.start != null ? recSt.start + (qs('#rec-video').currentTime || 0) : recSt.v0 + recSt.zoom / 2;
+  recSt.zoom = +b.dataset.z; recFocus(mid); recDrawTl(); });
+qs('#rec-pl').addEventListener('click', () => { if (!recSt) return; recSt.v0 = Math.max(0, recSt.v0 - recSt.zoom / 2); recSt.panUntil = Date.now() + 20000; recDrawTl(); });
+qs('#rec-pr').addEventListener('click', () => { if (!recSt) return; recSt.v0 = Math.min(86400 - recSt.zoom, recSt.v0 + recSt.zoom / 2); recSt.panUntil = Date.now() + 20000; recDrawTl(); });
 qs('#rec-segs').addEventListener('click', e => { const b = e.target.closest('button[data-s]'); if (b) recPlayAt(+b.dataset.s); });
 qs('#rec-ch').addEventListener('change', () => { if (!recSt) return; recSt.ch = +qs('#rec-ch').value; recLoadDay(true); });
 qs('#rec-date').addEventListener('change', () => { if (!recSt || !qs('#rec-date').value) return; recSt.date = qs('#rec-date').value; recLoadDay(false); });
