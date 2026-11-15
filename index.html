@@ -1377,7 +1377,8 @@ html:not(.unlocked) .app{display:none}
 .rec-tl .sg.m{background:var(--accent,#FF8A1F)}
 .rec-tl .nd{position:absolute;top:0;bottom:0;width:2px;background:#ef4444;box-shadow:0 0 0 1px rgba(255,255,255,.6);pointer-events:none}
 .rec-tl .hov{position:absolute;top:-2px;transform:translateX(-50%);font:700 10px var(--mono);background:var(--fg,#111);color:var(--bg,#fff);padding:2px 5px;border-radius:5px;pointer-events:none;white-space:nowrap}
-.rec-zoom{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}.rec-zl{font-size:12px;color:var(--fg-3)}.rec-zseg{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}.rec-zseg button{border:0;background:transparent;color:var(--fg-2);font:600 12px var(--sans,inherit);padding:7px 11px;cursor:pointer}.rec-zseg button+button{border-left:1px solid var(--border)}.rec-zseg button.on{background:var(--accent-soft);color:var(--accent-tx,var(--accent))}.rec-pan{display:inline-flex;align-items:center;gap:6px;margin-left:auto}@media(max-width:600px){.rec-zl{display:none}.rec-zseg{flex:1 1 100%}.rec-zseg button{flex:1;padding:8px 4px}.rec-pan{flex:1 1 100%;justify-content:space-between}}.rec-win{font:700 12px var(--mono);color:var(--fg-2);min-width:96px;text-align:center}
+.rec-zoom{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}.rec-zl{font-size:12px;color:var(--fg-3)}.rec-zseg{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}.rec-zseg button{border:0;background:transparent;color:var(--fg-2);font:600 12px var(--sans,inherit);padding:7px 11px;cursor:pointer}.rec-zseg button+button{border-left:1px solid var(--border)}.rec-zseg button.on{background:var(--accent-soft);color:var(--accent-tx,var(--accent))}.rec-dl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--accent-soft)}.rec-dl[hidden]{display:none}.rec-dl label{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600}.rec-dl input,.rec-dl select{height:34px;border-radius:9px;padding:0 8px;font:inherit;font-size:13px;width:auto}.rec-dl small{flex:1 1 100%;font-size:11.5px;color:var(--fg-3)}
+.rec-pan{display:inline-flex;align-items:center;gap:6px;margin-left:auto}@media(max-width:600px){.rec-zl{display:none}.rec-zseg{flex:1 1 100%}.rec-zseg button{flex:1;padding:8px 4px}.rec-pan{flex:1 1 100%;justify-content:space-between}}.rec-win{font:700 12px var(--mono);color:var(--fg-2);min-width:96px;text-align:center}
 .rec-ticks{display:flex;justify-content:space-between;font:10px var(--mono);color:var(--fg-3);padding:4px 1px 0}
 .rec-leg{display:flex;gap:14px;align-items:center;font-size:11.5px;color:var(--fg-2);padding:6px 14px 0;flex-wrap:wrap}
 .rec-leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
@@ -2795,6 +2796,13 @@ html:not(.unlocked) .app{display:none}
       <span style="flex:1"></span>
       <button class="btn sm" id="rec-back" type="button" title="Înapoi 1 minut">⏪ 1 min</button>
       <button class="btn sm" id="rec-fwd" type="button" title="Înainte 1 minut">1 min ⏩</button>
+      <button class="btn sm primary" id="rec-dlbtn" type="button" title="Descarcă filmarea ca MP4">⬇ Descarcă MP4</button>
+    </div>
+    <div class="rec-dl" id="rec-dl" hidden>
+      <label>De la <input type="time" step="1" id="rec-dl-from"></label>
+      <label>Durată <select id="rec-dl-dur"><option value="60">1 min</option><option value="120">2 min</option><option value="300" selected>5 min</option><option value="600">10 min</option><option value="900">15 min</option><option value="1800">30 min</option><option value="3600">60 min</option></select></label>
+      <button class="btn sm primary" id="rec-dl-go" type="button">⬇ Descarcă</button>
+      <small>Fișier MP4 cu sunet (dacă camera are microfon). Descărcarea pornește în browser după 5–20 de secunde; durează mai puțin decât filmarea, sau cât filmarea dacă NVR-ul nu permite descărcarea rapidă.</small>
     </div>
     <div class="rec-stage">
       <video id="rec-video" playsinline muted controls preload="none"></video>
@@ -5642,6 +5650,23 @@ qs('#rec-tl').addEventListener('mousemove', e => {
   if (!recSt) return; const s = recTlSec(e); h.textContent = recHms(s).slice(0, recSt.zoom <= 900 ? 8 : 5); h.style.left = ((s - recSt.v0) / recSt.zoom * 100) + '%';
 });
 qs('#rec-tl').addEventListener('mouseleave', () => { const h = qs('#rec-tl .hov'); if (h) h.remove(); });
+function recCurSec() { return recSt && recSt.start != null ? Math.floor(recSt.start + (qs('#rec-video').currentTime || 0)) : null; }
+qs('#rec-dlbtn').addEventListener('click', () => {
+  if (!recSt) return; const box = qs('#rec-dl'); box.hidden = !box.hidden; if (box.hidden) return;
+  let from = recCurSec();
+  const chip = qs('#rec-segs button.on'); const seg = chip && recSt.segs.find(s => s.s === +chip.dataset.s);
+  if (from == null) { const l = recSt.segs[recSt.segs.length - 1]; from = l ? Math.max(l.s, l.e - 300) : 0; }
+  if (seg && seg.e - seg.s <= 3600) { from = seg.s; const d = Math.ceil((seg.e - seg.s) / 60) * 60; const opt = [...qs('#rec-dl-dur').options].find(o => +o.value >= d); qs('#rec-dl-dur').value = opt ? opt.value : '3600'; }
+  qs('#rec-dl-from').value = recHms(from);
+});
+qs('#rec-dl-go').addEventListener('click', () => {
+  if (!recSt) return; const auth = getAuth(); if (!auth) return toast('Trebuie să fii conectat', 'warn');
+  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(qs('#rec-dl-from').value || ''); if (!m) return toast('Alege ora de început', 'warn');
+  const from = (+m[1]) * 3600 + (+m[2]) * 60 + (+(m[3] || 0)), dur = +qs('#rec-dl-dur').value;
+  const u = `${getProxyBase()}/rec/play?nvr=${encodeURIComponent(recSt.nvrId)}&ch=${recSt.ch}&start=${recSt.date}T${recHms(from)}&dur=${dur}&dl=1&token=${encodeURIComponent(auth.token)}`;
+  const a = document.createElement('a'); a.href = u; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
+  toast(`Descarc ${recHms(from)} · ${dur / 60} min — fișierul apare în Descărcări`, 'ok');
+});
 qs('#rec-zseg').addEventListener('click', e => { const b = e.target.closest('button[data-z]'); if (!b || !recSt) return;
   const mid = recSt.start != null ? recSt.start + (qs('#rec-video').currentTime || 0) : recSt.v0 + recSt.zoom / 2;
   recSt.zoom = +b.dataset.z; recFocus(mid); recDrawTl(); });

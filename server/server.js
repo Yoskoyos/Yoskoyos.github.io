@@ -983,7 +983,8 @@ async function handleRecPlay(req, res, parsed) {
   const q = parsed.query; const c = recNvrCtx(ctx, q); if (c.err) return sendJson(res, c.err[0], { error: c.err[1] });
   if (!hasFfmpeg()) return sendJson(res, 501, { error: 'ffmpeg nu e instalat pe server' });
   const start = recT(q.start); if (!start) return sendJson(res, 400, { error: 'Ora de început lipsește' });
-  const dur = Math.min(1800, Math.max(10, parseInt(q.dur, 10) || 600));
+  const dl = q.dl === '1';   // descărcare: fișier MP4 cu sunet, H.265 rămâne H.265, întâi descărcarea ISAPI (mai rapidă decât timpul real)
+  const dur = Math.min(dl ? 3600 : 1800, Math.max(10, parseInt(q.dur, 10) || 600));
   const end = new Date(start.getTime() + dur * 1000);
   if (recPlaying >= REC_PLAY_MAX) return sendJson(res, 429, { error: 'Sunt deja prea multe înregistrări deschise. Închide una și încearcă din nou.' });
   recPlaying++;
@@ -994,7 +995,8 @@ async function handleRecPlay(req, res, parsed) {
   const host = String(c.nvr.ip).trim(), port = parseInt(c.nvr.rtspPort, 10) || 554;
   const auth = `${encodeURIComponent(c.cred.user || 'admin')}:${encodeURIComponent(c.cred.pass || '')}@`;
   const track = `/Streaming/tracks/${c.ch}01/?starttime=${rtspT(start)}&endtime=${rtspT(end)}`;
-  const hevcOk = q.hevc === '1';
+  const hevcOk = dl || q.hevc === '1';
+  const fname = `${String(c.nvr.name || 'NVR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w-]+/g, '_').slice(0, 40)}_CH${c.ch}_${String(q.start).replace(/[^\dT]/g, '').replace('T', '_')}.mp4`;
   console.log(`[rec] ${ctx.uname} → ${c.nvr.name || c.nvr.ip} CH${c.ch} ${q.start} (${dur}s)`);
   // o încercare: sursa (rtsp | isapi), cu copiere sau transcodare → {ok} după primul fragment trimis, sau {err, hevc}
   const attempt = (mode, tc, hvc) => new Promise(async resolve => {
@@ -1007,7 +1009,8 @@ async function handleRecPlay(req, res, parsed) {
       input = ['-probesize', '5000000', '-analyzeduration', '5000000', '-i', 'pipe:0'];
     }
     const vcodec = tc ? ['-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency', '-crf', '27', '-vf', 'scale=-2:min(720\\,ih)', '-pix_fmt', 'yuv420p'] : ['-c:v', 'copy', ...(hvc ? ['-tag:v', 'hvc1'] : [])];
-    const args = ['-hide_banner', '-loglevel', 'info', ...input, '-t', String(dur), '-map', '0:v:0', ...vcodec, '-an', '-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov+default_base_moof', 'pipe:1'];
+    const audio = dl ? ['-map', '0:a:0?', '-c:a', 'aac', '-b:a', '64k', '-ar', '16000'] : ['-an'];
+    const args = ['-hide_banner', '-loglevel', 'info', ...input, '-t', String(dur), '-map', '0:v:0', ...vcodec, ...audio, '-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov+default_base_moof', 'pipe:1'];
     let p; try { p = spawn('ffmpeg', args, { stdio: [mode === 'isapi' ? 'pipe' : 'ignore', 'pipe', 'pipe'] }); } catch (e) { return resolve({ err: e.message }); }
     cur = p; let err = '', started = false, codec = '', settled = false, ready = false; const held = [];
     const settle = v => { if (!settled) { settled = true; clearTimeout(t0); resolve(v); } };
@@ -1024,7 +1027,7 @@ async function handleRecPlay(req, res, parsed) {
       if (closed) return;
       if (!started) {
         started = true; clearTimeout(t0); settle({ ok: true });
-        res.writeHead(200, { 'Content-Type': 'video/mp4', 'Cache-Control': 'no-store', 'X-Rec-Source': mode + (tc ? '+h264' : ''), ...CORS });
+        res.writeHead(200, { 'Content-Type': 'video/mp4', 'Cache-Control': 'no-store', 'X-Rec-Source': mode + (tc ? '+h264' : ''), ...(dl ? { 'Content-Disposition': `attachment; filename="${fname}"` } : {}), ...CORS });
       }
       if (!res.write(d)) { p.stdout.pause(); res.once('drain', () => p.stdout.resume()); }
     }
@@ -1037,7 +1040,7 @@ async function handleRecPlay(req, res, parsed) {
     p.on('error', e => settle({ err: e.message }));
   });
   let r = null; const errs = [];
-  for (const mode of ['rtsp', 'isapi']) {
+  for (const mode of dl ? ['isapi', 'rtsp'] : ['rtsp', 'isapi']) {
     if (closed) return;
     let tc = false;
     if (mode === 'isapi' && src) { try { src.req.destroy(); } catch {} src = null; }
@@ -4020,7 +4023,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 10.7, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 10.8, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
