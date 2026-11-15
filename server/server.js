@@ -200,7 +200,7 @@ function getAuth(req) {
   if (!tok) {   // <img src> nu poate trimite antete → tokenul poate veni și în ?token= (doar pentru /snap)
     try {
       const q = url.parse(req.url, true);
-      const tokOk = q.pathname === '/snap' || q.pathname === '/rec/play' || (req.method === 'GET' && (q.pathname === '/clients-backup' || /^\/clients\/[\w-]+\/contracts\/[\w-]+$/.test(q.pathname || '') || /^\/company-docs\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/ops\/(works|stock|gdpr|catalog)\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/seap\/[\w:%-]+\/zip$/.test(q.pathname || '') || /^\/seap\/[\w:%-]+\/files\/[\w-]+$/.test(q.pathname || '')));
+      const tokOk = q.pathname === '/snap' || q.pathname === '/rec/play' || /^\/rec\/export\/[0-9a-f]+\/file$/.test(q.pathname || '') || (req.method === 'GET' && (q.pathname === '/clients-backup' || /^\/clients\/[\w-]+\/contracts\/[\w-]+$/.test(q.pathname || '') || /^\/company-docs\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/ops\/(works|stock|gdpr|catalog)\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/seap\/[\w:%-]+\/zip$/.test(q.pathname || '') || /^\/seap\/[\w:%-]+\/files\/[\w-]+$/.test(q.pathname || '')));
       if (tokOk && q.query.token) tok = String(q.query.token);
     } catch {}
   }
@@ -981,6 +981,101 @@ function nvrStream(nvr, cred, pathName, timeoutMs, method, body) {   // GET/POST
     r1.on('error', () => fin(null)); r1.on('timeout', () => { r1.destroy(); fin(null); }); r1.end(body || undefined);
   });
 }
+/* ───── Descărcare MP4 rapidă (export): intervalul e împărțit în bucăți de 1 min luate în paralel din NVR (RTSP), apoi lipite într-un MP4 ─────
+   POST /rec/export {nvr, ch, start, dur} → {id};  GET /rec/export/<id> → stare/progres;  GET /rec/export/<id>/file?token= → fișierul;  DELETE → anulare */
+const REC_EXP_DIR = path.join(os.tmpdir(), 'yca-rec-export');
+const REC_EXP_PAR = 3, REC_EXP_CHUNK = 60;
+const recJobs = new Map();
+setInterval(() => { const now = Date.now(); for (const [id, j] of recJobs) if (now - j.at > 45 * 60e3) { recJobKill(j); try { fs.rmSync(j.dir, { recursive: true, force: true }); } catch {} recJobs.delete(id); } }, 5 * 60e3).unref();
+function recJobKill(j) { j.cancel = true; for (const p of j.procs) { try { p.kill('SIGKILL'); } catch {} } j.procs.clear(); }
+function recChunk(j, k) {   // o bucată → .ts; întoarce true/false
+  return new Promise(resolve => {
+    const t0 = new Date(j.start.getTime() + k.off * 1000), t1 = new Date(t0.getTime() + k.len * 1000);
+    const url = `rtsp://${j.auth}${j.host}:${j.port}/Streaming/tracks/${j.ch}01/?starttime=${rtspT(t0)}&endtime=${rtspT(t1)}`;
+    const audio = j.noAudio ? ['-an'] : ['-map', '0:a:0?', '-c:a', 'aac', '-b:a', '64k', '-ar', '16000'];
+    const args = ['-hide_banner', '-loglevel', 'info', '-rtsp_transport', 'tcp', '-i', url, '-t', String(k.len), '-map', '0:v:0', '-c:v', 'copy', ...audio, '-f', 'mpegts', '-y', k.file];
+    let p; try { p = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] }); } catch { return resolve(false); }
+    j.procs.add(p); let err = '', last = Date.now();
+    const idle = setInterval(() => { if (Date.now() - last > 40000) { try { p.kill('SIGKILL'); } catch {} } }, 5000);
+    p.stderr.on('data', d => {
+      const t = String(d); if (err.length < 4000) err += t; last = Date.now();
+      if (!j.codec) { const m = /Stream #0:\d+[^:]*: Video: (\w+)/.exec(err); if (m) j.codec = m[1].toLowerCase(); }
+      const tm = [...t.matchAll(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/g)].pop(); if (tm) k.done = Math.min(k.len, (+tm[1]) * 3600 + (+tm[2]) * 60 + (+tm[3]));
+    });
+    p.on('close', code => {
+      clearInterval(idle); j.procs.delete(p);
+      let ok = false; try { ok = code === 0 && fs.statSync(k.file).size > 1000; } catch {}
+      if (!ok) { k.done = 0; k.err = (err.split('\n').filter(l => /error|refused|401|unauthor|invalid|not found|404|timed out/i.test(l)).slice(-1)[0] || 'ffmpeg ' + code).replace(/rtsp:\/\/\S*/g, 'rtsp://…').trim().slice(0, 200); }
+      else k.done = k.len;
+      resolve(ok);
+    });
+  });
+}
+async function recExportRun(j) {
+  try {
+    const queue = j.chunks.slice();
+    const worker = async () => {
+      while (queue.length && !j.cancel) {
+        const k = queue.shift(); let ok = await recChunk(j, k);
+        if (!ok && !j.cancel && !j.noAudio && /audio|codec|invalid|output/i.test(k.err || '')) { j.noAudio = true; ok = await recChunk(j, k); }
+        if (!ok && !j.cancel) ok = await recChunk(j, k);   // încă o încercare
+        if (!ok && !j.cancel) { j.err = 'Nu am putut lua din NVR intervalul de la ' + recHmsS(j.start, k.off) + (k.err ? ` (${k.err})` : ''); j.cancel = true; recJobKill(j); }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(REC_EXP_PAR, j.chunks.length) }, worker));
+    if (j.err || j.cancel) { j.state = j.err ? 'error' : 'cancelled'; return; }
+    j.state = 'joining';
+    const list = path.join(j.dir, 'list.txt'); fs.writeFileSync(list, j.chunks.map(k => `file '${k.file}'`).join('\n'));
+    const out = path.join(j.dir, 'out.mp4');
+    const tag = j.codec === 'hevc' ? ['-tag:v', 'hvc1'] : [];
+    const ok = await new Promise(resolve => {
+      const p = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', list, '-map', '0', '-c', 'copy', ...tag, '-movflags', '+faststart', '-y', out], { stdio: ['ignore', 'ignore', 'pipe'] });
+      j.procs.add(p); let e = ''; p.stderr.on('data', d => { if (e.length < 2000) e += d; });
+      p.on('close', c => { j.procs.delete(p); if (c !== 0) j.err = 'Lipirea bucăților a eșuat: ' + e.trim().slice(0, 200); resolve(c === 0); });
+    });
+    for (const k of j.chunks) { try { fs.unlinkSync(k.file); } catch {} }
+    if (!ok) { j.state = 'error'; return; }
+    j.file = out; j.size = fs.statSync(out).size; j.state = 'done'; j.doneAt = Date.now();
+    console.log(`[rec-export] ${j.user} ${j.name}: ${j.dur}s în ${Math.round((j.doneAt - j.at) / 1000)}s, ${Math.round(j.size / 1048576)} MB`);
+  } catch (e) { j.state = 'error'; j.err = e.message; }
+}
+const recHmsS = (d0, off) => { const d = new Date(d0.getTime() + off * 1000); return `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}`; };
+function recJobPub(j) {
+  const done = j.chunks.reduce((t, k) => t + (k.done || 0), 0), el = (Date.now() - j.at) / 1000;
+  return { id: j.id, state: j.state, pct: j.state === 'done' ? 100 : Math.min(99, Math.round(done / j.dur * (j.state === 'joining' ? 100 : 97))), speed: el > 3 ? +(done / el).toFixed(1) : null,
+    eta: done > 5 && j.state === 'running' ? Math.round((j.dur - done) / (done / el)) : null, size: j.size || 0, name: j.name, err: j.err || '', noAudio: !!j.noAudio };
+}
+async function handleRecExport(req, res, parsed, pathname) {
+  const ctx = requireUser(req, res, 'snap'); if (!ctx) return;
+  const parts = pathname.split('/').filter(Boolean);   // rec/export[/id[/file]]
+  if (parts.length === 2 && req.method === 'POST') {
+    const b = await readJson(req); const c = recNvrCtx(ctx, b); if (c.err) return sendJson(res, c.err[0], { error: c.err[1] });
+    if (!hasFfmpeg()) return sendJson(res, 501, { error: 'ffmpeg nu e instalat pe server' });
+    const start = recT(b.start); if (!start) return sendJson(res, 400, { error: 'Ora de început lipsește' });
+    const dur = Math.min(3600, Math.max(5, parseInt(b.dur, 10) || 0));
+    const mine = [...recJobs.values()].filter(j => j.user === ctx.uname && ['running', 'joining'].includes(j.state));
+    if (mine.length) return sendJson(res, 429, { error: 'Ai deja o descărcare în lucru. Așteapt-o să se termine sau anuleaz-o.' });
+    if ([...recJobs.values()].filter(j => ['running', 'joining'].includes(j.state)).length >= 2) return sendJson(res, 429, { error: 'Serverul pregătește deja alte descărcări. Încearcă peste câteva minute.' });
+    const id = crypto.randomBytes(9).toString('hex'), dir = path.join(REC_EXP_DIR, id); fs.mkdirSync(dir, { recursive: true });
+    const chunks = []; for (let off = 0; off < dur; off += REC_EXP_CHUNK) chunks.push({ off, len: Math.min(REC_EXP_CHUNK, dur - off), file: path.join(dir, `c${String(off).padStart(5, '0')}.ts`), done: 0 });
+    const name = `${String(c.nvr.name || 'NVR').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w-]+/g, '_').slice(0, 40)}_CH${c.ch}_${String(b.start).replace(/[^\dT]/g, '').replace('T', '_')}.mp4`;
+    const j = { id, user: ctx.uname, at: Date.now(), dir, start, dur, ch: c.ch, chunks, name, state: 'running', procs: new Set(),
+      host: String(c.nvr.ip).trim(), port: parseInt(c.nvr.rtspPort, 10) || 554, auth: `${encodeURIComponent(c.cred.user || 'admin')}:${encodeURIComponent(c.cred.pass || '')}@` };
+    recJobs.set(id, j); console.log(`[rec-export] ${ctx.uname} → ${c.nvr.name || c.nvr.ip} CH${c.ch} ${b.start} (${dur}s)`);
+    recExportRun(j);
+    return sendJson(res, 200, recJobPub(j));
+  }
+  const j = recJobs.get(parts[2]); if (!j || j.user !== ctx.uname) return sendJson(res, 404, { error: 'Descărcarea nu mai există (fișierele se păstrează 45 de minute)' });
+  if (parts.length === 3 && req.method === 'GET') return sendJson(res, 200, recJobPub(j));
+  if (parts.length === 3 && req.method === 'DELETE') { recJobKill(j); j.state = 'cancelled'; try { fs.rmSync(j.dir, { recursive: true, force: true }); } catch {} recJobs.delete(j.id); return sendJson(res, 200, { ok: true }); }
+  if (parts.length === 4 && parts[3] === 'file' && req.method === 'GET') {
+    if (j.state !== 'done' || !j.file) return sendJson(res, 409, { error: 'Fișierul nu e gata încă' });
+    res.writeHead(200, { 'Content-Type': 'video/mp4', 'Content-Length': j.size, 'Content-Disposition': `attachment; filename="${j.name}"`, 'Cache-Control': 'no-store', ...CORS });
+    return fs.createReadStream(j.file).pipe(res);
+  }
+  return sendJson(res, 405, { error: 'Operație necunoscută' });
+}
+
 async function handleRecPlay(req, res, parsed) {
   const ctx = requireUser(req, res, 'snap'); if (!ctx) return;
   const q = parsed.query; const c = recNvrCtx(ctx, q); if (c.err) return sendJson(res, c.err[0], { error: c.err[1] });
@@ -4033,10 +4128,11 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.0, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.1, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
+    if (pathname === '/rec/export' || pathname.startsWith('/rec/export/')) return await handleRecExport(req, res, parsed, pathname);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
     if (pathname === '/ops' || pathname.startsWith('/ops/')) return await handleOps(req, res, pathname);

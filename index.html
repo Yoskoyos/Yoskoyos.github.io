@@ -1377,7 +1377,7 @@ html:not(.unlocked) .app{display:none}
 .rec-tl .sg.m{background:var(--accent,#FF8A1F)}
 .rec-tl .nd{position:absolute;top:0;bottom:0;width:2px;background:#ef4444;box-shadow:0 0 0 1px rgba(255,255,255,.6);pointer-events:none}
 .rec-tl .hov{position:absolute;top:-2px;transform:translateX(-50%);font:700 10px var(--mono);background:var(--fg,#111);color:var(--bg,#fff);padding:2px 5px;border-radius:5px;pointer-events:none;white-space:nowrap}
-.rec-zoom{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}.rec-zl{font-size:12px;color:var(--fg-3)}.rec-zseg{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}.rec-zseg button{border:0;background:transparent;color:var(--fg-2);font:600 12px var(--sans,inherit);padding:7px 11px;cursor:pointer}.rec-zseg button+button{border-left:1px solid var(--border)}.rec-zseg button.on{background:var(--accent-soft);color:var(--accent-tx,var(--accent))}.rec-dl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--accent-soft)}.rec-dl[hidden]{display:none}.rec-dl label{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600}.rec-dl input,.rec-dl select{height:34px;border-radius:9px;padding:0 8px;font:inherit;font-size:13px;width:auto}.rec-dl-len{font:700 12px var(--mono);color:var(--fg-2)}.rec-dl small{flex:1 1 100%;font-size:11.5px;color:var(--fg-3)}
+.rec-zoom{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}.rec-zl{font-size:12px;color:var(--fg-3)}.rec-zseg{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}.rec-zseg button{border:0;background:transparent;color:var(--fg-2);font:600 12px var(--sans,inherit);padding:7px 11px;cursor:pointer}.rec-zseg button+button{border-left:1px solid var(--border)}.rec-zseg button.on{background:var(--accent-soft);color:var(--accent-tx,var(--accent))}.rec-dl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--accent-soft)}.rec-dl[hidden]{display:none}.rec-dl label{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600}.rec-dl input,.rec-dl select{height:34px;border-radius:9px;padding:0 8px;font:inherit;font-size:13px;width:auto}.rec-dl-len{font:700 12px var(--mono);color:var(--fg-2)}.rec-dlp{flex:1 1 100%;display:flex;align-items:center;gap:10px}.rec-dlp[hidden]{display:none}.rec-dlbar{flex:1;height:10px;border-radius:99px;background:rgba(127,127,127,.2);overflow:hidden}.rec-dlbar i{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .4s}#rec-dltxt{font:600 12px var(--mono);color:var(--fg-2);white-space:nowrap}.rec-dl small{flex:1 1 100%;font-size:11.5px;color:var(--fg-3)}
 .rec-pan{display:inline-flex;align-items:center;gap:6px;margin-left:auto}@media(max-width:600px){.rec-zl{display:none}.rec-zseg{flex:1 1 100%}.rec-zseg button{flex:1;padding:8px 4px}.rec-pan{flex:1 1 100%;justify-content:space-between}}.rec-win{font:700 12px var(--mono);color:var(--fg-2);min-width:96px;text-align:center}
 .rec-ticks{display:flex;justify-content:space-between;font:10px var(--mono);color:var(--fg-3);padding:4px 1px 0}
 .rec-leg{display:flex;gap:14px;align-items:center;font-size:11.5px;color:var(--fg-2);padding:6px 14px 0;flex-wrap:wrap}
@@ -2803,7 +2803,8 @@ html:not(.unlocked) .app{display:none}
       <label data-noi18n>până la <input type="text" id="rec-dl-to" inputmode="numeric" placeholder="14:34" maxlength="8" style="width:92px;font-family:var(--mono)"></label>
       <span class="rec-dl-len" id="rec-dl-len"></span>
       <button class="btn sm primary" id="rec-dl-go" type="button">⬇ Descarcă</button>
-      <small>Scrie orele ca 14:30 sau 14:30:15 (maxim 60 de minute odată). Fișier MP4 cu sunet (dacă camera are microfon). Descărcarea pornește în browser după 5–20 de secunde; durează mai puțin decât filmarea, sau cât filmarea dacă NVR-ul nu permite descărcarea rapidă.</small>
+      <div class="rec-dlp" id="rec-dlp" hidden><div class="rec-dlbar"><i id="rec-dlfill"></i></div><span id="rec-dltxt">—</span><button class="btn sm" id="rec-dlcancel" type="button">Anulează</button></div>
+      <small>Scrie orele ca 14:30 sau 14:30:15 (maxim 60 de minute odată). Serverul ia filmarea din NVR în bucăți, în paralel, apoi îți dă fișierul MP4 (cu sunet, dacă camera are microfon). Poți închide fereastra — descărcarea pornește singură când e gata.</small>
     </div>
     <div class="rec-stage">
       <video id="rec-video" playsinline muted controls preload="none"></video>
@@ -5674,12 +5675,48 @@ qs('#rec-dlbtn').addEventListener('click', () => {
   const hm = x => recHms(x).replace(/:00$/, '');
   qs('#rec-dl-from').value = hm(from); qs('#rec-dl-to').value = hm(to); recDlLen(); qs('#rec-dl-from').focus();
 });
-qs('#rec-dl-go').addEventListener('click', () => {
-  if (!recSt) return; const auth = getAuth(); if (!auth) return toast('Trebuie să fii conectat', 'warn');
-  const r = recDlLen(); if (!r) return toast('Verifică orele: de exemplu de la 14:30 până la 14:34 (maxim 60 de minute)', 'warn');
-  const u = `${getProxyBase()}/rec/play?nvr=${encodeURIComponent(recSt.nvrId)}&ch=${recSt.ch}&start=${recSt.date}T${recHms(r.a)}&dur=${Math.max(10, r.d)}&dl=1&token=${encodeURIComponent(auth.token)}`;
-  const a = document.createElement('a'); a.href = u; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
-  toast(`Descarc ${recHms(r.a).slice(0, 5)}–${recHms(r.a + r.d).slice(0, 5)} — fișierul apare în Descărcări`, 'ok');
+let recDlJob = null;   // { id, timer }
+function recDlShow(j) {
+  const box = qs('#rec-dlp'); box.hidden = false;
+  qs('#rec-dlfill').style.width = (j.pct || 0) + '%';
+  const eta = j.eta != null ? (j.eta >= 60 ? ` · ~${Math.ceil(j.eta / 60)} min rămase` : ` · ~${j.eta} s rămase`) : '';
+  qs('#rec-dltxt').textContent = j.state === 'joining' ? 'Lipesc bucățile…' : j.state === 'done' ? `Gata · ${(j.size / 1048576).toFixed(1)} MB` : `${j.pct || 0}%${j.speed ? ` · ${String(j.speed).replace('.', ',')}× timp real` : ''}${eta}`;
+  qs('#rec-dl-go').disabled = ['running', 'joining'].includes(j.state);
+}
+function recDlStop(hideBar) { if (recDlJob) clearTimeout(recDlJob.timer); recDlJob = null; qs('#rec-dl-go').disabled = false; if (hideBar) qs('#rec-dlp').hidden = true; }
+async function recDlPoll() {
+  if (!recDlJob) return; const my = recDlJob, auth = getAuth(); if (!auth) return recDlStop(true);
+  try {
+    const r = await fetch(`${getProxyBase()}/rec/export/${my.id}`, { headers: { Authorization: 'Bearer ' + auth.token } }); const j = await readJsonSafe(r);
+    if (recDlJob !== my) return;
+    if (!r.ok) { recDlStop(true); return toast(j.error || 'Descărcarea s-a întrerupt', 'err'); }
+    recDlShow(j);
+    if (j.state === 'done') {
+      recDlStop(false);
+      const a = document.createElement('a'); a.href = `${getProxyBase()}/rec/export/${my.id}/file?token=${encodeURIComponent(auth.token)}`; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
+      return toast(`Fișierul ${j.name} se descarcă${j.noAudio ? ' (fără sunet — sunetul camerei nu s-a putut converti)' : ''}`, 'ok');
+    }
+    if (j.state === 'error' || j.state === 'cancelled') { recDlStop(true); return j.state === 'error' && toast(j.err || 'Descărcarea a eșuat', 'err'); }
+  } catch {}
+  my.timer = setTimeout(recDlPoll, 2000);
+}
+qs('#rec-dl-go').addEventListener('click', async () => {
+  if (!recSt || recDlJob) return; const auth = getAuth(); if (!auth) return toast('Trebuie să fii conectat', 'warn');
+  const r0 = recDlLen(); if (!r0) return toast('Verifică orele: de exemplu de la 14:30 până la 14:34 (maxim 60 de minute)', 'warn');
+  qs('#rec-dl-go').disabled = true;
+  try {
+    const r = await fetch(`${getProxyBase()}/rec/export`, { method: 'POST', headers: { Authorization: 'Bearer ' + auth.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nvr: recSt.nvrId, ch: recSt.ch, start: `${recSt.date}T${recHms(r0.a)}`, dur: r0.d }) });
+    const j = await readJsonSafe(r);
+    if (r.status === 404 && !j.error) { qs('#rec-dl-go').disabled = false; return toast('Actualizează serverul (v11.1) pentru descărcarea rapidă', 'warn'); }
+    if (!r.ok) { qs('#rec-dl-go').disabled = false; return toast(j.error || 'Eroare ' + r.status, 'err'); }
+    recDlJob = { id: j.id }; recDlShow(j); recDlJob.timer = setTimeout(recDlPoll, 1500);
+  } catch (e) { qs('#rec-dl-go').disabled = false; toast(e.message, 'err'); }
+});
+qs('#rec-dlcancel').addEventListener('click', async () => {
+  if (!recDlJob) return qs('#rec-dlp').hidden = true; const id = recDlJob.id; recDlStop(true); const auth = getAuth();
+  try { await fetch(`${getProxyBase()}/rec/export/${id}`, { method: 'DELETE', headers: { Authorization: 'Bearer ' + auth.token } }); } catch {}
+  toast('Descărcare anulată', 'ok');
 });
 qs('#rec-zseg').addEventListener('click', e => { const b = e.target.closest('button[data-z]'); if (!b || !recSt) return;
   const mid = recSt.start != null ? recSt.start + (qs('#rec-video').currentTime || 0) : recSt.v0 + recSt.zoom / 2;
