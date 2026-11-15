@@ -1359,6 +1359,32 @@ html:not(.unlocked) .app{display:none}
   html .mob-tabs-sec{display:none!important}
   .main{padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))!important}
 }
+#rec-modal .modal{max-width:980px;width:96vw;padding:0;overflow:hidden}
+.rec-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-2)}
+.rec-bar input[type=date],.rec-bar select{height:36px;border-radius:10px;padding:0 10px;font:inherit;font-size:13px;width:auto;min-width:0}
+.rec-bar .btn{height:36px}
+.rec-stage{position:relative;background:#000;aspect-ratio:16/9;max-height:62vh;width:100%;display:flex;align-items:center;justify-content:center}
+.rec-stage video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
+.rec-clock{position:absolute;left:10px;top:10px;background:rgba(0,0,0,.6);color:#fff;font:700 13px/1 var(--mono);padding:6px 9px;border-radius:8px;pointer-events:none}
+.rec-ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#fff;font-size:13px;text-align:center;padding:20px;background:rgba(0,0,0,.55)}
+.rec-ov[hidden]{display:none}
+.rec-ov .sp{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.25);border-top-color:#fff;animation:recspin .8s linear infinite}
+@keyframes recspin{to{transform:rotate(360deg)}}
+.rec-ov.err{color:#fecaca;background:rgba(0,0,0,.8)}
+.rec-tl-wrap{padding:12px 14px 6px}
+.rec-tl{position:relative;height:38px;border-radius:10px;background:var(--bg-3,rgba(127,127,127,.12));cursor:pointer;overflow:hidden;touch-action:none}
+.rec-tl .sg{position:absolute;top:6px;bottom:6px;border-radius:3px;background:#3B82F6;min-width:2px}
+.rec-tl .sg.m{background:var(--accent,#FF8A1F)}
+.rec-tl .nd{position:absolute;top:0;bottom:0;width:2px;background:#ef4444;box-shadow:0 0 0 1px rgba(255,255,255,.6);pointer-events:none}
+.rec-tl .hov{position:absolute;top:-2px;transform:translateX(-50%);font:700 10px var(--mono);background:var(--fg,#111);color:var(--bg,#fff);padding:2px 5px;border-radius:5px;pointer-events:none;white-space:nowrap}
+.rec-ticks{display:flex;justify-content:space-between;font:10px var(--mono);color:var(--fg-3);padding:4px 1px 0}
+.rec-leg{display:flex;gap:14px;align-items:center;font-size:11.5px;color:var(--fg-2);padding:6px 14px 0;flex-wrap:wrap}
+.rec-leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.rec-segs{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px 14px;max-height:120px;overflow:auto}
+.rec-segs button{border:1px solid var(--border);background:var(--bg-2);color:var(--fg);border-radius:999px;padding:5px 10px;font:600 12px var(--mono);cursor:pointer}
+.rec-segs button.on{border-color:var(--accent);color:var(--accent-tx,var(--accent));background:var(--accent-soft)}
+.rec-info{padding:8px 14px 12px;font-size:12px;color:var(--fg-3)}
+@media(max-width:600px){.rec-bar{padding:8px 10px}.rec-bar select{flex:1 1 100%}.rec-stage{aspect-ratio:4/3}}
 </style>
 </head>
 <body>
@@ -2733,6 +2759,7 @@ html:not(.unlocked) .app{display:none}
       <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
         <button class="btn sm" id="snap-modal-prev" title="Canal anterior">‹</button>
         <button class="btn sm" id="snap-modal-next" title="Canal următor">›</button>
+        <button class="btn sm" id="snap-modal-rec" type="button" title="Înregistrările acestei camere">⏪ Înregistrări</button>
         <button class="btn sm primary" id="snap-modal-refresh">↻ Refresh</button>
         <div class="modal-x" id="snap-modal-x">✕</div>
       </div>
@@ -2749,6 +2776,37 @@ html:not(.unlocked) .app{display:none}
       <span id="snap-modal-info">—</span>
       <span id="snap-modal-time" style="color:var(--fg-3)">—</span>
     </div>
+  </div>
+</div>
+
+<!-- Înregistrări (playback) -->
+<div class="overlay hidden" id="rec-modal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title" id="rec-title">Înregistrări</div>
+      <div class="modal-x" id="rec-x" style="margin-left:auto">✕</div>
+    </div>
+    <div class="rec-bar">
+      <button class="btn sm" id="rec-dprev" type="button" title="Ziua anterioară">‹</button>
+      <input type="date" id="rec-date">
+      <button class="btn sm" id="rec-dnext" type="button" title="Ziua următoare">›</button>
+      <select id="rec-ch" aria-label="Canal"></select>
+      <span style="flex:1"></span>
+      <button class="btn sm" id="rec-back" type="button" title="Înapoi 1 minut">⏪ 1 min</button>
+      <button class="btn sm" id="rec-fwd" type="button" title="Înainte 1 minut">1 min ⏩</button>
+    </div>
+    <div class="rec-stage">
+      <video id="rec-video" playsinline muted controls preload="none"></video>
+      <div class="rec-clock" id="rec-clock" hidden>—</div>
+      <div class="rec-ov" id="rec-ov" hidden></div>
+    </div>
+    <div class="rec-tl-wrap">
+      <div class="rec-tl" id="rec-tl" title="Apasă pe bară ca să redai de la ora aleasă"></div>
+      <div class="rec-ticks"><span>00</span><span>03</span><span>06</span><span>09</span><span>12</span><span>15</span><span>18</span><span>21</span><span>24</span></div>
+    </div>
+    <div class="rec-leg"><span><i style="background:#3B82F6"></i>Continuu / program</span><span><i style="background:var(--accent,#FF8A1F)"></i>Mișcare / eveniment</span><span id="rec-sum"></span></div>
+    <div class="rec-segs" id="rec-segs"></div>
+    <div class="rec-info" id="rec-info">Video fără sunet. Redarea vine direct din NVR, prin server; se încarcă în 5–20 de secunde.</div>
   </div>
 </div>
 
@@ -5466,6 +5524,119 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowRight') qs('#snap-modal-next').click();
   if (e.key === 'r' || e.key === 'R') qs('#snap-modal-refresh').click();
 });
+
+/* ───────────── Înregistrări din NVR (playback) ───────────── */
+let recSt = null;   // { nvrId, ch, date, segs, start, tries }
+const recTodayRo = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' });
+const recHms = s => { s = Math.max(0, Math.min(86399, Math.floor(s))); return `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(Math.floor(s % 3600 / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
+const recHevcOk = () => { try { const v = document.createElement('video'); return !!(v.canPlayType('video/mp4; codecs="hvc1.1.6.L93.B0"') || v.canPlayType('video/mp4; codecs="hev1.1.6.L93.B0"')); } catch { return false; } };
+const recIsMot = t => /motion|alarm|vmd|event|smart|line|intrusion|field|pir/i.test(t || '');
+function recOv(html, err) { const o = qs('#rec-ov'); if (!html) { o.hidden = true; return; } o.hidden = false; o.className = 'rec-ov' + (err ? ' err' : ''); o.innerHTML = html; }
+function recStopVideo() { const v = qs('#rec-video'); try { v.pause(); } catch {} v.removeAttribute('src'); try { v.load(); } catch {} }
+function openRecModal(nvrId, ch) {
+  const n = nvrs.find(x => x.id === nvrId); if (!n) return;
+  stopModalLive(); qs('#snap-modal').classList.add('hidden');
+  recSt = { nvrId, ch, date: recTodayRo(), segs: [], start: null, tries: 0 };
+  qs('#rec-title').textContent = `Înregistrări · ${n.name}`;
+  const chs = Array.from({ length: n.channels || 16 }, (_, i) => i + 1).filter(c => !Array.isArray(n.cams) || (n.cams[c - 1] && n.cams[c - 1] !== 'free'));
+  if (!chs.includes(ch)) chs.unshift(ch);
+  qs('#rec-ch').innerHTML = chs.map(c => `<option value="${c}"${c === ch ? ' selected' : ''}>CH${c}${(n.camNames || {})[c] ? ' · ' + escapeHtml(n.camNames[c]) : ''}</option>`).join('');
+  qs('#rec-date').value = recSt.date; qs('#rec-date').max = recTodayRo();
+  qs('#rec-modal').classList.remove('hidden');
+  recLoadDay(true);
+}
+function closeRecModal() { recStopVideo(); recSt = null; qs('#rec-modal').classList.add('hidden'); }
+async function recLoadDay(autoplay) {
+  if (!recSt) return; const my = recSt; recStopVideo(); my.segs = []; recDrawTl(); qs('#rec-segs').innerHTML = ''; qs('#rec-sum').textContent = '';
+  qs('#rec-clock').hidden = true;
+  recOv('<div class="sp"></div>Caut înregistrările din NVR…');
+  const auth = getAuth(); if (!auth) return recOv('Trebuie să fii conectat la server.', true);
+  try {
+    const r = await fetch(`${getProxyBase()}/rec/day?nvr=${encodeURIComponent(my.nvrId)}&ch=${my.ch}&date=${my.date}`, { headers: { Authorization: 'Bearer ' + auth.token } });
+    const d = await readJsonSafe(r);
+    if (recSt !== my) return;
+    if (r.status === 404 && !d.error) return recOv('Serverul nu are încă funcția de înregistrări — rulează actualizarea serverului (v10.7).', true);
+    if (!r.ok) return recOv(escapeHtml(d.error || 'Eroare ' + r.status), true);
+    my.segs = d.segs || [];
+  } catch (e) { if (recSt === my) recOv('Nu pot contacta serverul: ' + escapeHtml(e.message), true); return; }
+  recDrawTl();
+  const tot = my.segs.reduce((t, s) => t + (s.e - s.s), 0);
+  qs('#rec-sum').textContent = my.segs.length ? `${my.segs.length} ${my.segs.length === 1 ? 'segment' : 'segmente'} · ${Math.round(tot / 60)} min înregistrate` : '';
+  const showChips = my.segs.length && my.segs.length <= 300 && my.segs.some(s => s.e - s.s < 3600);
+  qs('#rec-segs').innerHTML = showChips ? my.segs.slice().reverse().map((s, i) => `<button type="button" data-s="${s.s}">${recHms(s.s).slice(0, 5)}–${recHms(s.e).slice(0, 5)}</button>`).join('') : '';
+  if (!my.segs.length) return recOv(`Nicio înregistrare pe CH${my.ch} în ${my.date.split('-').reverse().join('.')}.`, true);
+  recOv('');
+  if (autoplay) { const l = my.segs[my.segs.length - 1]; recPlayAt(Math.max(l.s, l.e - 300)); }
+  else recOv('Apasă pe bară sau pe un interval ca să pornești redarea.');
+}
+function recDrawTl() {
+  const tl = qs('#rec-tl'); if (!recSt) return;
+  tl.innerHTML = recSt.segs.map(s => `<span class="sg${recIsMot(s.t) ? ' m' : ''}" style="left:${s.s / 864}%;width:${Math.max(0.15, (s.e - s.s) / 864)}%"></span>`).join('') + '<span class="nd" id="rec-nd" style="display:none"></span>';
+}
+function recPlayAt(sec, keepTries) {
+  if (!recSt) return; const my = recSt;
+  if (my.segs.length) {   // dacă ora aleasă nu e înregistrată → următorul segment
+    const inside = my.segs.find(s => sec >= s.s && sec < s.e);
+    if (!inside) { const nx = my.segs.find(s => s.s > sec); sec = nx ? nx.s : my.segs[my.segs.length - 1].s; }
+  }
+  sec = Math.floor(sec); my.start = sec; if (!keepTries) my.tries = 0;
+  const auth = getAuth(); if (!auth) return;
+  const hevc = my.tries === 0 && recHevcOk() ? 1 : 0;
+  const v = qs('#rec-video');
+  recOv(`<div class="sp"></div>Pornesc redarea de la ${recHms(sec)}…<small style="opacity:.75">Poate dura 5–20 de secunde.</small>`);
+  qs('#rec-clock').hidden = false; qs('#rec-clock').textContent = recHms(sec);
+  qs('#rec-segs').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.s <= sec && sec < (my.segs.find(s => s.s === +b.dataset.s) || {}).e));
+  v.src = `${getProxyBase()}/rec/play?nvr=${encodeURIComponent(my.nvrId)}&ch=${my.ch}&start=${my.date}T${recHms(sec)}&dur=600&hevc=${hevc}&token=${encodeURIComponent(auth.token)}`;
+  v.play().catch(() => {});
+  recNeedle(sec);
+}
+function recNeedle(sec) { const nd = qs('#rec-nd'); if (nd) { nd.style.display = ''; nd.style.left = (sec / 864) + '%'; } }
+qs('#rec-video').addEventListener('playing', () => { if (recSt) recOv(''); });
+qs('#rec-video').addEventListener('timeupdate', () => {
+  if (!recSt || recSt.start == null) return; const cur = recSt.start + (qs('#rec-video').currentTime || 0);
+  qs('#rec-clock').textContent = recHms(cur) + ' · ' + recSt.date.split('-').reverse().join('.'); recNeedle(cur);
+});
+qs('#rec-video').addEventListener('ended', () => {
+  if (!recSt || recSt.start == null) return; const nxt = recSt.start + Math.round(qs('#rec-video').currentTime || 0);
+  if (nxt < 86390 && recSt.segs.some(s => s.e > nxt + 2)) recPlayAt(nxt);
+});
+qs('#rec-video').addEventListener('error', async () => {
+  const my = recSt; if (!my || my.start == null || !qs('#rec-video').getAttribute('src')) return;
+  if (my.tries === 0 && recHevcOk()) { my.tries = 1; return recPlayAt(my.start, true); }   // a doua încercare: H.264 garantat
+  recOv('<div class="sp"></div>Redarea nu a pornit — verific motivul…');
+  try {
+    const auth = getAuth();
+    const r = await fetch(`${getProxyBase()}/rec/play?nvr=${encodeURIComponent(my.nvrId)}&ch=${my.ch}&start=${my.date}T${recHms(my.start)}&dur=10&hevc=0`, { headers: { Authorization: 'Bearer ' + auth.token } });
+    if (recSt !== my) return;
+    if (r.ok) { try { await r.body.cancel(); } catch {} return recOv('Serverul trimite video, dar browserul nu îl poate reda. Încearcă din Chrome sau Safari actualizat.', true); }
+    const d = await readJsonSafe(r);
+    recOv(`<b>Nu pot reda înregistrarea</b>${escapeHtml(d.error || 'Eroare ' + r.status)}${d.hint ? `<small style="opacity:.8">${escapeHtml(d.hint)}</small>` : ''}`.replace('</b>', '</b><br>'), true);
+  } catch (e) { if (recSt === my) recOv('Nu pot reda înregistrarea: ' + escapeHtml(e.message), true); }
+});
+function recTlSec(e) { const r = qs('#rec-tl').getBoundingClientRect(); return Math.max(0, Math.min(86399, (e.clientX - r.left) / r.width * 86400)); }
+qs('#rec-tl').addEventListener('click', e => { if (recSt && recSt.segs.length) recPlayAt(recTlSec(e)); });
+qs('#rec-tl').addEventListener('mousemove', e => {
+  let h = qs('#rec-tl .hov'); if (!h) { h = document.createElement('span'); h.className = 'hov'; qs('#rec-tl').appendChild(h); }
+  const s = recTlSec(e); h.textContent = recHms(s).slice(0, 5); h.style.left = (s / 864) + '%';
+});
+qs('#rec-tl').addEventListener('mouseleave', () => { const h = qs('#rec-tl .hov'); if (h) h.remove(); });
+qs('#rec-segs').addEventListener('click', e => { const b = e.target.closest('button[data-s]'); if (b) recPlayAt(+b.dataset.s); });
+qs('#rec-ch').addEventListener('change', () => { if (!recSt) return; recSt.ch = +qs('#rec-ch').value; recLoadDay(true); });
+qs('#rec-date').addEventListener('change', () => { if (!recSt || !qs('#rec-date').value) return; recSt.date = qs('#rec-date').value; recLoadDay(false); });
+function recShiftDay(k) {
+  if (!recSt) return; const d = new Date(recSt.date + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + k);
+  const s = d.toISOString().slice(0, 10); if (s > recTodayRo()) return;
+  recSt.date = s; qs('#rec-date').value = s; recLoadDay(false);
+}
+qs('#rec-dprev').addEventListener('click', () => recShiftDay(-1));
+qs('#rec-dnext').addEventListener('click', () => recShiftDay(1));
+function recJump(d) { if (!recSt || recSt.start == null) return; recPlayAt(recSt.start + (qs('#rec-video').currentTime || 0) + d); }
+qs('#rec-back').addEventListener('click', () => recJump(-60));
+qs('#rec-fwd').addEventListener('click', () => recJump(60));
+qs('#rec-x').addEventListener('click', closeRecModal);
+qs('#rec-modal').addEventListener('click', e => { if (e.target.id === 'rec-modal') closeRecModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !qs('#rec-modal').classList.contains('hidden')) closeRecModal(); });
+qs('#snap-modal-rec').addEventListener('click', () => { if (snapState) openRecModal(snapState.nvrId, snapState.ch); });
 
 // Click pe ch-cell din NVR card
 document.addEventListener('click', e => {

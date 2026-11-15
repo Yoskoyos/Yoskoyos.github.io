@@ -200,7 +200,7 @@ function getAuth(req) {
   if (!tok) {   // <img src> nu poate trimite antete → tokenul poate veni și în ?token= (doar pentru /snap)
     try {
       const q = url.parse(req.url, true);
-      const tokOk = q.pathname === '/snap' || (req.method === 'GET' && (q.pathname === '/clients-backup' || /^\/clients\/[\w-]+\/contracts\/[\w-]+$/.test(q.pathname || '') || /^\/company-docs\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/ops\/(works|stock|gdpr|catalog)\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/seap\/[\w:%-]+\/zip$/.test(q.pathname || '') || /^\/seap\/[\w:%-]+\/files\/[\w-]+$/.test(q.pathname || '')));
+      const tokOk = q.pathname === '/snap' || q.pathname === '/rec/play' || (req.method === 'GET' && (q.pathname === '/clients-backup' || /^\/clients\/[\w-]+\/contracts\/[\w-]+$/.test(q.pathname || '') || /^\/company-docs\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/ops\/(works|stock|gdpr|catalog)\/[\w-]+\/files\/[\w-]+$/.test(q.pathname || '') || /^\/seap\/[\w:%-]+\/zip$/.test(q.pathname || '') || /^\/seap\/[\w:%-]+\/files\/[\w-]+$/.test(q.pathname || '')));
       if (tokOk && q.query.token) tok = String(q.query.token);
     } catch {}
   }
@@ -913,6 +913,147 @@ async function handleSnap(req, res, parsed) {
             : 'Nu s-a putut citi imaginea din stream';
   return sendJson(res, 502, { error: msg });
 }
+
+/* ═════════════ Înregistrări (playback) din NVR în aplicație — v10.7 ═════════════
+   GET /rec/day?nvr=&ch=&date=YYYY-MM-DD  → segmentele înregistrate în ziua respectivă (ora NVR-ului)
+   GET /rec/play?nvr=&ch=&start=YYYY-MM-DDTHH:MM:SS&dur=600&hevc=0|1&token=  → video MP4 fragmentat (fără sunet)
+   Sursa: întâi RTSP playback (portul RTSP), altfel descărcare ISAPI pe portul HTTP al NVR-ului. H.265 → transcodat H.264 dacă browserul nu-l suportă. */
+const REC_PLAY_MAX = 3, REC_TC_MAX = 1;
+let recPlaying = 0, recTranscoding = 0;
+function recNvrCtx(ctx, q) {
+  const conf = ctx.db.configs[ctx.uname] || {};
+  if (ctx.user.role === 'client' && !(ctx.user.nvrIds || []).map(String).includes(String(q.nvr))) return { err: [403, 'Nu ai acces la acest NVR'] };
+  const nvr = (conf.nvrs || []).find(n => String(n.id) === String(q.nvr));
+  const ch = parseInt(q.ch, 10);
+  if (!nvr || !(ch >= 1 && ch <= 64)) return { err: [404, 'NVR sau canal inexistent'] };
+  if (!/^[a-zA-Z0-9.\-]+$/.test(String(nvr.ip || '').trim())) return { err: [400, 'Adresă NVR invalidă'] };
+  const cred = (conf.creds || {})[nvr.id] || (conf.creds || {})[String(nvr.id)] || {};
+  return { nvr, ch, cred };
+}
+const recT = s => { const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/.exec(String(s || '')); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])) : null; };
+const rtspT = d => `${d.getUTCFullYear()}${pad2(d.getUTCMonth() + 1)}${pad2(d.getUTCDate())}T${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}${pad2(d.getUTCSeconds())}Z`;
+async function handleRecDay(req, res, parsed) {
+  const ctx = requireUser(req, res, 'snap'); if (!ctx) return;
+  const c = recNvrCtx(ctx, parsed.query); if (c.err) return sendJson(res, c.err[0], { error: c.err[1] });
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(parsed.query.date || '')); if (!m) return sendJson(res, 400, { error: 'Data lipsește' });
+  const d0 = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])), d1 = new Date(d0.getTime() + 864e5 - 1000);
+  const segs = []; let pos = 0, more = true, guard = 0;
+  while (more && guard++ < 12) {
+    const sid = crypto.randomUUID ? crypto.randomUUID() : newId();
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><CMSearchDescription><searchID>${sid}</searchID><trackList><trackID>${c.ch}01</trackID></trackList>` +
+      `<timeSpanList><timeSpan><startTime>${hikTime(d0)}</startTime><endTime>${hikTime(d1)}</endTime></timeSpan></timeSpanList><maxResults>100</maxResults>` +
+      `<searchResultPostion>${pos}</searchResultPostion><metadataList><metadataDescriptor>//recordType.meta.std-cgi.com</metadataDescriptor></metadataList></CMSearchDescription>`;
+    const r = await nvrRequest(c.nvr, c.cred, 'POST', '/ISAPI/ContentMgmt/search', xml, 20000);
+    if (r.status === 401) return sendJson(res, 502, { error: 'NVR-ul refuză utilizatorul sau parola' });
+    if (r.status !== 200) return sendJson(res, 502, { error: r.status ? `NVR-ul a răspuns ${r.status} la căutare` : 'NVR-ul nu răspunde' });
+    const items = [...r.body.matchAll(/<searchMatchItem>([\s\S]*?)<\/searchMatchItem>/g)];
+    for (const it of items) {
+      const s = recT((/<startTime>([^<]+)/.exec(it[1]) || [])[1]), e = recT((/<endTime>([^<]+)/.exec(it[1]) || [])[1]);
+      if (!s || !e) continue;
+      const type = /recordType\.meta\.std-cgi\.com\/(\w+)/i.exec(it[1]);
+      segs.push({ s: Math.max(0, (s - d0) / 1000), e: Math.min(86400, (e - d0) / 1000), t: type ? type[1] : '' });
+    }
+    more = /<responseStatusStrg>\s*MORE/i.test(r.body) && items.length > 0; pos += items.length;
+  }
+  segs.sort((a, b) => a.s - b.s);
+  const out = [];
+  for (const x of segs) { const l = out[out.length - 1]; if (l && x.s - l.e <= 5 && l.t === x.t) l.e = Math.max(l.e, x.e); else if (x.e > x.s) out.push({ ...x }); }
+  sendJson(res, 200, { date: parsed.query.date, segs: out });
+}
+function nvrStream(nvr, cred, pathName, timeoutMs) {   // GET cu Digest; întoarce răspunsul ca stream (sau null)
+  return new Promise(resolve => {
+    const opts = { hostname: String(nvr.ip).trim(), port: parseInt(nvr.port, 10) || 80, path: pathName, method: 'GET', timeout: timeoutMs || 15000 };
+    let done = false; const fin = v => { if (!done) { done = true; resolve(v); } };
+    const r1 = http.request(opts, res1 => {
+      if (res1.statusCode === 401) {
+        const wa = res1.headers['www-authenticate'] || ''; res1.resume();
+        if (!/digest/i.test(wa)) return fin(null);
+        const r2 = http.request({ ...opts, headers: { Authorization: buildDigestAuth(cred.user || 'admin', cred.pass || '', 'GET', pathName, wa) } }, res2 => {
+          if (res2.statusCode !== 200) { res2.resume(); return fin(null); } fin({ res: res2, req: r2 }); });
+        r2.on('error', () => fin(null)); r2.on('timeout', () => { r2.destroy(); fin(null); }); r2.end(); return;
+      }
+      if (res1.statusCode !== 200) { res1.resume(); return fin(null); }
+      fin({ res: res1, req: r1 });
+    });
+    r1.on('error', () => fin(null)); r1.on('timeout', () => { r1.destroy(); fin(null); }); r1.end();
+  });
+}
+async function handleRecPlay(req, res, parsed) {
+  const ctx = requireUser(req, res, 'snap'); if (!ctx) return;
+  const q = parsed.query; const c = recNvrCtx(ctx, q); if (c.err) return sendJson(res, c.err[0], { error: c.err[1] });
+  if (!hasFfmpeg()) return sendJson(res, 501, { error: 'ffmpeg nu e instalat pe server' });
+  const start = recT(q.start); if (!start) return sendJson(res, 400, { error: 'Ora de început lipsește' });
+  const dur = Math.min(1800, Math.max(10, parseInt(q.dur, 10) || 600));
+  const end = new Date(start.getTime() + dur * 1000);
+  if (recPlaying >= REC_PLAY_MAX) return sendJson(res, 429, { error: 'Sunt deja prea multe înregistrări deschise. Închide una și încearcă din nou.' });
+  recPlaying++;
+  let closed = false, cur = null, src = null, released = false;
+  const release = () => { if (!released) { released = true; recPlaying--; } };
+  const killAll = () => { try { cur && cur.kill('SIGKILL'); } catch {} try { src && src.req.destroy(); } catch {} };
+  req.on('close', () => { closed = true; killAll(); release(); });
+  const host = String(c.nvr.ip).trim(), port = parseInt(c.nvr.rtspPort, 10) || 554;
+  const auth = `${encodeURIComponent(c.cred.user || 'admin')}:${encodeURIComponent(c.cred.pass || '')}@`;
+  const track = `/Streaming/tracks/${c.ch}01/?starttime=${rtspT(start)}&endtime=${rtspT(end)}`;
+  const hevcOk = q.hevc === '1';
+  console.log(`[rec] ${ctx.uname} → ${c.nvr.name || c.nvr.ip} CH${c.ch} ${q.start} (${dur}s)`);
+  // o încercare: sursa (rtsp | isapi), cu copiere sau transcodare → {ok} după primul fragment trimis, sau {err, hevc}
+  const attempt = (mode, tc, hvc) => new Promise(async resolve => {
+    let input = [];
+    if (mode === 'rtsp') input = ['-rtsp_transport', 'tcp', '-i', `rtsp://${auth}${host}:${port}${track}`];
+    else {
+      const uri = `rtsp://${host}:${port}${track}`;
+      src = await nvrStream(c.nvr, c.cred, '/ISAPI/ContentMgmt/download?playbackURI=' + encodeURIComponent(uri), 20000);
+      if (!src || closed) return resolve({ err: 'descărcarea ISAPI nu e disponibilă' });
+      input = ['-probesize', '5000000', '-analyzeduration', '5000000', '-i', 'pipe:0'];
+    }
+    const vcodec = tc ? ['-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency', '-crf', '27', '-vf', 'scale=-2:min(720\\,ih)', '-pix_fmt', 'yuv420p'] : ['-c:v', 'copy', ...(hvc ? ['-tag:v', 'hvc1'] : [])];
+    const args = ['-hide_banner', '-loglevel', 'info', ...input, '-t', String(dur), '-map', '0:v:0', ...vcodec, '-an', '-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov+default_base_moof', 'pipe:1'];
+    let p; try { p = spawn('ffmpeg', args, { stdio: [mode === 'isapi' ? 'pipe' : 'ignore', 'pipe', 'pipe'] }); } catch (e) { return resolve({ err: e.message }); }
+    cur = p; let err = '', started = false, codec = '', settled = false, ready = false; const held = [];
+    const settle = v => { if (!settled) { settled = true; clearTimeout(t0); resolve(v); } };
+    if (mode === 'isapi') { src.res.pipe(p.stdin); p.stdin.on('error', () => {}); src.res.on('error', () => {}); }
+    const t0 = setTimeout(() => { try { p.kill('SIGKILL'); } catch {} }, 20000);
+    p.stderr.on('data', d => {
+      if (err.length < 6000) err += d;
+      if (!codec) { const m = /Stream #0:\d+[^:]*: Video: (\w+)/.exec(err); if (m) { codec = m[1].toLowerCase();
+        if (!tc && !hvc && codec === 'hevc') { try { p.kill('SIGKILL'); } catch {} settle({ err: 'hevc', hevc: true }); return; } } }
+      if (!ready && /Output #0/.test(err) && !settled) { ready = true; const h = held.splice(0); for (const d of h) out(d); }
+    });
+    // ieșirea se ține până știm codecul (altfel H.265 ar pleca spre browser înainte să-l putem transcoda)
+    function out(d) {
+      if (closed) return;
+      if (!started) {
+        started = true; clearTimeout(t0); settle({ ok: true });
+        res.writeHead(200, { 'Content-Type': 'video/mp4', 'Cache-Control': 'no-store', 'X-Rec-Source': mode + (tc ? '+h264' : ''), ...CORS });
+      }
+      if (!res.write(d)) { p.stdout.pause(); res.once('drain', () => p.stdout.resume()); }
+    }
+    p.stdout.on('data', d => { if (!ready) held.push(d); else out(d); });
+    p.on('close', code => {
+      if (started) { try { res.end(); } catch {} return; }
+      const e = err.split('\n').filter(l => /error|refused|401|unauthor|timed out|invalid|not found|404/i.test(l)).slice(-2).join(' ').slice(0, 300);
+      settle({ err: (e || ('ffmpeg ' + code)).replace(/rtsp:\/\/[^\s]*/g, 'rtsp://…').replace(/Error opening input files?:?/g, '').replace(/\s+/g, ' ').trim() });
+    });
+    p.on('error', e => settle({ err: e.message }));
+  });
+  let r = null; const errs = [];
+  for (const mode of ['rtsp', 'isapi']) {
+    if (closed) return;
+    let tc = false;
+    if (mode === 'isapi' && src) { try { src.req.destroy(); } catch {} src = null; }
+    r = await attempt(mode, tc);
+    if (r.hevc && !closed && hevcOk) r = await attempt(mode, false, true);   // browserul știe H.265 → doar reetichetat (hvc1)
+    else if (r.hevc && !closed) {
+      if (recTranscoding >= REC_TC_MAX) { errs.push('H.265 — serverul transcodează deja altă înregistrare'); r = null; break; }
+      recTranscoding++; try { r = await attempt(mode, true); } finally { recTranscoding--; }
+    }
+    if (r && r.ok) return;
+    errs.push(`${mode.toUpperCase()}: ${r ? r.err : '—'}`);
+  }
+  release();
+  if (!closed && !res.headersSent) sendJson(res, 502, { error: 'Nu am putut porni redarea. ' + errs.join(' · '), hint: `Verifică portul RTSP (${port}) redirecționat în router sau accesul ISAPI al utilizatorului la redare.` });
+}
+
 
 
 /* ═════════════ Clienți + contracte ═════════════ */
@@ -3879,8 +4020,10 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 10.6, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 10.7, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
+    if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
+    if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
     if (pathname === '/ops' || pathname.startsWith('/ops/')) return await handleOps(req, res, pathname);
