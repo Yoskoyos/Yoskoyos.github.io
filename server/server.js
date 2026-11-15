@@ -463,7 +463,7 @@ async function probeNvr(nvr, cred) {
    Doar pentru camere online și HDD bun (acelea au alertele lor). */
 const REC_EVERY_MS = parseInt(process.env.REC_EVERY_MS || '900000', 10);          // 15 min
 const REC_MOT_EVERY_MS = parseInt(process.env.REC_MOT_EVERY_MS || '21600000', 10); // 6 ore
-const REC_TRACKS_EVERY_MS = 6 * 3600e3, REC_WINDOW_MIN = 120, REC_MOT_WINDOW_MIN = 12 * 60;
+const REC_TRACKS_EVERY_MS = 6 * 3600e3, REC_WINDOW_MIN = 120, REC_MOT_WINDOW_MIN = 24 * 60;   // la mișcare: alertă abia după 24 h fără nicio înregistrare
 const pad2 = n => String(n).padStart(2, '0');
 function nvrWall(xml) {   // <localTime>2026-11-01T11:00:00+02:00</localTime> → ora de pe ceasul NVR-ului
   const m = /<localTime>(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/.exec(xml || '');
@@ -547,7 +547,8 @@ async function recCheck(key, nvr, cred) {
     }
     st.recTracks = list; st.recTracksAt = now;
   }
-  const todo = st.recTracks.filter(t => t.cont ? dueCont : dueMot);
+  // canalele deja marcate „nu înregistrează” se reverifică la fiecare 15 min → dispar din listă imediat ce apare o înregistrare
+  const todo = st.recTracks.filter(t => t.cont ? dueCont : (dueMot || (dueCont && st.recBad[Math.floor(t.id / 100)])));
   if (dueMot && st.recTracks.some(t => !t.cont)) st.recMotAt = now;
   if (!todo.length) return [];
   const tm = await nvrGet(nvr, cred, '/ISAPI/System/time', 6000);
@@ -562,12 +563,12 @@ async function recCheck(key, nvr, cred) {
       st.recMiss[ch] = 0; st.recBad[ch] = false;
     } else {
       st.recMiss[ch] = (st.recMiss[ch] || 0) + 1;
-      const need = t.cont ? MON_CONFIRM : 1;                                 // la mișcare fereastra e deja de 12 ore
+      const need = t.cont ? MON_CONFIRM : 1;                                 // la mișcare fereastra e deja de 24 de ore
       if (st.recMiss[ch] >= need && !st.recBad[ch]) {
         st.recBad[ch] = true;
         lines.push({ kind: 'crit', text: t.cont
           ? `🔴 ${chLbl(st, ch)} — NU ÎNREGISTREAZĂ (nicio înregistrare în ultimele 2 ore, deși camera e online)`
-          : `🔴 ${chLbl(st, ch)} — NU ÎNREGISTREAZĂ (înregistrare la mișcare: nimic în ultimele 12 ore, deși camera e online)` });
+          : `🔴 ${chLbl(st, ch)} — NU ÎNREGISTREAZĂ (înregistrare la mișcare: nimic în ultimele 24 de ore, deși camera e online)` });
       }
     }
   }
@@ -3878,7 +3879,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 10.5, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 10.6, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/clients-backup' && req.method === 'GET') return handleClientsBackup(req, res);
     if (pathname === '/ops/purchase' || pathname.startsWith('/ops/purchase/')) return await handlePurchase(req, res, pathname);
