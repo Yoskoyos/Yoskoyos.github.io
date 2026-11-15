@@ -1359,11 +1359,11 @@ html:not(.unlocked) .app{display:none}
   html .mob-tabs-sec{display:none!important}
   .main{padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))!important}
 }
-#rec-modal .modal{max-width:980px;width:96vw;padding:0;overflow:hidden}
+#rec-modal .modal{max-width:860px;width:96vw;padding:0;overflow:hidden;max-height:calc(100dvh - 24px);display:flex;flex-direction:column}#rec-modal{padding:12px}.rec-body{overflow-y:auto;flex:1 1 auto;min-height:0}
 .rec-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-2)}
 .rec-bar input[type=date],.rec-bar select{height:36px;border-radius:10px;padding:0 10px;font:inherit;font-size:13px;width:auto;min-width:0}
 .rec-bar .btn{height:36px}
-.rec-stage{position:relative;background:#000;aspect-ratio:16/9;max-height:62vh;width:100%;display:flex;align-items:center;justify-content:center}
+.rec-stage{position:relative;background:#000;aspect-ratio:16/9;max-height:44vh;width:100%;display:flex;align-items:center;justify-content:center}
 .rec-stage video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
 .rec-clock{position:absolute;left:10px;top:10px;background:rgba(0,0,0,.6);color:#fff;font:700 13px/1 var(--mono);padding:6px 9px;border-radius:8px;pointer-events:none}
 .rec-ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#fff;font-size:13px;text-align:center;padding:20px;background:rgba(0,0,0,.55)}
@@ -1377,12 +1377,12 @@ html:not(.unlocked) .app{display:none}
 .rec-tl .sg.m{background:var(--accent,#FF8A1F)}
 .rec-tl .nd{position:absolute;top:0;bottom:0;width:2px;background:#ef4444;box-shadow:0 0 0 1px rgba(255,255,255,.6);pointer-events:none}
 .rec-tl .hov{position:absolute;top:-2px;transform:translateX(-50%);font:700 10px var(--mono);background:var(--fg,#111);color:var(--bg,#fff);padding:2px 5px;border-radius:5px;pointer-events:none;white-space:nowrap}
-.rec-zoom{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}.rec-zl{font-size:12px;color:var(--fg-3)}.rec-zseg{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}.rec-zseg button{border:0;background:transparent;color:var(--fg-2);font:600 12px var(--sans,inherit);padding:7px 11px;cursor:pointer}.rec-zseg button+button{border-left:1px solid var(--border)}.rec-zseg button.on{background:var(--accent-soft);color:var(--accent-tx,var(--accent))}.rec-dl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--accent-soft)}.rec-dl[hidden]{display:none}.rec-dl label{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600}.rec-dl input,.rec-dl select{height:34px;border-radius:9px;padding:0 8px;font:inherit;font-size:13px;width:auto}.rec-dl-len{font:700 12px var(--mono);color:var(--fg-2)}.rec-dlp{flex:1 1 100%;display:flex;align-items:center;gap:10px}.rec-dlp[hidden]{display:none}.rec-dlbar{flex:1;height:10px;border-radius:99px;background:rgba(127,127,127,.2);overflow:hidden}.rec-dlbar i{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .4s}#rec-dltxt{font:600 12px var(--mono);color:var(--fg-2);white-space:nowrap}.rec-dl small{flex:1 1 100%;font-size:11.5px;color:var(--fg-3)}
-.rec-pan{display:inline-flex;align-items:center;gap:6px;margin-left:auto}@media(max-width:600px){.rec-zl{display:none}.rec-zseg{flex:1 1 100%}.rec-zseg button{flex:1;padding:8px 4px}.rec-pan{flex:1 1 100%;justify-content:space-between}}.rec-win{font:700 12px var(--mono);color:var(--fg-2);min-width:96px;text-align:center}
+.rec-zoom{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}.rec-zl{font-size:12.5px;color:var(--fg-2);font-weight:600;display:inline-flex;align-items:center;gap:6px}.rec-zl input{width:70px;height:34px;border-radius:9px;padding:0 8px;font:600 13px var(--mono);text-align:center}.rec-zseg{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}.rec-zseg button{border:0;background:transparent;color:var(--fg-2);font:600 12px var(--sans,inherit);padding:7px 11px;cursor:pointer}.rec-zseg button+button{border-left:1px solid var(--border)}.rec-zseg button.on{background:var(--accent-soft);color:var(--accent-tx,var(--accent))}.rec-dl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--accent-soft)}.rec-dl[hidden]{display:none}.rec-dl label{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600}.rec-dl input,.rec-dl select{height:34px;border-radius:9px;padding:0 8px;font:inherit;font-size:13px;width:auto}.rec-dl-len{font:700 12px var(--mono);color:var(--fg-2)}.rec-dlp{flex:1 1 100%;display:flex;align-items:center;gap:10px}.rec-dlp[hidden]{display:none}.rec-dlbar{flex:1;height:10px;border-radius:99px;background:rgba(127,127,127,.2);overflow:hidden}.rec-dlbar i{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .4s}#rec-dltxt{font:600 12px var(--mono);color:var(--fg-2);white-space:nowrap}.rec-dl small{flex:1 1 100%;font-size:11.5px;color:var(--fg-3)}
+.rec-pan{display:inline-flex;align-items:center;gap:6px;margin-left:auto}@media(max-width:600px){.rec-pan{margin-left:0}}.rec-win{font:700 12px var(--mono);color:var(--fg-2);min-width:96px;text-align:center}
 .rec-ticks{display:flex;justify-content:space-between;font:10px var(--mono);color:var(--fg-3);padding:4px 1px 0}
 .rec-leg{display:flex;gap:14px;align-items:center;font-size:11.5px;color:var(--fg-2);padding:6px 14px 0;flex-wrap:wrap}
 .rec-leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
-.rec-segs{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px 14px;max-height:120px;overflow:auto}
+.rec-segs{display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px 12px;max-height:84px;overflow:auto}
 .rec-segs button{border:1px solid var(--border);background:var(--bg-2);color:var(--fg);border-radius:999px;padding:5px 10px;font:600 12px var(--mono);cursor:pointer}
 .rec-segs button.on{border-color:var(--accent);color:var(--accent-tx,var(--accent));background:var(--accent-soft)}
 .rec-info{padding:8px 14px 12px;font-size:12px;color:var(--fg-3)}
@@ -2782,12 +2782,13 @@ html:not(.unlocked) .app{display:none}
 </div>
 
 <!-- Înregistrări (playback) -->
-<div class="overlay hidden" id="rec-modal">
+<div class="overlay hidden" id="rec-modal" data-noi18n>
   <div class="modal">
     <div class="modal-hdr">
       <div class="modal-title" id="rec-title">Înregistrări</div>
       <div class="modal-x" id="rec-x" style="margin-left:auto">✕</div>
     </div>
+    <div class="rec-body">
     <div class="rec-bar">
       <button class="btn sm" id="rec-dprev" type="button" title="Ziua anterioară">‹</button>
       <input type="date" id="rec-date">
@@ -2812,14 +2813,20 @@ html:not(.unlocked) .app{display:none}
       <div class="rec-ov" id="rec-ov" hidden></div>
     </div>
     <div class="rec-tl-wrap">
-      <div class="rec-zoom"><span class="rec-zl">Perioadă afișată:</span><div class="rec-zseg" id="rec-zseg"><button type="button" data-z="86400">24 h</button><button type="button" data-z="21600">6 h</button><button type="button" data-z="3600" class="on">1 h</button><button type="button" data-z="900">15 min</button><button type="button" data-z="300">5 min</button></div>
-        <span class="rec-pan"><button type="button" class="btn sm" id="rec-pl" title="Mai devreme">‹</button><span class="rec-win" id="rec-win">—</span><button type="button" class="btn sm" id="rec-pr" title="Mai târziu">›</button></span></div>
+      <div class="rec-zoom">
+        <label class="rec-zl">Afișează de la <input type="text" id="rec-vfrom" inputmode="numeric" maxlength="5" placeholder="08:00"></label>
+        <label class="rec-zl">până la <input type="text" id="rec-vto" inputmode="numeric" maxlength="5" placeholder="12:00"></label>
+        <button type="button" class="btn sm" id="rec-vgo">Afișează</button>
+        <button type="button" class="btn sm" id="rec-vall" title="Toată ziua">Toată ziua</button>
+        <span class="rec-pan"><button type="button" class="btn sm" id="rec-pl" title="Mai devreme">‹</button><button type="button" class="btn sm" id="rec-pr" title="Mai târziu">›</button></span>
+      </div>
       <div class="rec-tl" id="rec-tl" title="Apasă pe bară ca să redai de la ora aleasă"></div>
       <div class="rec-ticks" id="rec-ticks"></div>
     </div>
     <div class="rec-leg"><span><i style="background:#3B82F6"></i>Continuu / program</span><span><i style="background:var(--accent,#FF8A1F)"></i>Mișcare / eveniment</span><span id="rec-sum"></span></div>
     <div class="rec-segs" id="rec-segs"></div>
     <div class="rec-info" id="rec-info">Video fără sunet. Redarea vine direct din NVR, prin server; se încarcă în 5–20 de secunde.</div>
+    </div>
   </div>
 </div>
 
@@ -5593,8 +5600,8 @@ function recDrawTl() {
     return `<span class="sg${recIsMot(s.t) ? ' m' : ''}" style="left:${pc(a)}%;width:${Math.max(0.3, pc(b) - pc(a))}%" title="${recHms(s.s)}–${recHms(s.e)}"></span>`; }).join('') + '<span class="nd" id="rec-nd" style="display:none"></span>';
   const n = 6, step = z / n, fmt = x => z >= 3600 * 6 ? recHms(x).slice(0, 2) === '24' ? '24' : recHms(x).slice(0, 5) : recHms(x).slice(0, z <= 900 ? 8 : 5);
   qs('#rec-ticks').innerHTML = Array.from({ length: n + 1 }, (_, i) => `<span>${v0 + i * step >= 86400 ? '24:00' : fmt(v0 + i * step)}</span>`).join('');
-  qs('#rec-win').textContent = `${recHms(v0).slice(0, 5)} – ${v1 >= 86400 ? '24:00' : recHms(v1).slice(0, 5)}`;
-  qs('#rec-zseg').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.z === z));
+  if (document.activeElement !== qs('#rec-vfrom') && document.activeElement !== qs('#rec-vto')) {
+    qs('#rec-vfrom').value = recHms(v0).slice(0, 5); qs('#rec-vto').value = v1 >= 86400 ? '24:00' : recHms(v1).slice(0, 5); }
   qs('#rec-pl').disabled = v0 <= 0; qs('#rec-pr').disabled = v1 >= 86400;
   if (recSt.start != null) recNeedle(recSt.start + (qs('#rec-video').currentTime || 0));
 }
@@ -5605,6 +5612,7 @@ function recPlayAt(sec, keepTries) {
     if (!inside) { const nx = my.segs.find(s => s.s > sec); sec = nx ? nx.s : my.segs[my.segs.length - 1].s; }
   }
   sec = Math.floor(sec); my.start = sec; my.panUntil = 0; if (!keepTries) my.tries = 0;
+  if (sec < my.v0 || sec >= my.v0 + my.zoom) { recFocus(sec); recDrawTl(); }   // ora aleasă e în afara intervalului afișat → îl mutăm
   const auth = getAuth(); if (!auth) return;
   const hevc = my.tries === 0 && recHevcOk() ? 1 : 0;
   const v = qs('#rec-video');
@@ -5618,7 +5626,7 @@ function recPlayAt(sec, keepTries) {
 function recNeedle(sec) {
   if (!recSt) return; const z = recSt.zoom; sec = Math.max(0, Math.min(86400, sec));
   if (sec < recSt.v0 || sec > recSt.v0 + z) {
-    if (Date.now() < (recSt.panUntil || 0)) { const nd = qs('#rec-nd'); if (nd) nd.style.display = 'none'; return; }   // utilizatorul răsfoiește bara
+    if (recSt.custom || Date.now() < (recSt.panUntil || 0)) { const nd = qs('#rec-nd'); if (nd) nd.style.display = 'none'; return; }   // utilizatorul răsfoiește bara
     recFocus(sec); return recDrawTl();
   }   // indicatorul iese din fereastră → o mutăm
   const nd = qs('#rec-nd'); if (nd) { nd.style.display = ''; nd.style.left = ((sec - recSt.v0) / z * 100) + '%'; }
@@ -5718,9 +5726,14 @@ qs('#rec-dlcancel').addEventListener('click', async () => {
   try { await fetch(`${getProxyBase()}/rec/export/${id}`, { method: 'DELETE', headers: { Authorization: 'Bearer ' + auth.token } }); } catch {}
   toast('Descărcare anulată', 'ok');
 });
-qs('#rec-zseg').addEventListener('click', e => { const b = e.target.closest('button[data-z]'); if (!b || !recSt) return;
-  const mid = recSt.start != null ? recSt.start + (qs('#rec-video').currentTime || 0) : recSt.v0 + recSt.zoom / 2;
-  recSt.zoom = +b.dataset.z; recFocus(mid); recDrawTl(); });
+function recApplyView() {
+  if (!recSt) return; const a = recParseT(qs('#rec-vfrom').value), b = recParseT(qs('#rec-vto').value);
+  if (a == null || b == null || b - a < 60) return toast('Scrie intervalul, de exemplu de la 08:00 până la 12:00', 'warn');
+  recSt.v0 = a; recSt.zoom = b - a; recSt.custom = true; qs('#rec-vfrom').blur(); qs('#rec-vto').blur(); recDrawTl();
+}
+qs('#rec-vgo').addEventListener('click', recApplyView);
+['#rec-vfrom', '#rec-vto'].forEach(id => qs(id).addEventListener('keydown', e => { if (e.key === 'Enter') recApplyView(); }));
+qs('#rec-vall').addEventListener('click', () => { if (!recSt) return; recSt.v0 = 0; recSt.zoom = 86400; recSt.custom = true; recDrawTl(); });
 qs('#rec-pl').addEventListener('click', () => { if (!recSt) return; recSt.v0 = Math.max(0, recSt.v0 - recSt.zoom / 2); recSt.panUntil = Date.now() + 20000; recDrawTl(); });
 qs('#rec-pr').addEventListener('click', () => { if (!recSt) return; recSt.v0 = Math.min(86400 - recSt.zoom, recSt.v0 + recSt.zoom / 2); recSt.panUntil = Date.now() + 20000; recDrawTl(); });
 qs('#rec-segs').addEventListener('click', e => { const b = e.target.closest('button[data-s]'); if (b) recPlayAt(+b.dataset.s); });
