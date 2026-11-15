@@ -1386,7 +1386,32 @@ html:not(.unlocked) .app{display:none}
 .rec-segs button{border:1px solid var(--border);background:var(--bg-2);color:var(--fg);border-radius:999px;padding:5px 10px;font:600 12px var(--mono);cursor:pointer}
 .rec-segs button.on{border-color:var(--accent);color:var(--accent-tx,var(--accent));background:var(--accent-soft)}
 .rec-info{padding:8px 14px 12px;font-size:12px;color:var(--fg-3)}
-@media(max-width:600px){.rec-bar{padding:8px 10px}.rec-bar select{flex:1 1 100%}.rec-stage{aspect-ratio:4/3}}
+.rec-sm{display:none}
+@media(max-width:600px){
+  .rec-lg{display:none}.rec-sm{display:inline}
+  #rec-modal{padding:0}#rec-modal .modal{width:100vw;max-width:none;max-height:100dvh;height:100dvh;border-radius:0;border:0}
+  #rec-modal .modal-hdr{padding:10px 12px}
+  .rec-bar{padding:8px 10px;gap:6px}
+  .rec-bar input[type=date]{flex:1 1 130px;min-width:120px;height:38px}
+  .rec-bar select{flex:0 1 auto;height:38px;max-width:34%}
+  .rec-bar>span[style]{display:none}
+  .rec-bar #rec-back,.rec-bar #rec-fwd,.rec-bar #rec-dlbtn{flex:1 1 30%;height:40px;font-size:13px;white-space:nowrap;padding:0 6px}
+  .rec-stage{aspect-ratio:16/9;max-height:none}
+  .rec-clock{font-size:11px;padding:4px 7px;left:6px;top:6px}
+  .rec-tl-wrap{padding:10px 10px 4px}
+  .rec-tl{height:48px}
+  .rec-zoom{gap:6px;flex-wrap:nowrap}.rec-zl{font-size:12px;gap:4px}.rec-zl input{width:60px;height:38px;font-size:14px;padding:0 4px}
+  .rec-zoom .btn{height:38px;padding:0 9px;flex:0 0 auto}.rec-pan{gap:4px}
+  .rec-pan{margin-left:auto}
+  .rec-ticks span:nth-child(even){visibility:hidden}
+  .rec-leg{padding:6px 10px 0;font-size:11px;gap:10px}
+  .rec-segs{flex-wrap:nowrap;overflow-x:auto;max-height:none;padding:8px 10px 12px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .rec-segs button{flex:0 0 auto;padding:8px 12px}
+  .rec-info{display:none}
+  .rec-dl{padding:10px;gap:8px}.rec-dl label{font-size:12.5px}.rec-dl input{width:84px!important;height:38px}
+  #rec-dl-go{height:38px}
+  #snap-modal-rec{padding:0 10px}
+}
 </style>
 </head>
 <body>
@@ -2761,7 +2786,7 @@ html:not(.unlocked) .app{display:none}
       <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
         <button class="btn sm" id="snap-modal-prev" title="Canal anterior">‹</button>
         <button class="btn sm" id="snap-modal-next" title="Canal următor">›</button>
-        <button class="btn sm" id="snap-modal-rec" type="button" title="Înregistrările acestei camere">⏪ Înregistrări</button>
+        <button class="btn sm" id="snap-modal-rec" type="button" title="Înregistrările acestei camere">⏪<span class="rec-lg"> Înregistrări</span></button>
         <button class="btn sm primary" id="snap-modal-refresh">↻ Refresh</button>
         <div class="modal-x" id="snap-modal-x">✕</div>
       </div>
@@ -2797,7 +2822,7 @@ html:not(.unlocked) .app{display:none}
       <span style="flex:1"></span>
       <button class="btn sm" id="rec-back" type="button" title="Înapoi 1 minut">⏪ 1 min</button>
       <button class="btn sm" id="rec-fwd" type="button" title="Înainte 1 minut">1 min ⏩</button>
-      <button class="btn sm primary" id="rec-dlbtn" type="button" title="Descarcă filmarea ca MP4">⬇ Descarcă MP4</button>
+      <button class="btn sm primary" id="rec-dlbtn" type="button" title="Descarcă filmarea ca MP4">⬇<span class="rec-lg"> Descarcă</span> MP4</button>
     </div>
     <div class="rec-dl" id="rec-dl" hidden>
       <label data-noi18n>De la ora <input type="text" id="rec-dl-from" inputmode="numeric" placeholder="14:30" maxlength="8" style="width:92px;font-family:var(--mono)"></label>
@@ -2805,7 +2830,7 @@ html:not(.unlocked) .app{display:none}
       <span class="rec-dl-len" id="rec-dl-len"></span>
       <button class="btn sm primary" id="rec-dl-go" type="button">⬇ Descarcă</button>
       <div class="rec-dlp" id="rec-dlp" hidden><div class="rec-dlbar"><i id="rec-dlfill"></i></div><span id="rec-dltxt">—</span><button class="btn sm" id="rec-dlcancel" type="button">Anulează</button></div>
-      <small>Scrie orele ca 14:30 sau 14:30:15 (maxim 60 de minute odată). Serverul ia filmarea din NVR în bucăți, în paralel, apoi îți dă fișierul MP4 (cu sunet, dacă camera are microfon). Poți închide fereastra — descărcarea pornește singură când e gata.</small>
+      <small class="rec-lg">Scrie orele ca 14:30 sau 14:30:15 (maxim 60 de minute odată). Serverul ia filmarea din NVR în bucăți, în paralel, apoi îți dă fișierul MP4 (cu sunet, dacă camera are microfon). Poți închide fereastra — descărcarea pornește singură când e gata.</small>
     </div>
     <div class="rec-stage">
       <video id="rec-video" playsinline muted controls preload="none"></video>
@@ -2814,10 +2839,10 @@ html:not(.unlocked) .app{display:none}
     </div>
     <div class="rec-tl-wrap">
       <div class="rec-zoom">
-        <label class="rec-zl">Afișează de la <input type="text" id="rec-vfrom" inputmode="numeric" maxlength="5" placeholder="08:00"></label>
-        <label class="rec-zl">până la <input type="text" id="rec-vto" inputmode="numeric" maxlength="5" placeholder="12:00"></label>
-        <button type="button" class="btn sm" id="rec-vgo">Afișează</button>
-        <button type="button" class="btn sm" id="rec-vall" title="Toată ziua">Toată ziua</button>
+        <label class="rec-zl"><span class="rec-lg">Afișează de la</span> <input type="text" id="rec-vfrom" inputmode="numeric" maxlength="5" placeholder="08:00"></label>
+        <label class="rec-zl"><span class="rec-lg">până la</span><span class="rec-sm">–</span> <input type="text" id="rec-vto" inputmode="numeric" maxlength="5" placeholder="12:00"></label>
+        <button type="button" class="btn sm" id="rec-vgo"><span class="rec-lg">Afișează</span><span class="rec-sm">OK</span></button>
+        <button type="button" class="btn sm" id="rec-vall" title="Toată ziua"><span class="rec-lg">Toată ziua</span><span class="rec-sm">24 h</span></button>
         <span class="rec-pan"><button type="button" class="btn sm" id="rec-pl" title="Mai devreme">‹</button><button type="button" class="btn sm" id="rec-pr" title="Mai târziu">›</button></span>
       </div>
       <div class="rec-tl" id="rec-tl" title="Apasă pe bară ca să redai de la ora aleasă"></div>
@@ -5655,11 +5680,12 @@ qs('#rec-video').addEventListener('error', async () => {
 });
 function recTlSec(e) { const r = qs('#rec-tl').getBoundingClientRect(); return Math.max(0, Math.min(86399, recSt.v0 + (e.clientX - r.left) / r.width * recSt.zoom)); }
 qs('#rec-tl').addEventListener('click', e => { if (recSt && recSt.segs.length) recPlayAt(recTlSec(e)); });
-qs('#rec-tl').addEventListener('mousemove', e => {
+qs('#rec-tl').addEventListener('pointermove', e => {
   let h = qs('#rec-tl .hov'); if (!h) { h = document.createElement('span'); h.className = 'hov'; qs('#rec-tl').appendChild(h); }
   if (!recSt) return; const s = recTlSec(e); h.textContent = recHms(s).slice(0, recSt.zoom <= 900 ? 8 : 5); h.style.left = ((s - recSt.v0) / recSt.zoom * 100) + '%';
 });
-qs('#rec-tl').addEventListener('mouseleave', () => { const h = qs('#rec-tl .hov'); if (h) h.remove(); });
+qs('#rec-tl').addEventListener('pointerleave', () => { const h = qs('#rec-tl .hov'); if (h) h.remove(); });
+qs('#rec-tl').addEventListener('pointerdown', e => { qs('#rec-tl').dispatchEvent(new PointerEvent('pointermove', { clientX: e.clientX, bubbles: true })); });
 function recCurSec() { return recSt && recSt.start != null ? Math.floor(recSt.start + (qs('#rec-video').currentTime || 0)) : null; }
 function recParseT(v) {   // „14:30”, „1430”, „14.30.15” → secunde
   v = String(v || '').trim().replace(/[.\s]/g, ':'); if (/^\d{3,4}$/.test(v)) v = v.padStart(4, '0').replace(/^(\d\d)(\d\d)$/, '$1:$2');
