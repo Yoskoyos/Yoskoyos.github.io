@@ -11,7 +11,7 @@ if ! node --check server.new.js 2>/dev/null; then echo "EROARE: fișier invalid,
 # imaginile din e-mailul cu oferta (servite de server la /email-img/)
 mkdir -p "$DIR/email-img"
 for f in hero.jpg i-img.png i-lock.png i-phone.png i-rec.png i-shield.png i-wrench.png p-bullet.png p-cab.png p-hdd.png p-mon.png p-nvr.png p-sw.png p-tech.png p-turret.png p-lift.png s-badge.png s-cam.png s-check.png s-gear.png s-key.png s-note.png s-shield.png s-shield2.png s-tool.png; do curl -fsSL --max-time 20 "https://raw.githubusercontent.com/Yoskoyos/Yoskoyos.github.io/$REF/server/email-img/$f" -o "$DIR/email-img/$f.tmp" && mv "$DIR/email-img/$f.tmp" "$DIR/email-img/$f"; done
-if cmp -s server.new.js server.js; then rm -f server.new.js; echo "Serverul are deja ultima versiune."; curl -s http://localhost:3000/health; echo; exit 0; fi
+SAME=0; if cmp -s server.new.js server.js; then rm -f server.new.js; SAME=1; fi   # chiar dacă e aceeași versiune, aplicăm mai jos setările nginx / pachetele lipsă
 if ! command -v ffmpeg >/dev/null 2>&1; then
   echo "Instalez ffmpeg (pentru imaginile din stream RTSP)..."
   (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg) >/dev/null 2>&1 || echo "ATENȚIE: ffmpeg nu s-a instalat — restul merge normal"
@@ -47,6 +47,7 @@ fi
 [ -d node_modules/web-push ] || { echo "Instalez modulul pentru notificări push..."; npm install --silent web-push@latest >/dev/null 2>&1 || echo "ATENȚIE: web-push nu s-a instalat — notificările push nu vor merge"; }
 # portul 8443: interfața web a NVR-urilor deschisă din aplicație (deja logată)
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then ufw allow 8443/tcp >/dev/null 2>&1 && echo "firewall: port 8443 deschis"; fi
+if [ "$SAME" = 1 ]; then echo "Serverul are deja ultima versiune."; curl -s http://localhost:3000/health; echo; exit 0; fi
 cp server.js server.js.prev
 mv server.new.js server.js
 systemctl restart nvr-proxy
