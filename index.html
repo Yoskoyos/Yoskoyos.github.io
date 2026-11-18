@@ -8456,7 +8456,7 @@ qs('#nld-copy').addEventListener('click', async () => {
 /* ── contacte ── */
 function nlkRender() {
   const q = qs('#nlk-q').value.trim().toLowerCase(), L = ((nlData && nlData.contacts) || []).filter(c => !q || [c.email, c.name, c.org].join(' ').toLowerCase().includes(q));
-  qs('#nlk-list').innerHTML = L.length ? L.map(c => `<div class="nl-r${nlUnsub(c.email) ? ' off' : ''}"><span><b>${escapeHtml(c.org || c.name || c.email)}</b><small>${escapeHtml(c.email)}${c.name && c.org ? ' · ' + escapeHtml(c.name) : ''}</small></span>${nlUnsub(c.email) ? '<em>dezabonat</em>' : ''}<button type="button" class="of-x" data-kid="${escapeHtml(c.id)}" title="Șterge">✕</button></div>`).join('') : '<div class="cm-hint">Niciun contact.</div>';
+  qs('#nlk-list').innerHTML = L.length ? L.map(c => `<div class="nl-r${nlUnsub(c.email) ? ' off' : ''}"><span><b>${escapeHtml(c.org || c.name || c.email)}</b><small>${escapeHtml(c.email)}${c.name && c.org ? ' · ' + escapeHtml(c.name) : ''}</small></span>${nlUnsub(c.email) ? '<em>dezabonat</em>' : c.consent ? `<em style="color:var(--ok,#16a34a)" title="Abonat de pe site, cu acord confirmat pe e-mail${c.consent.at ? ' la ' + new Date(c.consent.at).toLocaleDateString('ro-RO') : ''}">✓ acord</em>` : ''}<button type="button" class="of-x" data-kid="${escapeHtml(c.id)}" title="Șterge">✕</button></div>`).join('') : '<div class="cm-hint">Niciun contact.</div>';
 }
 qs('#nl-contacts-btn').addEventListener('click', async () => { await loadNl(true); qs('#nlk-modal').classList.remove('hidden'); nlkRender(); });
 qs('#nlk-x').addEventListener('click', () => qs('#nlk-modal').classList.add('hidden'));

@@ -2933,6 +2933,53 @@ async function handleNlPublic(req, res, pathname) {
   }
   return page('Dezabonare', `<h1>Dezabonare</h1><p>Nu mai doriți să primiți mesaje de la SUPRAVEGHERE24h la adresa <b>${escHtml(f.r.email)}</b>?</p><form method="post"><button type="submit">Da, dezabonează-mă</button></form>`);
 }
+/* ───── Abonare la newsletter de pe site, cu dublă confirmare (acord GDPR salvat) — v11.2 ─────
+   POST /nl/subscribe {email, nume?, asociatie?, acord, website(capcană)} → mail cu link → GET /nl/confirm/<t> (pagină cu buton) → POST confirmă
+   → contact nou în newsletter (source:'site', consent: {at, ip, page, text}). Linkurile se aplică doar pentru 7 zile. */
+const NL_CONSENT_TXT = 'Sunt de acord să primesc pe e-mail oferte și noutăți de la SUPRAVEGHERE24h (Yca Solutions SRL). Mă pot dezabona oricând.';
+const nlIp = req => String(req.headers['x-real-ip'] || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '').slice(0, 60);
+const nlPage = (res, title, body) => sendHtml(res, 200, `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${title}</title><style>body{margin:0;background:#eef2f7;font:16px/1.55 Arial,sans-serif;color:#14202E;display:grid;place-items:center;min-height:100vh;padding:20px;box-sizing:border-box}.b{background:#fff;border-radius:16px;padding:32px 28px;max-width:460px;text-align:center;box-shadow:0 10px 30px rgba(13,31,51,.08)}h1{font-size:22px;margin:0 0 10px}button,a.k{display:inline-block;margin-top:16px;background:#F5A100;color:#0D1F33;border:0;border-radius:10px;padding:12px 22px;font:700 16px Arial,sans-serif;cursor:pointer;text-decoration:none}p{margin:8px 0;color:#3B4A5C}</style></head><body><div class="b">${body}</div></body></html>`);
+async function handleNlSubscribe(req, res) {
+  let back = null;
+  try { const r = new URL(String(req.headers.referer || '')); if (SITE_HOSTS.test(r.hostname)) { r.search = ''; r.hash = ''; back = r.toString(); } } catch {}
+  const done = (ok, err) => {
+    if (back) { res.writeHead(303, { Location: `${back}?abonare=${ok ? 'trimis' : 'eroare&motiv=' + encodeURIComponent(err || '')}#abonare`, ...PUB_CORS }); return res.end(); }
+    return nlPage(res, ok ? 'Verifică e-mailul' : 'Eroare', ok ? '<h1>Mai ai un pas</h1><p>Ți-am trimis un e-mail. Apasă linkul din el ca să confirmi abonarea.</p>' : `<h1>Abonarea nu a mers</h1><p>${escHtml(err || '')}</p>`);
+  };
+  if (pubLimited(req, 5)) return done(false, 'Prea multe încercări. Încearcă mai târziu.');
+  const f = await readBodyAny(req);
+  if (f.website) return done(true);                                       // capcană roboți
+  const email = nlEmail(f.email);
+  if (!email) return done(false, 'Adresa de e-mail nu pare corectă.');
+  if (!(f.acord || f.consent)) return done(false, 'Bifează acordul ca să te putem abona.');
+  const db = loadDb(); const owner = quoteOwner(db); if (!owner) return done(false, 'Serviciu indisponibil.');
+  if (!mailReady()) return done(false, 'Abonarea nu e disponibilă acum. Scrie-ne la contact@supraveghere24h.ro.');
+  const all = loadNl(), u = nlUser(all, owner.username); u.pending = (u.pending || []).filter(p => Date.now() - p.at < 7 * 864e5 && p.email !== email);
+  const t = crypto.randomBytes(18).toString('hex');
+  u.pending.push({ t, email, name: str(f.nume || f.name || '', 160).trim(), org: str(f.asociatie || f.org || '', 200).trim(), at: Date.now(), ip: nlIp(req), page: back ? new URL(back).pathname : '' });
+  if (u.pending.length > 500) u.pending = u.pending.slice(-500);
+  saveNl(all);
+  const base = 'https://' + (req.headers.host || 'proxy.supraveghere24h.ro'), link = `${base}/nl/confirm/${t}`;
+  const html = `<div style="font:16px/1.55 Arial,sans-serif;color:#14202E;max-width:520px"><p>Bună ziua,</p><p>Ai cerut să primești pe e-mail ofertele și noutățile SUPRAVEGHERE24h. Confirmă abonarea apăsând butonul de mai jos:</p><p><a href="${link}" style="display:inline-block;background:#F5A100;color:#0D1F33;font-weight:700;padding:12px 22px;border-radius:10px;text-decoration:none">Confirm abonarea</a></p><p style="color:#52606F;font-size:14px">Dacă nu tu ai cerut abonarea, ignoră acest mesaj — nu vei primi nimic de la noi.</p><p style="color:#52606F;font-size:14px">SUPRAVEGHERE24h · Yca Solutions SRL · 0763 354 355 · supraveghere24h.ro</p></div>`;
+  const ok = await sendMail(email, 'Confirmă abonarea la SUPRAVEGHERE24h', `Confirmă abonarea la ofertele și noutățile SUPRAVEGHERE24h: ${link}\n\nDacă nu tu ai cerut abonarea, ignoră acest mesaj.`, html);
+  return done(ok, ok ? '' : 'Nu am putut trimite e-mailul de confirmare. Încearcă din nou.');
+}
+async function handleNlConfirm(req, res, pathname) {
+  const t = (/^\/nl\/confirm\/([0-9a-f]{36})$/.exec(pathname) || [])[1];
+  const all = loadNl(); let hit = null;
+  if (t) for (const [owner, u] of Object.entries(all)) { const p = (u.pending || []).find(x => x.t === t); if (p) { hit = { owner, u, p }; break; } }
+  if (!hit || Date.now() - hit.p.at > 7 * 864e5) return nlPage(res, 'Link expirat', '<h1>Link expirat</h1><p>Linkul de confirmare nu mai este valabil. Te poți abona din nou de pe <a href="https://supraveghere24h.ro">supraveghere24h.ro</a>.</p>');
+  if (req.method !== 'POST')   // GET doar arată butonul (scannerele de linkuri din e-mail nu abonează pe nimeni)
+    return nlPage(res, 'Confirmă abonarea', `<h1>Confirmi abonarea?</h1><p>Adresa <b>${escHtml(hit.p.email)}</b> va primi ofertele și noutățile SUPRAVEGHERE24h. Te poți dezabona oricând, din orice e-mail.</p><form method="post"><button type="submit">Da, confirm</button></form>`);
+  const { u, p } = hit;
+  const consent = { at: Date.now(), requestedAt: p.at, ip: p.ip, confirmIp: nlIp(req), page: p.page, text: NL_CONSENT_TXT, method: 'double-opt-in' };
+  const ex = u.contacts.find(c => c.email === p.email);
+  if (ex) { ex.consent = consent; if (!ex.name && p.name) ex.name = p.name; if (!ex.org && p.org) ex.org = p.org; }
+  else u.contacts.push({ id: newId(), email: p.email, name: p.name, org: p.org, source: 'site', consent, createdAt: Date.now() });
+  delete u.unsub[p.email]; u.pending = u.pending.filter(x => x.t !== p.t); saveNl(all);
+  try { const db = loadDb(); const ow = (db.users || []).find(x => x.username === hit.owner); if (ow) notifyOwner(db, ow, `📬 <b>Abonat nou la newsletter</b>\n${escHtml(p.email)}${p.org ? ' · ' + escHtml(p.org) : ''}`, '/?tab=quotes').catch(() => {}); } catch {}
+  return nlPage(res, 'Abonare confirmată', '<h1>Gata, ești abonat!</h1><p>Îți vom trimite ofertele și noutățile noastre. Te poți dezabona oricând, din linkul aflat în fiecare e-mail.</p><a class="k" href="https://supraveghere24h.ro/calculator-pret">Calculează prețul blocului</a>');
+}
 function nlSummary(c, quotesList) {
   const R = c.recipients || [], sent = R.filter(r => r.st === 'sent');
   const leads = new Set(); if (c.sentAt) for (const q of quotesList) { const e = nlEmail(q.customer && q.customer.email); if (e && q.createdAt >= c.sentAt && R.some(r => r.email === e)) leads.add(e); }
@@ -4128,7 +4175,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.1, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.2, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
@@ -4171,6 +4218,8 @@ const server = http.createServer(async (req, res) => {
       if (isPdf) { const nm = `Oferta-OF-${hit.o.no}-SUPRAVEGHERE24h.pdf`; res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Length': html.length, 'Content-Disposition': `inline; filename="${nm}"`, 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' }); return res.end(html); }
       return sendHtml(res, 200, html);
     }
+    if (pathname === '/nl/subscribe' && req.method === 'POST') return await handleNlSubscribe(req, res);
+    if (pathname.startsWith('/nl/confirm/')) return await handleNlConfirm(req, res, pathname);
     if (pathname.startsWith('/nl/')) return await handleNlPublic(req, res, pathname);
     if (pathname === '/agent' || pathname.startsWith('/agent/')) return await handleAgent(req, res, pathname);
     if (pathname === '/newsletter' || pathname.startsWith('/newsletter/')) return await handleNewsletter(req, res, pathname);
