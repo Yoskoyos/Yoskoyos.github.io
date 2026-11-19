@@ -1733,6 +1733,7 @@ html:not(.unlocked) .app{display:none}
         <div class="section-hdr">
           <div class="section-title sec-t"><span class="intg-ic" style="background:#0EA5E9"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg></span><span>Echipamente pe site</span></div>
           <div class="section-action" id="ct-inv-btn" style="margin-left:auto" title="Încarcă factura de la furnizor: produsele intră în stoc și, dacă sunt noi, aici"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 15V3M7 8l5-5 5 5M5 21h14"/></svg>Factură furnizor</div>
+          <div class="section-action" id="ct-a2t-btn" title="Caută produse pe A2T și adaugă-le aici, cu caracteristici, preț și stoc"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>Din A2T</div>
           <div class="section-action" id="ct-add-btn"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Echipament nou</div>
         </div>
         <div class="cm-hint" style="margin-bottom:12px">Ce bifezi „Pe site” apare pe pagina <a href="https://supraveghere24h.ro/echipamente.html" target="_blank" rel="noopener">supraveghere24h.ro/echipamente</a>, în ordinea de aici, cu poză și caracteristici. Ce bifezi și „Se vinde pe site” apare cu preț și buton „Adaugă în coș” (când magazinul e pornit, din Comenzi → Setări magazin). Cantitățile din stoc și costurile nu apar pe site.</div>
@@ -2453,6 +2454,22 @@ html:not(.unlocked) .app{display:none}
       <button class="btn cm-del" id="om-delete" type="button">Șterge</button>
       <button class="btn" id="om-cancel" type="button">Închide</button>
       <button class="btn primary" id="om-save" type="button">Salvează</button>
+    </div>
+  </div>
+</div>
+<div class="overlay hidden" id="a2t-modal" role="dialog" aria-modal="true" aria-labelledby="a2m-title">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-hdr"><div class="modal-title" id="a2m-title">Adaugă produse din A2T</div><div class="modal-x" id="a2m-x" role="button" aria-label="Închide">✕</div></div>
+    <div class="modal-body">
+      <div class="fg"><label for="a2m-q">Caută după nume sau lipește coduri (câte unul pe rând)</label>
+        <div style="display:flex;gap:8px;align-items:flex-start"><textarea id="a2m-q" rows="2" placeholder="ex. camera IP 4MP turret  sau  DS-2CD1043G2-LIUF(2.8MM)" style="flex:1;resize:vertical"></textarea><button type="button" class="btn primary" id="a2m-go" style="flex:0 0 auto">Caută</button></div></div>
+      <div class="cm-hint">Produsele intră în Echipamente <b>ascunse</b>, bifate „Se vinde pe site”, cu codul A2T, caracteristicile și prețul A2T. Le verifici, pui poza (la Safer și Dahua o iau automat de pe A2T) și apoi bifezi „Arată pe site”. Produsele resigilate nu apar.</div>
+      <div id="a2m-res" style="margin-top:12px"></div>
+    </div>
+    <div class="modal-foot">
+      <span id="a2m-n" class="cm-hint" style="margin-right:auto"></span>
+      <button class="btn" id="a2m-cancel" type="button">Închide</button>
+      <button class="btn primary" id="a2m-add" type="button" disabled>Adaugă selectate</button>
     </div>
   </div>
 </div>
@@ -6960,6 +6977,38 @@ qs('#sm-save').addEventListener('click', async () => {
   const b = { on: qs('#sm-on').checked, markup: qs('#sm-mk').value, ship: qs('#sm-ship').value, freeOver: qs('#sm-free').value, cod: qs('#sm-cod').checked, codFee: qs('#sm-codfee').value, op: qs('#sm-op').checked, pickup: qs('#sm-pickup').checked, note: qs('#sm-note').value.trim() };
   if (b.on && !b.cod && !b.op && !b.pickup) return toast('Alege cel puțin o metodă de plată', 'warn');
   try { opsApply(await clApi('/ops/shop-cfg', jsonOpt('PUT', b))); renderOrders(); renderCatalog(); closeShop(); toast(b.on ? 'Magazinul e pornit — prețurile apar pe site în cel mult un minut' : 'Setări salvate', 'ok'); } catch (e) { toast(e.message, 'err'); }
+});
+/* ── Adaugă din A2T ── */
+let a2mRes = [];
+const a2mSel = () => [...document.querySelectorAll('#a2m-res input[data-sku]:checked')].map(i => i.dataset.sku);
+function a2mCount() { const n = a2mSel().length; qs('#a2m-add').disabled = !n; qs('#a2m-add').textContent = n ? `Adaugă ${n} ${n === 1 ? 'produs' : 'produse'}` : 'Adaugă selectate'; }
+async function a2mSearch() {
+  const q = qs('#a2m-q').value.trim(); if (!q) return; const box = qs('#a2m-res'); box.innerHTML = '<div class="cm-hint">Caut pe A2T…</div>';
+  try {
+    const r = await clApi('/ops/a2t-find?q=' + encodeURIComponent(q)); a2mRes = r.items || [];
+    const mk = ((ops && ops.shopCfg) || {}).markup || 0;
+    box.innerHTML = (r.missing && r.missing.length ? `<div class="cm-hint" style="color:var(--warn);margin-bottom:8px">Negăsite pe A2T: ${r.missing.map(escapeHtml).join(', ')}</div>` : '') + (a2mRes.length ? `<div style="display:flex;flex-direction:column;gap:6px">${a2mRes.map(x => `
+      <label class="cl-card" style="cursor:${x.have ? 'default' : 'pointer'};opacity:${x.have ? .55 : 1};align-items:flex-start">
+        <input type="checkbox" data-sku="${escapeHtml(x.sku)}" ${x.have ? 'disabled' : ''} style="width:18px;height:18px;margin-top:3px;accent-color:var(--accent);flex-shrink:0">
+        <div class="cl-main"><div class="cl-name" style="white-space:normal"><span>${escapeHtml(x.name)}</span></div>
+          <div class="cl-sub">${escapeHtml([x.sku, x.brand, CT_CAT[x.cat]].filter(Boolean).join(' · '))}${x.specs.length ? ` · ${x.specs.length} caracteristici` : ''} · ${x.photoOk ? 'cu poză' : 'fără poză (o pui tu)'}${x.have ? ' · <b>există deja în Echipamente</b>' : ''}</div></div>
+        <div style="text-align:right;flex-shrink:0"><b style="white-space:nowrap">${fmtLei(x.price)}</b><div class="cm-hint" style="white-space:nowrap">la tine ≈ ${fmtLei(Math.ceil(x.price * (1 + mk / 100)))}</div><div class="cm-hint" style="white-space:nowrap;color:${x.inStock ? 'var(--ok)' : 'var(--fg-3)'}">${x.inStock ? 'în stoc A2T' : 'fără stoc A2T'}</div></div>
+      </label>`).join('')}</div>` : '<div class="cl-empty">Nimic găsit. Încearcă alte cuvinte sau codul exact de pe A2T.</div>');
+    a2mCount();
+  } catch (e) { box.innerHTML = `<div class="cl-empty">${escapeHtml(/HTTP 404|Secțiune/.test(e.message) ? 'Actualizează serverul (v11.6) ca să poți căuta pe A2T' : e.message)}</div>`; }
+}
+qs('#ct-a2t-btn').addEventListener('click', () => { qs('#a2t-modal').classList.remove('hidden'); setTimeout(() => qs('#a2m-q').focus(), 50); });
+const a2mClose = () => qs('#a2t-modal').classList.add('hidden');
+qs('#a2m-x').addEventListener('click', a2mClose); qs('#a2m-cancel').addEventListener('click', a2mClose);
+qs('#a2t-modal').addEventListener('click', e => { if (e.target.id === 'a2t-modal') a2mClose(); });
+qs('#a2m-go').addEventListener('click', a2mSearch);
+qs('#a2m-q').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); a2mSearch(); } });
+qs('#a2m-res').addEventListener('change', a2mCount);
+qs('#a2m-add').addEventListener('click', async () => {
+  const skus = a2mSel(); if (!skus.length) return; const bt = qs('#a2m-add'); bt.disabled = true; bt.textContent = 'Se adaugă…';
+  try { const r = await clApi('/ops/a2t-import', jsonOpt('POST', { skus })); opsApply(r); renderCatalog(); renderOrders(); a2mClose(); qs('#a2m-res').innerHTML = ''; qs('#a2m-q').value = '';
+    toast(`${r.added} produse adăugate (ascunse)${r.photos ? `, ${r.photos} cu poză` : ''}${r.skipped ? ` · ${r.skipped} existau deja` : ''}. Verifică-le și bifează „Arată pe site”.`, 'ok'); }
+  catch (e) { toast(e.message, 'err'); a2mCount(); }
 });
 qs('#sm-sync').addEventListener('click', async () => {
   const bt = qs('#sm-sync'); bt.disabled = true; bt.textContent = 'Se citesc prețurile de pe A2T…';

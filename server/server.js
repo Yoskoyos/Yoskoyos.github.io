@@ -1469,7 +1469,7 @@ function worksOnDone(u, w) {
    POST /ops/purchase/apply { token, lines:[…] } → adaugă în stoc, creează echipamentele noi (nevizibile pe site), păstrează factura. Istoric: ops.json → purchases */
 const PURCH_TMP = path.join(os.tmpdir(), 'yca-purchase');
 const PHOTO_BRANDS = ['Safer', 'Dahua'];   // pozele de pe A2T se folosesc doar la mărcile acestea (regula stabilită cu proprietarul)
-const BRANDS = ['HiLook', 'Hikvision', 'Dahua', 'Imou', 'Ezviz', 'Safer', 'TP-Link', 'Mercusys', 'Ubiquiti', 'Tenda', 'Uniview', 'Reolink', 'Ajax', 'Satel', 'Paradox', 'DSC', 'Teknim', 'Unipos', 'Fireclass', 'Optex', 'ZKTeco',
+const BRANDS = ['HiLook', 'Hikvision', 'Dahua', 'Imou', 'Ezviz', 'Safer', 'Tiandy', 'TP-Link', 'Mercusys', 'Ubiquiti', 'Tenda', 'Uniview', 'Reolink', 'Ajax', 'Satel', 'Paradox', 'DSC', 'Teknim', 'Unipos', 'Fireclass', 'Optex', 'ZKTeco',
   'Western Digital', 'WD', 'Seagate', 'Toshiba', 'Kingston', 'Eaton', 'APC', 'Mustek', 'Kassinakis', 'Gewiss', 'Schrack', 'Elan', 'Mekas', 'Braun', 'Gembird', 'Logilink', 'Milwaukee', 'Nice', 'Came', 'BFT', 'Motorline'];
 const numRo = s => { s = String(s || '').trim(); if (/,\d{1,2}$/.test(s) && !/\.\d{1,3}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.'); else s = s.replace(/,/g, ''); const n = parseFloat(s); return isFinite(n) ? n : 0; };
 function purchParsePdf(buf) {
@@ -1700,6 +1700,26 @@ ${bank}
   notifyOwner(db, owner, `🛒 <b>Comandă nouă CMD-${no}</b> · ${lei2(o.total)}\n${escHtml(c.name)} · ${escHtml(c.phone)}${c.type === 'pj' ? ' · ' + escHtml(c.company) : ''}\n${lines.map(l => `${l.qty} × ${escHtml(l.name)}`).join('\n')}\n${PAY[pay]}${delivery === 'curier' ? ' · curier ' + escHtml(c.city) : ' · ridicare'}`, '/?tab=catalog&view=orders').catch(() => {});
   return send(200, { ok: true, no: 'CMD-' + no, total: o.total, pay, mailed });
 }
+// căutare pe A2T pentru importul în Echipamente: după coduri exacte sau după text; fără produse resigilate, inactive sau fără preț
+function a2tFind(o) {
+  return new Promise(resolve => {
+    const f = [{ terms: { visibility: [3, 4] } }, { terms: { status: [0, 1] } }];
+    const query = o.codes ? { bool: { filter: [{ terms: { sku: o.codes } }] } } : { bool: { must: [{ multi_match: { query: o.text, fields: ['name^3', 'sku^2'], operator: 'and', fuzziness: 'AUTO' } }], filter: f } };
+    const body = JSON.stringify({ query });
+    const rq = https.request({ host: 'www.a2t.ro', path: `/api/catalog/vue_storefront_catalog_1/product/_search?size=${o.codes ? Math.min(100, o.codes.length + 10) : 40}&_source_include=name,sku,image,url_path,short_description,category,final_price,price,stock.is_in_stock,stock.qty`, method: 'POST', timeout: 20000,
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), 'User-Agent': 'Mozilla/5.0 (compatible; YCA/1.0)', Accept: 'application/json' } }, r => {
+      const ch = []; r.on('data', d => ch.push(d));
+      r.on('end', () => { let hits = []; try { hits = (JSON.parse(Buffer.concat(ch).toString('utf8')).hits || {}).hits || []; } catch {}
+        resolve(hits.map(h => h._source).filter(s => s && s.sku && (+(s.final_price || s.price) > 0) && !/^\[?resigilat|-R\d+$/i.test(String(s.name || '') + ' ' + s.sku) && !/-R\d+$/i.test(s.sku)).map(s => {
+          const name = String(s.name || '').replace(/\s+/g, ' ').trim(); const brand = guessBrand(name); const g = guessCats(name, (s.category || []).map(c => c && c.name).filter(Boolean));
+          return { sku: s.sku, model: String(s.sku).replace(/\((\d+(\.\d+)?\s*mm)\)$/i, '').trim(), name: name.slice(0, 200), title: name.split(',').slice(0, 2).join(',').trim().slice(0, 160),
+            brand, cat: g.cat, price: Math.round(+(s.final_price || s.price) * 100) / 100, qty: s.stock ? +s.stock.qty || 0 : 0, inStock: !!(s.stock && s.stock.is_in_stock && s.stock.qty > 0),
+            image: s.image && s.image !== 'no_selection' ? String(s.image) : '', photoOk: !!(s.image && PHOTO_BRANDS.includes(brand)), specs: htmlList(s.short_description).slice(0, 14), url: s.url_path ? 'https://www.a2t.ro/' + s.url_path : '' };
+        })); });
+    });
+    rq.on('timeout', () => rq.destroy()); rq.on('error', () => resolve([])); rq.write(body); rq.end();
+  });
+}
 // detaliile unui produs de pe a2t.ro după cod
 function a2tBySku(skus) {
   return new Promise(resolve => {
@@ -1816,8 +1836,8 @@ async function handlePurchase(req, res, pathname) {
   return sendJson(res, 405, { error: 'Operație necunoscută' });
 }
 async function handleOps(req, res, pathname) {
-  const coll0 = (/^\/ops\/(works|stock|gdpr|catalog|offers|offer-cfg|a2t-stock|shop-cfg|orders)/.exec(pathname) || [])[1];
-  const ctx = requireUser(req, res, coll0 ? ({ works: 'works', stock: 'works', gdpr: 'clients', catalog: 'catalog', offers: 'quotes', 'offer-cfg': 'quotes', 'a2t-stock': 'quotes', 'shop-cfg': 'catalog', orders: 'catalog' })[coll0] : null); if (!ctx) return;
+  const coll0 = (/^\/ops\/(works|stock|gdpr|catalog|offers|offer-cfg|a2t-stock|shop-cfg|orders|a2t-find|a2t-import)/.exec(pathname) || [])[1];
+  const ctx = requireUser(req, res, coll0 ? ({ works: 'works', stock: 'works', gdpr: 'clients', catalog: 'catalog', offers: 'quotes', 'offer-cfg': 'quotes', 'a2t-stock': 'quotes', 'shop-cfg': 'catalog', orders: 'catalog', 'a2t-find': 'catalog', 'a2t-import': 'catalog' })[coll0] : null); if (!ctx) return;
   if (!coll0 && ctx.user.role === 'client') return sendJson(res, 403, { error: 'Nu ai acces la această secțiune' });
   const uname = ctx.uname;
   const all = loadOps(); const u = all[uname] = all[uname] || {}; for (const c of OPS_COLLS) if (!Array.isArray(u[c])) u[c] = [];
@@ -1836,6 +1856,34 @@ async function handleOps(req, res, pathname) {
         codFee: b.codFee !== undefined ? Math.max(0, num(b.codFee)) : o.codFee, pickup: b.pickup !== undefined ? !!b.pickup : o.pickup,
         cod: b.cod !== undefined ? !!b.cod : o.cod, op: b.op !== undefined ? !!b.op : o.op, note: b.note !== undefined ? str(b.note, 300) : o.note };
       shopRecord(u); saveOps(all); return sendJson(res, 200, shopView()); }
+  }
+  if (coll === 'a2t-find' && req.method === 'GET') {   // caută pe A2T: după coduri (mai multe, pe rânduri sau cu virgulă) sau după text
+    const q = String(url.parse(req.url, true).query.q || '').trim().slice(0, 2000); if (!q) return sendJson(res, 200, { items: [] });
+    const codes = q.split(/[\n,;]+/).map(x => x.trim()).filter(Boolean);
+    const found = codes.length > 1 || (codes.length === 1 && !/\s/.test(codes[0]) && /\d/.test(codes[0])) ? await a2tFind({ codes: codes.slice(0, 60) }) : await a2tFind({ text: q });
+    const have = new Set((u.catalog || []).flatMap(c => [skuKey(c.sku), skuKey(c.model)]).filter(Boolean));
+    return sendJson(res, 200, { items: found.map(x => ({ ...x, have: have.has(skuKey(x.sku)) })), missing: codes.length > 1 ? codes.filter(c => !found.some(x => skuKey(x.sku) === skuKey(c))) : [] });
+  }
+  if (coll === 'a2t-import' && req.method === 'POST') {   // adaugă produse A2T în Echipamente (ascunse, de verificat înainte de „Arată pe site”)
+    const b = await readJson(req) || {}; const want = (Array.isArray(b.skus) ? b.skus : []).map(x => str(x, 80).trim()).filter(Boolean).slice(0, 60);
+    if (!want.length) return sendJson(res, 400, { error: 'Alege cel puțin un produs' });
+    const got = await a2tFind({ codes: want }); if (!got.length) return sendJson(res, 502, { error: 'A2T nu a răspuns. Încearcă din nou.' });
+    let added = 0, photos = 0, skipped = 0; let order = u.catalog.reduce((m, c) => Math.max(m, c.order || 0), 0);
+    for (const x of got) {
+      if (u.catalog.some(c => skuKey(c.sku || c.model) === skuKey(x.sku) || skuKey(c.model) === skuKey(x.sku))) { skipped++; continue; }
+      const c = cleanOp('catalog', { name: x.title, brand: x.brand, model: x.model, sku: x.sku, cat: x.cat, specs: x.specs.join('\n'), visible: false, sell: true, order: ++order }, null);
+      c.a2t = { at: Date.now(), site: x.price, inStock: x.inStock, name: x.name };
+      u.catalog.push(c); added++;
+      if (x.image && PHOTO_BRANDS.includes(x.brand)) {
+        const img = await a2tImage(x.image); const ik = img ? fileKind(img, 'poza.jpg') : '';
+        if (img && ['jpg', 'png', 'webp'].includes(ik)) {
+          const cdir = path.join(OPS_DIR, uname.replace(/[^\w.-]/g, '_'), 'catalog', c.id); fs.mkdirSync(cdir, { recursive: true, mode: 0o700 });
+          const f = { id: newId(), ext: ik, name: (x.model || 'poza') + '.' + ik, size: img.length, uploadedAt: Date.now() };
+          fs.writeFileSync(path.join(cdir, f.id + '.' + ik), img, { mode: 0o600 }); c.files = [f]; photos++;
+        }
+      }
+    }
+    saveOps(all); return sendJson(res, 200, { ...view(), ...shopView(), added, photos, skipped });
   }
   if (coll === 'orders') {   // comenzile din magazinul online
     const o = id && /^[\w-]+$/.test(id) ? (u.orders || []).find(x => x.id === id) : null;
@@ -4330,7 +4378,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.5, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.6, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
