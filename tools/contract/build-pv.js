@@ -38,8 +38,8 @@ const header = new Header({ children: [
         children: [new Paragraph({ children: [new ImageRun({ type: 'png', data: LOGO, transformation: { width: 205, height: 50 } })] })] }),
       new TableCell({ width: { size: 5825, type: WidthType.DXA }, borders: hb, margins: { bottom: 100 }, children: [
         new Paragraph({ alignment: AlignmentType.RIGHT, children: [hr('YCA SOLUTIONS S.R.L.', { bold: true, color: NAVY, size: 17 })] }),
-        new Paragraph({ alignment: AlignmentType.RIGHT, children: [hr('CUI 45211628 · J40/19754/2021 · Licență IGPR nr. 6310/T')] }),
-        new Paragraph({ alignment: AlignmentType.RIGHT, children: [hr('Str. Aviator Mircea Petre nr. 10, Sector 1, București')] }),
+        new Paragraph({ alignment: AlignmentType.RIGHT, children: [hr('CUI 45211628 · J2021019754409 · Licență IGPR nr. 6310/T')] }),
+        new Paragraph({ alignment: AlignmentType.RIGHT, children: [hr('Str. Aviator Mircea Petre nr. 10, Camera 1, Sector 1, București')] }),
         new Paragraph({ alignment: AlignmentType.RIGHT, children: [hr('0763 354 355 · contact@supraveghere24h.ro · supraveghere24h.ro')] }),
       ] }),
     ] })] }),
@@ -49,7 +49,7 @@ const body = [
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 60 }, children: [t('PROCES-VERBAL DE RECEPȚIE', { bold: true, size: 32, color: NAVY })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 360 }, children: [t(`Nr. ${K('NR', '……………')}  din  ${K('DATA', '……… / ……… / ……………')}`, { color: '52606F' })] }),
 
-  P([t('YCA SOLUTIONS S.R.L.', { bold: true }), t(', cu sediul în București, Str. Aviator Mircea Petre nr. 10, Camera 1, Sector 1, CUI 45211628, J40/19754/2021, reprezentată prin Dima Florin, în calitate de Administrator, denumită în continuare '), t('PRESTATOR', { bold: true }), t(',')], { alignment: AlignmentType.JUSTIFIED, spacing: { after: 120, line: 300 } }),
+  P([t('YCA SOLUTIONS S.R.L.', { bold: true }), t(', cu sediul în București, Str. Aviator Mircea Petre nr. 10, Camera 1, Sector 1, CUI 45211628, J2021019754409, reprezentată prin Dima Florin, în calitate de Administrator, denumită în continuare '), t('PRESTATOR', { bold: true }), t(',')], { alignment: AlignmentType.JUSTIFIED, spacing: { after: 120, line: 300 } }),
   P('și', { spacing: { after: 120, line: 300 } }),
   P([t(`ASOCIAȚIA DE PROPRIETARI ${K('ASOC', '……………………')}`, { bold: true }), t(`, cu sediul în ${K('SEDIU', '……………………………')}, CIF ${K('CIF', '……………………')}, reprezentată prin ${K('PRES', '……………………………')}, în calitate de Președinte, denumită în continuare `), t('BENEFICIAR', { bold: true }), t(',')], { alignment: AlignmentType.JUSTIFIED, spacing: { after: 240, line: 300 } }),
 

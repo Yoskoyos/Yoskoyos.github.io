@@ -48,8 +48,8 @@ const header = new Header({ children: [
       new TableCell({ width: { size: 5825, type: WidthType.DXA }, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.SINGLE, size: 12, color: 'F5A100' }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, margins: { bottom: 100 },
         children: [
           new Paragraph({ alignment: AlignmentType.RIGHT, children: [hr('YCA SOLUTIONS S.R.L.', { bold: true, color: '0D1F33', size: 17 })] }),
-          new Paragraph({ alignment: AlignmentType.RIGHT, children: [hr('CUI 45211628 · J40/19754/2021')] }),
-          new Paragraph({ alignment: AlignmentType.RIGHT, children: [hr('Str. Aviator Mircea Petre nr. 10, Sector 1, București')] }),
+          new Paragraph({ alignment: AlignmentType.RIGHT, children: [hr('CUI 45211628 · J2021019754409')] }),
+          new Paragraph({ alignment: AlignmentType.RIGHT, children: [hr('Str. Aviator Mircea Petre nr. 10, Camera 1, Sector 1, București')] }),
           new Paragraph({ alignment: AlignmentType.RIGHT, children: [hr('0763 354 355 · contact@supraveghere24h.ro · supraveghere24h.ro')] }),
         ] }),
     ] })] }),
@@ -61,7 +61,7 @@ const body = [
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 280 }, children: [t(`Nr. ${K('NR')} din ${K('DATA')}`)] }),
 
   H('I. PĂRȚILE CONTRACTANTE'),
-  P([t('YCA SOLUTIONS S.R.L.', { bold: true }), t(', cu sediul social în București, Str. Aviator Mircea Petre nr. 10, Camera 1, Sector 1, înregistrată la Registrul Comerțului sub nr. J40/19754/2021, CUI 45211628, cont bancar RO62INGB0000999911979489 deschis la ING Bank, titulară a licenței de funcționare emise de Inspectoratul General al Poliției Române nr. ' + K('LICENTA') + ', reprezentată prin dl. Dima Florin, în calitate de Administrator, denumită în continuare '), t('FURNIZOR', { bold: true }), t(',')]),
+  P([t('YCA SOLUTIONS S.R.L.', { bold: true }), t(', cu sediul social în București, Str. Aviator Mircea Petre nr. 10, Camera 1, Sector 1, înregistrată la Registrul Comerțului sub nr. J2021019754409, CUI 45211628, cont bancar RO62INGB0000999911979489 deschis la ING Bank, titulară a licenței de funcționare emise de Inspectoratul General al Poliției Române nr. ' + K('LICENTA') + ', reprezentată prin dl. Dima Florin, în calitate de Administrator, denumită în continuare '), t('FURNIZOR', { bold: true }), t(',')]),
   P('și'),
   P([t('ASOCIAȚIA DE PROPRIETARI ' + K('ASOC'), { bold: true }), t(`, cu sediul în ${K('SEDIU')}, CIF ${K('CIF')}, cont bancar ${K('IBAN')} deschis la ${K('BANCA')}, reprezentată prin ${K('PRES')}, în calitate de Președinte, împuternicit(ă) prin Hotărârea Adunării Generale a Asociației nr. ${K('HAG_NR')} din ${K('HAG_DATA')}, denumită în continuare `), t('BENEFICIAR', { bold: true }), t('.')]),
 

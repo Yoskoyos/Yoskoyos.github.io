@@ -1764,7 +1764,7 @@ async function handleOps(req, res, pathname) {
 <tr><td align="center" style="padding:8px 30px 6px"><a href="${link}" style="display:inline-block;background:#F2611D;color:#fff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 30px;border-radius:999px">Vezi oferta completă →</a></td></tr>
 <tr><td align="center" style="padding:4px 30px 18px;font-size:12px;color:#8a93a3">Din pagina ofertei o puteți descărca și ca PDF.</td></tr>
 <tr><td style="padding:6px 30px 22px;font-size:14px;line-height:22px;color:#3b4456">Pentru întrebări sau programarea montajului ne găsiți la <a href="tel:+40763354355" style="color:#F2611D;font-weight:bold;text-decoration:none">0763 354 355</a>.<br><br><b style="color:#0b2a5b">SUPRAVEGHERE24h</b><br><a href="mailto:contact@supraveghere24h.ro" style="color:#0b2a5b;text-decoration:none">contact@supraveghere24h.ro</a></td></tr>
-<tr><td style="padding:14px 30px;background:#0b2a5b;font-size:11px;line-height:17px;color:#b9c6dc">YCA SOLUTIONS S.R.L. · CUI 45211628 · J40/19754/2021 · Licență IGPR nr. 6310/T</td></tr></table></td></tr></table></body></html>`;
+<tr><td style="padding:14px 30px;background:#0b2a5b;font-size:11px;line-height:17px;color:#b9c6dc">YCA SOLUTIONS S.R.L. · CUI 45211628 · J2021019754409 · Licență IGPR nr. 6310/T</td></tr></table></td></tr></table></body></html>`;
     const text = `Bună ziua${it.clientContact ? ', ' + String(it.clientContact).split(' ')[0] : ''},\n\nVă transmitem oferta noastră nr. OF-${it.no}${it.title ? ' – ' + it.title : ''}, valoare totală ${lei(tot)}${it.vat ? ' cu TVA' : ''}.\nO găsiți aici: ${link}\n\nPentru întrebări: 0763 354 355\nSUPRAVEGHERE24h · contact@supraveghere24h.ro`;
     const att = []; if (!b.pdf) { try { const pb = fs.readFileSync(path.join(dir, 'oferta.pdf')); att.push({ filename: `Oferta-OF-${it.no}-SUPRAVEGHERE24h.pdf`, content: pb, contentType: 'application/pdf' }); } catch {} } if (typeof b.pdf === 'string' && b.pdf.length > 100 && b.pdf.length < 14e6) { const pb = Buffer.from(b.pdf, 'base64'); if (pb.slice(0, 5).toString('latin1') === '%PDF-') att.push({ filename: str(b.pdfName, 120).replace(/[^\w.-]/g, '_') || `Oferta-OF-${it.no}.pdf`, content: pb, contentType: 'application/pdf' }); }
     const ok = await sendMail(to, `Oferta SUPRAVEGHERE24h nr. OF-${it.no}${it.title ? ' – ' + str(it.title, 80) : ''}`, text.replace('O găsiți aici:', att.length ? 'O găsiți atașată (PDF) și online:' : 'O găsiți aici:'), att.length ? html.replace('Din pagina ofertei o puteți descărca și ca PDF.', 'Oferta este atașată și ca PDF la acest e-mail.') : html, att);
@@ -2475,7 +2475,7 @@ function aiExtract(f, depth, scans) {
 }
 const AI_PROMPT = `Ești consultant senior în achiziții publice din România (Legea 98/2016, HG 395/2016, Legea 101/2016, practica ANAP/CNSC) și analizezi o oportunitate SEAP pentru firma de mai jos. Scrii pentru proprietarul firmei, în română, concret și practic.
 
-FIRMA: YCA SOLUTIONS SRL (marca SUPRAVEGHERE24h), CUI 45211628, J40/19754/11.11.2021, sediul în București, Sector 1. Domeniu: sisteme de supraveghere video (CCTV), alarme antiefracție, control acces, interfoane, rețele de date, echipamente IT, mentenanță. Licență IGPR nr. 6310/T (valabilă până la 13.06.2028) pentru proiectare/instalare/întreținere sisteme de alarmare. Furnizor principal: A2T / Atu Tech (a2t.ro). Firmă mică: cifra de afaceri, numărul de angajați, certificările ISO și experiența similară NU sunt cunoscute aici — marchează-le ca „de verificat de tine” și spune exact ce prag trebuie atins.
+FIRMA: YCA SOLUTIONS SRL (marca SUPRAVEGHERE24h), CUI 45211628, J2021019754409 (din 11.11.2021), sediul în București, Sector 1. Domeniu: sisteme de supraveghere video (CCTV), alarme antiefracție, control acces, interfoane, rețele de date, echipamente IT, mentenanță. Licență IGPR nr. 6310/T (valabilă până la 13.06.2028) pentru proiectare/instalare/întreținere sisteme de alarmare. Furnizor principal: A2T / Atu Tech (a2t.ro). Firmă mică: cifra de afaceri, numărul de angajați, certificările ISO și experiența similară NU sunt cunoscute aici — marchează-le ca „de verificat de tine” și spune exact ce prag trebuie atins.
 
 REGULI:
 - Folosește DOAR informațiile din documentele primite pentru cerințe, termene și criterii; dacă ceva nu apare, scrie „nu reiese din documente” (nu inventa). Citează secțiunea/documentul (ex. „Fișa de date, III.1.3”).
@@ -3310,7 +3310,7 @@ const QUOTE_DEFAULTS = {
   enabled: true,
   company: 'Supraveghere24h',
   phone: '0763 354 355', email: 'contact@supraveghere24h.ro',
-  legal: 'Yca Solutions SRL · CUI 45211628 · J40/19754/2021 · Str. Aviator Mircea Petre nr. 10, Sector 1, București',
+  legal: 'Yca Solutions SRL · CUI 45211628 · J2021019754409 · Str. Aviator Mircea Petre nr. 10, Camera 1, Sector 1, București',
   website: 'https://supraveghere24h.ro',
   assetBase: '',                                         // gol = imaginile din e-mail se servesc de server (/email-img/, instalate de update.sh)
   // Formula de pe site: prețul de bază include primele `baseCams` camere de interior/exterior + punctul de stocare
@@ -4175,7 +4175,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.2, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.3, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
