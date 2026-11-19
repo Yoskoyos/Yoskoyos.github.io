@@ -795,6 +795,7 @@ async function monitorRun() {
     try { await opsMorning(db); } catch (e) { console.error('[lucrari] dimineata:', e.message); }
     try { await seapTick(db); } catch (e) { console.error('[seap]', e.message); }
     try { await a2tTick(db); } catch (e) { console.error('[a2t]', e.message); }
+    try { await shopTick(db); } catch (e) { console.error('[magazin]', e.message); }
     try { await grRefresh(db); } catch (e) { console.error('[recenzii]', e.message); }
 
     monLastRun = new Date().toISOString();
@@ -1430,7 +1431,9 @@ function cleanOp(coll, b, prev) {
   if (coll === 'catalog') {   // echipamentele prezentate pe site (pagina Echipamente)
     return { ...base, name: str(b.name, 160).trim(), brand: str(b.brand, 60), model: str(b.model, 120),
       cat: pick(b.cat, ['exterior', 'interior', 'lift', 'nvr', 'hdd', 'rack', 'retea', 'altele'], 'altele'),
-      tagline: str(b.tagline, 400), specs: str(b.specs, 3000), visible: !!b.visible, order: Math.round(num(b.order)) };
+      tagline: str(b.tagline, 400), specs: str(b.specs, 3000), visible: !!b.visible, order: Math.round(num(b.order)),
+      sell: !!b.sell, sku: str(b.sku, 60).trim(), markup: b.markup === '' || b.markup == null ? '' : Math.min(500, Math.max(-50, num(b.markup))), price: Math.max(0, Math.round(num(b.price))),
+      a2t: prev && prev.a2t && (str(b.sku, 60).trim() || str(b.model, 120)) === (prev.sku || prev.model) ? prev.a2t : null };
   }
   if (coll === 'stock') {
     return { ...base, name: str(b.name, 200).trim(), cat: pick(b.cat, ['camera', 'nvr', 'hdd', 'switch', 'cablu', 'sursa', 'altele'], 'altele'),
@@ -1570,6 +1573,109 @@ async function a2tTick(db) {
     if (changed) { const cur = loadOps(); for (const [k, v] of Object.entries(all)) if (v.offerCfg) { cur[k] = cur[k] || {}; cur[k].offerCfg = v.offerCfg; } saveOps(cur); }
   } finally { a2tBusy = false; }
 }
+/* ═════════════ Magazin online (pagina Echipamente de pe supraveghere24h.ro) ═════════════
+   Preț pe site = preț fix (dacă e pus) sau prețul public A2T (cu TVA) × (1 + adaos%), rotunjit în sus la leu. Firma nu e plătitoare de TVA → prețul afișat e prețul final.
+   Prețul și stocul A2T se actualizează zilnic. Comenzile: ops[<proprietar>].orders, numerotate CMD-<n>. */
+const SHOP_DEF = { on: false, markup: 10, ship: 25, freeOver: 1000, pickup: true, cod: true, op: true, codFee: 0, note: '' };
+const shopCfgOf = u => ({ ...SHOP_DEF, ...(u.shopCfg || {}) });
+const skuKey = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+function shopPrice(x, cfg) {
+  if (x.price > 0) return x.price;
+  const site = x.a2t && x.a2t.site; if (!site) return 0;
+  const mk = x.markup === '' || x.markup == null ? +cfg.markup || 0 : +x.markup;
+  return Math.ceil(site * (1 + mk / 100));
+}
+function shopAvail(x, u) {
+  const k = skuKey(x.sku || x.model); let own = 0;
+  if (k) for (const st of u.stock || []) if (skuKey(st.model) === k) own += +st.qty || 0;
+  return own > 0 ? 'stoc' : x.a2t && x.a2t.inStock ? 'furnizor' : 'comanda';
+}
+async function shopSync(u, only) {
+  const L = (u.catalog || []).filter(x => x.sell && (x.sku || x.model) && (!only || only.includes(x.id)));
+  if (!L.length) return { ok: 0, missing: 0 };
+  const got = await a2tBySku([...new Set(L.map(x => String(x.sku || x.model).trim()))]);
+  if (!Object.keys(got).length) return { ok: 0, missing: L.length, err: 'A2T nu a răspuns' };
+  let ok = 0, missing = 0;
+  for (const x of L) {
+    const s = got[String(x.sku || x.model).trim().toUpperCase()]; const site = s ? +(s.final_price || s.price) || 0 : 0;
+    if (!site) { x.a2t = { at: Date.now(), missing: true }; missing++; continue; }
+    x.a2t = { at: Date.now(), site: Math.round(site * 100) / 100, inStock: !!(s.stock && s.stock.is_in_stock && s.stock.qty > 0), name: String(s.name || '').slice(0, 160) }; ok++;
+  }
+  u.shopCfg = { ...(u.shopCfg || {}), syncAt: Date.now() };
+  return { ok, missing };
+}
+async function shopTick(db) {
+  for (const usr of (db.users || []).filter(x => x.role === 'admin')) {
+    const all = loadOps(); const u = all[usr.username]; if (!u || !(u.catalog || []).some(x => x.sell)) continue;
+    if (Date.now() - ((u.shopCfg || {}).syncAt || 0) < 864e5 - 600e3) continue;
+    const r = await shopSync(u); if (r.err) { u.shopCfg.syncAt = Date.now() - 864e5 + 3 * 3600e3; }   // reîncearcă peste ~3 ore
+    const cur = loadOps(); const cu = cur[usr.username] = cur[usr.username] || {};
+    for (const x of cu.catalog || []) { const y = u.catalog.find(z => z.id === x.id); if (y && y.a2t) x.a2t = y.a2t; }
+    cu.shopCfg = { ...(cu.shopCfg || {}), syncAt: u.shopCfg.syncAt }; saveOps(cur);
+    console.log(`[magazin] ${usr.username}: ${r.ok} prețuri A2T actualizate${r.missing ? ', ' + r.missing + ' negăsite' : ''}`);
+  }
+}
+const ORDER_ST = ['noua', 'confirmata', 'expediata', 'livrata', 'anulata'];
+const lei2 = v => (+v || 0).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' lei';
+async function handlePublicOrder(req, res) {
+  const send = (st, o) => { res.writeHead(st, { 'Content-Type': 'application/json; charset=utf-8', ...PUB_CORS }); res.end(JSON.stringify(o)); };
+  if (pubLimited(req, 5)) return send(429, { error: 'Prea multe comenzi trimise. Încearcă mai târziu sau sună-ne la 0763 354 355.' });
+  let b; try { b = JSON.parse((await readRaw(req, 64 * 1024)).toString('utf8') || '{}'); } catch { return send(400, { error: 'Cerere invalidă' }); }
+  if (b.website) return send(200, { ok: true, no: 'CMD-0' });                            // capcană roboți
+  const db = loadDb(); const owner = quoteOwner(db); if (!owner) return send(503, { error: 'Serviciu indisponibil' });
+  const all = loadOps(); const u = all[owner.username] = all[owner.username] || {}; const cfg = shopCfgOf(u);
+  if (!cfg.on) return send(400, { error: 'Comenzile online nu sunt active acum. Sună-ne la 0763 354 355.' });
+  const c0 = b.c || {}; const c = { type: c0.type === 'pj' ? 'pj' : 'pf', name: str(c0.name, 120).trim(), phone: str(c0.phone, 40).trim(), email: str(c0.email, 160).trim(),
+    company: str(c0.company, 160).trim(), cui: str(c0.cui, 30).trim(), regcom: str(c0.regcom, 40).trim(), county: str(c0.county, 60).trim(), city: str(c0.city, 80).trim(),
+    address: str(c0.address, 300).trim(), zip: str(c0.zip, 12).trim(), notes: str(c0.notes, 1500).trim() };
+  const delivery = b.delivery === 'ridicare' && cfg.pickup ? 'ridicare' : 'curier';
+  const pay = b.pay === 'op' && cfg.op ? 'op' : b.pay === 'ramburs' && cfg.cod && delivery === 'curier' ? 'ramburs' : delivery === 'ridicare' ? 'ridicare' : '';
+  if (!pay) return send(400, { error: 'Alege metoda de plată' });
+  if (!c.name || c.phone.replace(/\D/g, '').length < 9) return send(400, { error: 'Completează numele și un număr de telefon valid' });
+  if (!/^[^\s@<>,;]+@[^\s@<>,;]+\.[a-z]{2,}$/i.test(c.email)) return send(400, { error: 'Completează o adresă de e-mail validă (îți trimitem confirmarea comenzii)' });
+  if (c.type === 'pj' && (!c.company || !c.cui)) return send(400, { error: 'Pentru factură pe firmă completează denumirea firmei și CUI-ul' });
+  if (delivery === 'curier' && (!c.county || !c.city || c.address.length < 5)) return send(400, { error: 'Completează adresa de livrare (județ, localitate, stradă și număr)' });
+  if (!b.terms) return send(400, { error: 'Trebuie să accepți termenii și condițiile de vânzare' });
+  const lines = [];
+  for (const r of (Array.isArray(b.items) ? b.items : []).slice(0, 40)) {
+    const x = (u.catalog || []).find(y => y.id === String(r && r.id || '')); const qty = Math.min(99, Math.max(1, Math.round(num(r && r.qty))));
+    if (!x || !x.visible || !x.sell) return send(409, { error: 'Un produs din coș nu mai este disponibil. Reîncarcă pagina coșului.', gone: r && r.id });
+    const price = shopPrice(x, cfg); if (!price) return send(409, { error: `„${x.name}” nu are preț acum. Sună-ne la 0763 354 355.`, gone: x.id });
+    if (r.price != null && Math.abs(num(r.price) - price) >= 0.5) return send(409, { error: 'Prețurile s-au actualizat între timp. Verifică din nou coșul și trimite comanda.', changed: true });
+    lines.push({ id: x.id, name: x.name, brand: x.brand, sku: x.sku || x.model, qty, price, avail: shopAvail(x, u) });
+  }
+  if (!lines.length) return send(400, { error: 'Coșul este gol' });
+  const sub = lines.reduce((t, l) => t + l.qty * l.price, 0);
+  const ship = delivery === 'curier' ? (cfg.freeOver > 0 && sub >= cfg.freeOver ? 0 : +cfg.ship || 0) : 0;
+  const fee = pay === 'ramburs' ? +cfg.codFee || 0 : 0;
+  const no = u.orderSeq = (u.orderSeq || 1000) + 1;
+  const fwd = req.headers['x-forwarded-for'] || req.headers['x-real-ip'];
+  const o = { id: newId(), no, at: Date.now(), status: 'noua', c, delivery, pay, lines, sub, ship, fee, total: sub + ship + fee,
+    terms: { at: Date.now(), ip: fwd ? String(fwd).split(',')[0].trim() : '' }, notes: '', history: [{ t: Date.now(), st: 'noua' }] };
+  u.orders = (u.orders || []).concat(o).slice(-3000); saveOps(all);
+  const PAY = { ramburs: 'Ramburs (plătești la curier)', op: 'Transfer bancar (ordin de plată)', ridicare: 'La ridicare, din sediu' };
+  const rows = lines.map(l => `<tr><td style="padding:8px 0;border-bottom:1px solid #eef1f5">${escHtml(l.name)}<br><span style="color:#8a93a3;font-size:12px">${escHtml(l.sku || '')}</span></td><td align="center" style="padding:8px;border-bottom:1px solid #eef1f5">${l.qty}</td><td align="right" style="padding:8px 0;border-bottom:1px solid #eef1f5;white-space:nowrap">${lei2(l.qty * l.price)}</td></tr>`).join('');
+  const bank = pay === 'op' ? `<tr><td style="padding:6px 30px 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFF6E0;border-radius:10px"><tr><td style="padding:14px 16px;font-size:14px;line-height:22px;color:#3b4456"><b>Date pentru plată</b><br>Beneficiar: YCA SOLUTIONS S.R.L. · CUI 45211628<br>IBAN: <b>RO62INGB0000999911979489</b> (ING Bank)<br>Suma: <b>${lei2(o.total)}</b> · Detalii plată: <b>CMD-${no}</b><br><span style="color:#6b7487;font-size:13px">Expediem comanda după ce primim plata. Factura o primești pe e-mail.</span></td></tr></table></td></tr>` : '';
+  const html = `<!doctype html><html lang="ro"><body style="margin:0;background:#eef2f7;font-family:Arial,Helvetica,sans-serif;color:#1d2433"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef2f7"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:560px;max-width:100%;background:#fff;border-radius:14px;overflow:hidden">
+<tr><td style="height:5px;background:#0D1F33;background-image:linear-gradient(90deg,#0D1F33,#1B7AB3 60%,#F5A100);font-size:0">&nbsp;</td></tr>
+<tr><td style="padding:22px 30px 6px"><img src="https://app.supraveghere24h.ro/tools/contract/logo-antet.png" width="210" alt="SUPRAVEGHERE24h" style="display:block;border:0;width:210px;height:auto"></td></tr>
+<tr><td style="padding:14px 30px 4px;font-size:15px;line-height:24px;color:#3b4456">Bună ziua, ${escHtml(c.name.split(' ')[0])},<br><br>Am primit comanda ta <b>nr. CMD-${no}</b>. Te sunăm în cel mai scurt timp, în zilele lucrătoare, ca să o confirmăm${delivery === 'curier' ? ' și să stabilim livrarea' : ' și ora la care o poți ridica'}.</td></tr>
+<tr><td style="padding:10px 30px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;color:#1d2433"><tr><td style="padding:6px 0;color:#8a93a3;font-size:12px">PRODUS</td><td align="center" style="color:#8a93a3;font-size:12px">BUC.</td><td align="right" style="color:#8a93a3;font-size:12px">TOTAL</td></tr>${rows}
+<tr><td colspan="2" style="padding:8px 0 2px;color:#6b7487">Subtotal</td><td align="right" style="padding:8px 0 2px">${lei2(sub)}</td></tr>
+${delivery === 'curier' ? `<tr><td colspan="2" style="padding:2px 0;color:#6b7487">Transport prin curier</td><td align="right">${ship ? lei2(ship) : 'gratuit'}</td></tr>` : ''}${fee ? `<tr><td colspan="2" style="padding:2px 0;color:#6b7487">Taxă ramburs</td><td align="right">${lei2(fee)}</td></tr>` : ''}
+<tr><td colspan="2" style="padding:8px 0;font-weight:bold;font-size:16px">Total de plată</td><td align="right" style="font-weight:bold;font-size:16px;white-space:nowrap">${lei2(o.total)}</td></tr></table>
+<p style="font-size:12px;color:#8a93a3;margin:4px 0 0">Prețuri finale. YCA SOLUTIONS S.R.L. nu este plătitoare de TVA.</p></td></tr>
+${bank}
+<tr><td style="padding:6px 30px 14px;font-size:14px;line-height:22px;color:#3b4456"><b>Plata:</b> ${PAY[pay]}<br><b>${delivery === 'curier' ? 'Livrare' : 'Ridicare'}:</b> ${delivery === 'curier' ? escHtml([c.address, c.city, c.county].filter(Boolean).join(', ')) : 'din sediul nostru din București, după ce te sunăm'}${c.type === 'pj' ? `<br><b>Factură pe:</b> ${escHtml(c.company)} · CUI ${escHtml(c.cui)}` : ''}</td></tr>
+<tr><td style="padding:6px 30px 20px;font-size:13px;line-height:20px;color:#6b7487">Ai dreptul să te retragi din contract în 14 zile de la primirea produselor, fără să justifici decizia. Detalii: <a href="https://supraveghere24h.ro/livrare-si-retur" style="color:#1B7AB3">Livrare și retur</a> · <a href="https://supraveghere24h.ro/termeni-si-conditii" style="color:#1B7AB3">Termeni și condiții</a>.<br><br>Întrebări despre comandă: <a href="tel:+40763354355" style="color:#F5A100;font-weight:bold;text-decoration:none">0763 354 355</a> · <a href="mailto:contact@supraveghere24h.ro" style="color:#1B7AB3">contact@supraveghere24h.ro</a></td></tr>
+<tr><td style="padding:14px 30px;background:#0D1F33;font-size:11px;line-height:17px;color:#b9c6dc">YCA SOLUTIONS S.R.L. · CUI 45211628 · J2021019754409 · Str. Aviator Mircea Petre nr. 10, Sector 1, București</td></tr></table></td></tr></table></body></html>`;
+  const text = `Bună ziua, ${c.name.split(' ')[0]},\n\nAm primit comanda ta nr. CMD-${no}. Te sunăm în cel mai scurt timp ca să o confirmăm.\n\n${lines.map(l => `${l.qty} × ${l.name} (${l.sku}) — ${lei2(l.qty * l.price)}`).join('\n')}\nSubtotal: ${lei2(sub)}${delivery === 'curier' ? `\nTransport: ${ship ? lei2(ship) : 'gratuit'}` : ''}${fee ? `\nTaxă ramburs: ${lei2(fee)}` : ''}\nTotal de plată: ${lei2(o.total)}\nPlata: ${PAY[pay]}${pay === 'op' ? `\n\nPlata prin transfer: YCA SOLUTIONS S.R.L., IBAN RO62INGB0000999911979489 (ING Bank), detalii plată: CMD-${no}` : ''}\n\nDreptul de retragere (14 zile) și condițiile de retur: https://supraveghere24h.ro/livrare-si-retur\n\nSUPRAVEGHERE24h · 0763 354 355 · contact@supraveghere24h.ro`;
+  const mailed = mailReady() ? await sendMail(c.email, `Comanda ta CMD-${no} – SUPRAVEGHERE24h`, text, html) : false;
+  if (!mailed) { o.mailErr = true; const cur = loadOps(); const co = ((cur[owner.username] || {}).orders || []).find(z => z.id === o.id); if (co) { co.mailErr = true; saveOps(cur); } }
+  notifyOwner(db, owner, `🛒 <b>Comandă nouă CMD-${no}</b> · ${lei2(o.total)}\n${escHtml(c.name)} · ${escHtml(c.phone)}${c.type === 'pj' ? ' · ' + escHtml(c.company) : ''}\n${lines.map(l => `${l.qty} × ${escHtml(l.name)}`).join('\n')}\n${PAY[pay]}${delivery === 'curier' ? ' · curier ' + escHtml(c.city) : ' · ridicare'}`, '/?tab=catalog&view=orders').catch(() => {});
+  return send(200, { ok: true, no: 'CMD-' + no, total: o.total, pay, mailed });
+}
 // detaliile unui produs de pe a2t.ro după cod
 function a2tBySku(skus) {
   return new Promise(resolve => {
@@ -1686,8 +1792,8 @@ async function handlePurchase(req, res, pathname) {
   return sendJson(res, 405, { error: 'Operație necunoscută' });
 }
 async function handleOps(req, res, pathname) {
-  const coll0 = (/^\/ops\/(works|stock|gdpr|catalog|offers|offer-cfg|a2t-stock)/.exec(pathname) || [])[1];
-  const ctx = requireUser(req, res, coll0 ? ({ works: 'works', stock: 'works', gdpr: 'clients', catalog: 'catalog', offers: 'quotes', 'offer-cfg': 'quotes', 'a2t-stock': 'quotes' })[coll0] : null); if (!ctx) return;
+  const coll0 = (/^\/ops\/(works|stock|gdpr|catalog|offers|offer-cfg|a2t-stock|shop-cfg|orders)/.exec(pathname) || [])[1];
+  const ctx = requireUser(req, res, coll0 ? ({ works: 'works', stock: 'works', gdpr: 'clients', catalog: 'catalog', offers: 'quotes', 'offer-cfg': 'quotes', 'a2t-stock': 'quotes', 'shop-cfg': 'catalog', orders: 'catalog' })[coll0] : null); if (!ctx) return;
   if (!coll0 && ctx.user.role === 'client') return sendJson(res, 403, { error: 'Nu ai acces la această secțiune' });
   const uname = ctx.uname;
   const all = loadOps(); const u = all[uname] = all[uname] || {}; for (const c of OPS_COLLS) if (!Array.isArray(u[c])) u[c] = [];
@@ -1695,7 +1801,28 @@ async function handleOps(req, res, pathname) {
   const coll = parts[1], id = parts[2], fid = parts[4];
   const OPS_PERM = { works: 'works', stock: 'works', gdpr: 'clients', catalog: 'catalog', offers: 'quotes' };
   const view = () => { const o = {}; for (const c of OPS_COLLS) o[c] = userCan(ctx.user, OPS_PERM[c]) ? u[c] : []; return o; };   // angajatul vede doar secțiunile lui
-  if (parts.length === 1 && req.method === 'GET') return sendJson(res, 200, { ...view(), offerCfg: userCan(ctx.user, 'quotes') ? (u.offerCfg || null) : null });
+  const shopView = () => userCan(ctx.user, 'catalog') ? { shopCfg: shopCfgOf(u), orders: (u.orders || []).slice(-500).reverse() } : {};
+  if (parts.length === 1 && req.method === 'GET') return sendJson(res, 200, { ...view(), ...shopView(), offerCfg: userCan(ctx.user, 'quotes') ? (u.offerCfg || null) : null });
+  if (coll === 'shop-cfg') {   // setările magazinului online
+    if (req.method === 'GET') return sendJson(res, 200, shopView());
+    if (req.method === 'POST' && parts[2] === 'sync') { const r = await shopSync(u); saveOps(all); return sendJson(res, 200, { ...view(), ...shopView(), ...r }); }
+    if (req.method === 'PUT') { const b = await readJson(req) || {}; const o = shopCfgOf(u);
+      u.shopCfg = { ...(u.shopCfg || {}), on: b.on !== undefined ? !!b.on : o.on, markup: b.markup !== undefined ? Math.min(500, Math.max(-50, num(b.markup))) : o.markup,
+        ship: b.ship !== undefined ? Math.max(0, num(b.ship)) : o.ship, freeOver: b.freeOver !== undefined ? Math.max(0, num(b.freeOver)) : o.freeOver,
+        codFee: b.codFee !== undefined ? Math.max(0, num(b.codFee)) : o.codFee, pickup: b.pickup !== undefined ? !!b.pickup : o.pickup,
+        cod: b.cod !== undefined ? !!b.cod : o.cod, op: b.op !== undefined ? !!b.op : o.op, note: b.note !== undefined ? str(b.note, 300) : o.note };
+      saveOps(all); return sendJson(res, 200, shopView()); }
+  }
+  if (coll === 'orders') {   // comenzile din magazinul online
+    const o = id && /^[\w-]+$/.test(id) ? (u.orders || []).find(x => x.id === id) : null;
+    if (parts.length === 2 && req.method === 'GET') return sendJson(res, 200, shopView());
+    if (!o) return sendJson(res, 404, { error: 'Comandă inexistentă' });
+    if (req.method === 'PUT') { const b = await readJson(req) || {};
+      if (b.status && ORDER_ST.includes(b.status) && b.status !== o.status) { o.status = b.status; o.history = (o.history || []).concat({ t: Date.now(), st: b.status, by: ctx.uname }).slice(-30); }
+      if (b.notes !== undefined) o.notes = str(b.notes, 3000);
+      saveOps(all); return sendJson(res, 200, { item: o, ...shopView() }); }
+    if (req.method === 'DELETE') { if (ctx.user.role !== 'admin') return sendJson(res, 403, { error: 'Doar administratorul' }); u.orders = u.orders.filter(x => x !== o); saveOps(all); return sendJson(res, 200, shopView()); }
+  }
   if (coll === 'a2t-stock' && req.method === 'GET') {   // stoc + preț live la A2T pentru codurile din ofertă
     if (!userCan(ctx.user, 'quotes')) return sendJson(res, 403, { error: 'Nu ai acces' });
     const skus = String(url.parse(req.url, true).query.skus || '').split(',').map(x => x.trim()).filter(Boolean).slice(0, 80);
@@ -1729,6 +1856,7 @@ async function handleOps(req, res, pathname) {
     if (coll === 'offers' && !it) x.no = u.offerSeq = (u.offerSeq || 0) + 1;
     if (it) list[list.indexOf(it)] = x; else list.push(x);
     if (coll === 'works') worksOnDone(u, x);
+    if (coll === 'catalog' && x.sell && (x.sku || x.model) && !x.a2t) { try { await shopSync(u, [x.id]); } catch {} }
     saveOps(all); return reply(200, { item: x });
   }
   if (parts.length === 3 && req.method === 'DELETE') {
@@ -3749,7 +3877,7 @@ async function readBodyAny(req) {
   }
   try { return JSON.parse(raw || '{}'); } catch { return {}; }
 }
-// Echipamentele bifate „Pe site” → pagina Echipamente de pe supraveghere24h.ro (doar ce e public: fără prețuri sau stoc)
+// Echipamentele bifate „Pe site” → pagina Echipamente de pe supraveghere24h.ro (fără stocuri sau costuri; prețul de vânzare doar dacă magazinul e pornit)
 function catalogPublic(req, res, pathname) {
   const db = loadDb(); const owner = quoteOwner(db); const uname = owner ? owner.username : '';
   const items = ((loadOps()[uname] || {}).catalog || []).filter(x => x.visible).sort((a, b) => (a.order || 0) - (b.order || 0) || a.createdAt - b.createdAt);
@@ -3764,12 +3892,13 @@ function catalogPublic(req, res, pathname) {
       ...(f.ext === 'pdf' ? { 'Content-Disposition': `inline; filename="${nm}"` } : {}) });
     return res.end(data);
   }
-  const base = publicBase(req);
+  const base = publicBase(req); const u = loadOps()[uname] || {}; const cfg = shopCfgOf(u);
   const out = items.map(x => { const f = (x.files || []).find(y => ['jpg', 'png', 'webp'].includes(y.ext)), pdf = (x.files || []).find(y => y.ext === 'pdf');
-    return { id: x.id, name: x.name, brand: x.brand, model: x.model, cat: x.cat, tagline: x.tagline,
+    const price = cfg.on && x.sell ? shopPrice(x, cfg) : 0;
+    return { id: x.id, name: x.name, brand: x.brand, model: x.model, cat: x.cat, tagline: x.tagline, ...(price ? { price, avail: shopAvail(x, u), sku: x.sku || x.model } : {}),
       specs: String(x.specs || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 20), photo: f ? `${base}/public/catalog/${x.id}/photo?v=${f.id}` : '', datasheet: pdf ? `${base}/public/catalog/${x.id}/fisa?v=${pdf.id}` : '' }; });
-  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=300', ...PUB_CORS });
-  res.end(JSON.stringify({ items: out }));
+  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=60', ...PUB_CORS });
+  res.end(JSON.stringify({ items: out, shop: cfg.on ? { on: true, ship: +cfg.ship || 0, freeOver: +cfg.freeOver || 0, codFee: +cfg.codFee || 0, pickup: !!cfg.pickup, cod: !!cfg.cod, op: !!cfg.op, note: cfg.note || '' } : { on: false } }));
 }
 function handlePublicPrices(req, res) {
   const db = loadDb(); const c = quoteCfg(db, quoteOwner(db));
@@ -4175,7 +4304,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.3, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.4, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
@@ -4204,6 +4333,7 @@ const server = http.createServer(async (req, res) => {
     if ((pathname === '/contact' || pathname === '/public/contact') && req.method === 'POST') return await handleSiteContact(req, res);
     if ((pathname === '/cerere' || pathname === '/public/cerere') && req.method === 'POST') return await handlePublicQuote(req, res, true);
     if (pathname === '/public/prices' && req.method === 'GET') return handlePublicPrices(req, res);
+    if (pathname === '/public/order' && req.method === 'POST') return await handlePublicOrder(req, res);
     if (pathname === '/public/reviews' && req.method === 'GET') return reviewsPublic(req, res);
     if (pathname === '/reviews/config') return await handleReviewsConfig(req, res);
     if ((pathname === '/public/catalog' || /^\/public\/catalog\/[\w-]+\/(photo|fisa)$/.test(pathname)) && req.method === 'GET') return catalogPublic(req, res, pathname);

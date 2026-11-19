@@ -196,6 +196,7 @@ html[data-role="client"] .nvr-web-btn{display:none!important}
 .nvr-menu button.danger:hover,.nvr-menu button.danger:focus-visible{background:var(--err-dim)}
 .nvr-menu-sep{height:1px;background:var(--border);margin:5px 4px}
 .ord-modal{max-width:460px}
+.om-act .btn{text-decoration:none;flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
 .ord-hint{padding:12px 20px 4px;font-size:12px;color:var(--fg-3)}
 .ord-list{list-style:none;margin:0;padding:8px 12px 12px;max-height:60vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
 .ord-row{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 10px;background:var(--bg-2);border:1px solid var(--border);border-radius:10px;cursor:grab;user-select:none;transition:background .15s,border-color .15s}
@@ -1726,7 +1727,7 @@ html:not(.unlocked) .app{display:none}
 
     <!-- ── Echipamente prezentate pe site ── -->
     <div class="panel" id="panel-catalog">
-      <div class="seg" role="tablist"><button type="button" class="on" data-cv="site">Pe site</button><button type="button" data-cv="stock">Stoc <span class="cnt" id="st-badge" hidden></span></button></div>
+      <div class="seg" role="tablist"><button type="button" class="on" data-cv="site">Pe site</button><button type="button" data-cv="orders">Comenzi <span class="cnt" id="or-badge" hidden></span></button><button type="button" data-cv="stock">Stoc <span class="cnt" id="st-badge" hidden></span></button></div>
       <div id="ct-view-site">
       <div class="section">
         <div class="section-hdr">
@@ -1734,9 +1735,20 @@ html:not(.unlocked) .app{display:none}
           <div class="section-action" id="ct-inv-btn" style="margin-left:auto" title="Încarcă factura de la furnizor: produsele intră în stoc și, dacă sunt noi, aici"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 15V3M7 8l5-5 5 5M5 21h14"/></svg>Factură furnizor</div>
           <div class="section-action" id="ct-add-btn"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Echipament nou</div>
         </div>
-        <div class="cm-hint" style="margin-bottom:12px">Ce bifezi „Pe site” apare pe pagina <a href="https://supraveghere24h.ro/echipamente.html" target="_blank" rel="noopener">supraveghere24h.ro/echipamente</a>, în ordinea de aici, cu poză și caracteristici. Prețurile și stocul nu apar nicăieri pe site.</div>
+        <div class="cm-hint" style="margin-bottom:12px">Ce bifezi „Pe site” apare pe pagina <a href="https://supraveghere24h.ro/echipamente.html" target="_blank" rel="noopener">supraveghere24h.ro/echipamente</a>, în ordinea de aici, cu poză și caracteristici. Ce bifezi și „Se vinde pe site” apare cu preț și buton „Adaugă în coș” (când magazinul e pornit, din Comenzi → Setări magazin). Cantitățile din stoc și costurile nu apar pe site.</div>
         <div class="qt-stats" id="ct-stats"></div>
         <div class="cl-list" id="ct-list"><div class="cl-empty">Se încarcă…</div></div>
+      </div>
+      </div>
+      <div id="ct-view-orders" hidden>
+      <div class="section">
+        <div class="section-hdr">
+          <div class="section-title sec-t"><span class="intg-ic" style="background:#F59E0B"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a2 2 0 0 0 2 1.6h8.6a2 2 0 0 0 2-1.5L22 7H6"/></svg></span><span>Comenzi din magazinul online</span></div>
+          <div class="section-action" id="or-cfg-btn" style="margin-left:auto"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Setări magazin</div>
+        </div>
+        <div id="or-shopst" class="cm-hint" style="margin-bottom:12px"></div>
+        <div class="qt-stats" id="or-stats"></div>
+        <div class="cl-list" id="or-list"><div class="cl-empty">Se încarcă…</div></div>
       </div>
       </div>
       <div id="ct-view-stock" hidden>
@@ -2403,6 +2415,16 @@ html:not(.unlocked) .app{display:none}
       </div>
       <div class="fg"><label for="ctm-cat">Unde se folosește</label><select id="ctm-cat"><option value="exterior">Cameră exterior</option><option value="interior">Cameră interior</option><option value="lift">Cameră lift</option><option value="nvr">Recorder (NVR)</option><option value="hdd">Hard disk</option><option value="rack">Accesorii: rack / protecție</option><option value="retea">Accesorii: rețea / alimentare</option><option value="altele">Accesorii: altele</option></select></div>
       <div class="fg"><label for="ctm-specs">Caracteristici (câte una pe rând)</label><textarea id="ctm-specs" rows="5" placeholder="Rezoluție 4 MP (2560 × 1440)&#10;Lentilă 2,8 mm&#10;Infraroșu și lumină albă până la 40 m&#10;Protecție IP67"></textarea></div>
+      <div class="cm-sec">Vânzare pe site</div>
+      <label class="cm-check" style="font-weight:700"><input type="checkbox" id="ctm-sell"> Se vinde pe site (cu preț și „Adaugă în coș”)</label>
+      <div id="ctm-sellbox">
+        <div class="f2">
+          <div class="fg"><label for="ctm-sku">Cod A2T (pentru preț și stoc)</label><input type="text" id="ctm-sku" placeholder="gol = același ca modelul" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+          <div class="fg"><label for="ctm-mk">Adaos propriu (%)</label><input type="number" id="ctm-mk" inputmode="decimal" step="1" placeholder="gol = adaosul implicit"></div>
+        </div>
+        <div class="fg"><label for="ctm-price">Preț fix pe site (lei)</label><input type="number" id="ctm-price" inputmode="numeric" min="0" step="1" placeholder="gol = automat, din prețul A2T + adaos"></div>
+        <div class="cm-hint" id="ctm-priceinfo" style="font-size:12.5px"></div>
+      </div>
       <div class="cm-sec">Poză și fișă tehnică</div>
       <div class="cm-files" id="ctm-files"></div>
       <div class="cm-upload"><button type="button" class="btn" id="ctm-up" style="flex:1 1 100%">📷 Încarcă poza (JPG, PNG sau WebP)</button>
@@ -2415,6 +2437,46 @@ html:not(.unlocked) .app{display:none}
       <button class="btn cm-del" id="ctm-delete" type="button">Șterge</button>
       <button class="btn" id="ctm-cancel" type="button">Anulează</button>
       <button class="btn primary" id="ctm-save" type="button">Salvează</button>
+    </div>
+  </div>
+</div>
+<div class="overlay hidden" id="shopord-modal" role="dialog" aria-modal="true" aria-labelledby="om-title">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="om-title">Comandă</div><div class="modal-x" id="om-x" role="button" aria-label="Închide">✕</div></div>
+    <div class="modal-body" id="om-body"></div>
+    <div class="modal-foot">
+      <button class="btn cm-del" id="om-delete" type="button">Șterge</button>
+      <button class="btn" id="om-cancel" type="button">Închide</button>
+      <button class="btn primary" id="om-save" type="button">Salvează</button>
+    </div>
+  </div>
+</div>
+<div class="overlay hidden" id="shop-modal" role="dialog" aria-modal="true" aria-labelledby="sm-title">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="sm-title">Setări magazin online</div><div class="modal-x" id="sm-x" role="button" aria-label="Închide">✕</div></div>
+    <div class="modal-body">
+      <label class="cm-check" style="font-weight:700"><input type="checkbox" id="sm-on"> Magazinul e pornit (prețuri și comenzi pe site)</label>
+      <div class="cm-hint">Când e oprit, pagina Echipamente arată produsele fără prețuri, cu „Cere ofertă”, ca înainte.</div>
+      <div class="cm-sec">Prețuri</div>
+      <div class="fg"><label for="sm-mk">Adaos implicit peste prețul public A2T (%)</label><input type="number" id="sm-mk" inputmode="decimal" step="1"></div>
+      <div class="cm-hint">Prețul de pe site = prețul afișat pe a2t.ro (cu TVA) + adaosul, rotunjit în sus la leu. Cu 0% vinzi la prețul public A2T. Firma nu e plătitoare de TVA, deci prețul afișat e prețul final. Prețurile și stocul A2T se actualizează automat o dată pe zi.</div>
+      <button type="button" class="btn" id="sm-sync" style="margin-top:8px">↻ Actualizează acum prețurile din A2T</button>
+      <div class="cm-hint" id="sm-syncat"></div>
+      <div class="cm-sec">Livrare și plată</div>
+      <div class="f2">
+        <div class="fg"><label for="sm-ship">Transport prin curier (lei)</label><input type="number" id="sm-ship" inputmode="decimal" min="0" step="1"></div>
+        <div class="fg"><label for="sm-free">Transport gratuit peste (lei, 0 = niciodată)</label><input type="number" id="sm-free" inputmode="decimal" min="0" step="10"></div>
+      </div>
+      <label class="cm-check"><input type="checkbox" id="sm-cod"> Plata ramburs (la curier)</label>
+      <div class="fg" style="margin-top:6px"><label for="sm-codfee">Taxă ramburs (lei, 0 = fără)</label><input type="number" id="sm-codfee" inputmode="decimal" min="0" step="1"></div>
+      <label class="cm-check" style="margin-top:8px"><input type="checkbox" id="sm-op"> Plata prin transfer bancar (IBAN ING din e-mailul de confirmare)</label>
+      <label class="cm-check" style="margin-top:8px"><input type="checkbox" id="sm-pickup"> Ridicare personală din București (fără transport)</label>
+      <div class="fg" style="margin-top:8px"><label for="sm-note">Mesaj scurt pe pagina coșului (opțional)</label><input type="text" id="sm-note" maxlength="300" placeholder="ex. Comenzile plasate până la ora 14 pleacă în aceeași zi"></div>
+      <div class="cm-hint">Plata cu cardul online se adaugă după ce deschizi cont la un procesator de plăți (de ex. Netopia sau Stripe).</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="sm-cancel" type="button">Anulează</button>
+      <button class="btn primary" id="sm-save" type="button">Salvează</button>
     </div>
   </div>
 </div>
@@ -6406,16 +6468,16 @@ const ymdAdd = (d, n) => { const t = new Date(d + 'T12:00:00'); t.setDate(t.getD
 const jsonOpt = (method, body) => ({ method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
 async function loadOps(force) {
-  if (ops && !force) { renderWorks(); renderStock(); renderGdpr(); renderCatalog(); return; }
+  if (ops && !force) { renderWorks(); renderStock(); renderGdpr(); renderCatalog(); renderOrders(); return; }
   try { ops = await clApi('/ops'); ops.works = ops.works || []; ops.stock = ops.stock || []; ops.gdpr = ops.gdpr || []; ops.catalog = ops.catalog || []; }
   catch (e) {
     const m = /HTTP 40[45]|Secțiune|evidența clienților/.test(e.message) ? 'Serverul nu are încă secțiunea aceasta — actualizează serverul (v6.9)' : e.message;
     ['#wk-list', '#st-list', '#gd-list', '#ct-list'].forEach(s => { const el = qs(s); if (el) el.innerHTML = `<div class="cl-empty">${escapeHtml(m)}</div>`; });
     return;
   }
-  renderWorks(); renderStock(); renderGdpr(); renderCatalog();
+  renderWorks(); renderStock(); renderGdpr(); renderCatalog(); renderOrders();
 }
-function opsApply(r) { if (r && r.works) { ops.works = r.works; ops.stock = r.stock; ops.gdpr = r.gdpr; ops.catalog = r.catalog || ops.catalog || []; } }
+function opsApply(r) { if (r && r.works) { ops.works = r.works; ops.stock = r.stock; ops.gdpr = r.gdpr; ops.catalog = r.catalog || ops.catalog || []; } if (r && r.shopCfg) { ops.shopCfg = r.shopCfg; ops.orders = r.orders || []; } }
 async function needClients() { if (!clients) { try { clients = (await clApi('/clients')).clients || []; } catch { clients = clients || []; } } return clients; }
 function clientOptions(sel) {
   const list = (clients || []).slice().sort((a, b) => a.name.localeCompare(b.name, 'ro'));
@@ -6565,11 +6627,11 @@ qs('#wm-file').addEventListener('change', e => { opUpload('works', wmDraft, e.ta
 qs('#wm-files').addEventListener('click', e => { const b = e.target.closest('.del'); if (b) opDelFile('works', wmDraft, b.dataset.fid, () => { wmFiles(); renderWorks(); }); });
 function showCtView(v) {
   document.querySelectorAll('#panel-catalog .seg button').forEach(b => b.classList.toggle('on', b.dataset.cv === v));
-  qs('#ct-view-site').hidden = v !== 'site'; qs('#ct-view-stock').hidden = v !== 'stock';
+  qs('#ct-view-site').hidden = v !== 'site'; qs('#ct-view-stock').hidden = v !== 'stock'; qs('#ct-view-orders').hidden = v !== 'orders';
   try { localStorage.setItem('yca_ct_view', v); } catch {}
 }
 document.querySelectorAll('#panel-catalog .seg button').forEach(b => b.addEventListener('click', () => showCtView(b.dataset.cv)));
-document.querySelectorAll('.nav-tab[data-tab="catalog"]').forEach(t => t.addEventListener('click', () => { let v = 'site'; try { v = localStorage.getItem('yca_ct_view') || 'site'; } catch {} showCtView(v === 'stock' ? 'stock' : 'site'); }));
+document.querySelectorAll('.nav-tab[data-tab="catalog"]').forEach(t => t.addEventListener('click', () => { let v = 'site'; try { v = localStorage.getItem('yca_ct_view') || 'site'; } catch {} showCtView(['stock', 'orders'].includes(v) ? v : 'site'); }));
 
 /* ── Factură de la furnizor → stoc + echipamente ── */
 let purDraft = null;
@@ -6720,7 +6782,7 @@ function renderCatalog() {
       ${ph ? `<img data-authsrc="${escapeHtml(ph)}" alt="" style="width:56px;height:56px;object-fit:contain;border-radius:10px;background:#fff;border:1px solid var(--border);flex-shrink:0">` : '<div style="width:56px;height:56px;border-radius:10px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--fg-3);flex-shrink:0;text-align:center">fără poză</div>'}
       <div class="cl-main"><div class="cl-name"><span>${escapeHtml(x.name)}</span></div><div class="cl-sub">${[CT_CAT[x.cat], [x.brand, x.model].filter(Boolean).join(' ')].filter(Boolean).map(escapeHtml).join(' · ')}</div></div>
       <div class="ct-right" style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-        ${(() => { const q = stOf(x), sid = stId[skuN(x.model)]; return q === null ? `<button type="button" class="ct-stk add" data-stnew title="Pune echipamentul în stoc">+ Stoc</button>` : `<span class="ct-stq" data-stid="${escapeHtml(sid)}"><button type="button" data-sd="-1" aria-label="Scade stocul">−</button><button type="button" class="ct-stk ${q > 0 ? 'on' : ''}" data-sedit title="Modifică stocul">Stoc: ${q}</button><button type="button" data-sd="1" aria-label="Crește stocul">+</button></span>`; })()}        ${(x.files || []).some(f => f.ext === 'pdf') ? '<span class="qpill" style="white-space:nowrap" title="Are fișă tehnică">PDF</span>' : ''}<span class="qpill ${x.visible ? 'accepted' : ''}" style="white-space:nowrap">${x.visible ? 'Pe site' : 'Ascuns'}</span>
+        ${(() => { const q = stOf(x), sid = stId[skuN(x.model)]; return q === null ? `<button type="button" class="ct-stk add" data-stnew title="Pune echipamentul în stoc">+ Stoc</button>` : `<span class="ct-stq" data-stid="${escapeHtml(sid)}"><button type="button" data-sd="-1" aria-label="Scade stocul">−</button><button type="button" class="ct-stk ${q > 0 ? 'on' : ''}" data-sedit title="Modifică stocul">Stoc: ${q}</button><button type="button" data-sd="1" aria-label="Crește stocul">+</button></span>`; })()}        ${x.sell ? (() => { const p = ctPrice(x); return `<span class="qpill ${p ? 'sent' : 'clarify'}" style="white-space:nowrap" title="Prețul de vânzare de pe site">${p ? p.toLocaleString('ro-RO') + ' lei' : 'fără preț'}</span>`; })() : ''}${(x.files || []).some(f => f.ext === 'pdf') ? '<span class="qpill" style="white-space:nowrap" title="Are fișă tehnică">PDF</span>' : ''}<span class="qpill ${x.visible ? 'accepted' : ''}" style="white-space:nowrap">${x.visible ? 'Pe site' : 'Ascuns'}</span>
         <button type="button" class="btn" data-mv="-1" aria-label="Mută mai sus" ${i ? '' : 'disabled'} style="min-width:40px;min-height:40px;padding:6px">↑</button>
         <button type="button" class="btn" data-mv="1" aria-label="Mută mai jos" ${i < L.length - 1 ? '' : 'disabled'} style="min-width:40px;min-height:40px;padding:6px">↓</button>
       </div></div>`; }).join('')}</div>`;
@@ -6743,6 +6805,7 @@ function openCatalogModal(x) {
   qs('#ctm-title').textContent = x ? x.name : 'Echipament nou';
   qs('#ctm-vis').checked = x ? !!x.visible : true; qs('#ctm-name').value = x ? x.name : ''; qs('#ctm-brand').value = x ? x.brand || '' : '';
   qs('#ctm-model').value = x ? x.model || '' : ''; qs('#ctm-cat').value = x ? x.cat : 'exterior'; qs('#ctm-specs').value = x ? x.specs || '' : '';
+  qs('#ctm-sell').checked = !!(x && x.sell); qs('#ctm-sku').value = x ? x.sku || '' : ''; qs('#ctm-mk').value = x && x.markup !== '' && x.markup != null ? x.markup : ''; qs('#ctm-price').value = x && x.price ? x.price : ''; ctmPriceInfo();
   qs('#ctm-delete').style.display = x ? '' : 'none'; ctFiles(); qs('#catalog-modal').classList.remove('hidden');
   if (!x) setTimeout(() => qs('#ctm-name').focus(), 50);
 }
@@ -6751,10 +6814,10 @@ async function ctmSave(stay) {
   const name = qs('#ctm-name').value.trim(); if (!name) { toast('Scrie denumirea', 'warn'); qs('#ctm-name').focus(); return false; }
   const L = ctSorted();
   const body = { name, brand: qs('#ctm-brand').value.trim(), model: qs('#ctm-model').value.trim(), cat: qs('#ctm-cat').value, tagline: '',
-    specs: qs('#ctm-specs').value.trim(), visible: qs('#ctm-vis').checked, order: ctDraft.id ? (ctDraft.order || 0) : (L.length ? (L[L.length - 1].order || 0) + 1 : 1) };
+    specs: qs('#ctm-specs').value.trim(), visible: qs('#ctm-vis').checked, sell: qs('#ctm-sell').checked, sku: qs('#ctm-sku').value.trim(), markup: qs('#ctm-mk').value.trim(), price: qs('#ctm-price').value.trim() || 0, order: ctDraft.id ? (ctDraft.order || 0) : (L.length ? (L[L.length - 1].order || 0) + 1 : 1) };
   try {
     const r = ctDraft.id ? await clApi('/ops/catalog/' + encodeURIComponent(ctDraft.id), jsonOpt('PUT', body)) : await clApi('/ops/catalog', jsonOpt('POST', body));
-    opsApply(r); ctDraft = JSON.parse(JSON.stringify(r.item)); renderCatalog();
+    opsApply(r); ctDraft = JSON.parse(JSON.stringify(r.item)); renderCatalog(); ctmPriceInfo();
     if (!stay) { closeCatalogModal(); toast('Echipament salvat', 'ok'); } else qs('#ctm-delete').style.display = '';
     return true;
   } catch (e) { toast(/Secțiune|HTTP 404/.test(e.message) ? 'Serverul nu are încă secțiunea Echipamente — actualizează serverul (v7.2)' : e.message, 'err'); return false; }
@@ -6796,6 +6859,103 @@ qs('#ctm-delete').addEventListener('click', async () => {
 });
 document.querySelectorAll('.nav-tab[data-tab="catalog"]').forEach(t => t.addEventListener('click', () => loadOps(true)));
 document.querySelectorAll('.nav-tab[data-tab="docs"]').forEach(t => t.addEventListener('click', () => loadCDocs(true)));
+/* ── Magazin online: prețuri, comenzi, setări ── */
+function ctPrice(x, over) {
+  const cfg = (ops && ops.shopCfg) || { markup: 10 }; const o = over || {};
+  const fixed = o.price !== undefined ? +o.price || 0 : +x.price || 0; if (fixed > 0) return fixed;
+  const site = x.a2t && x.a2t.site; if (!site) return 0;
+  const mkRaw = o.markup !== undefined ? o.markup : x.markup; const mk = mkRaw === '' || mkRaw == null ? +cfg.markup || 0 : +mkRaw;
+  return Math.ceil(site * (1 + mk / 100));
+}
+function ctmPriceInfo() {
+  const box = qs('#ctm-priceinfo'); if (!box) return; qs('#ctm-sellbox').hidden = !qs('#ctm-sell').checked;
+  const x = ctDraft || {}; const a = x.a2t; const sameSku = (qs('#ctm-sku').value.trim() || qs('#ctm-model').value.trim()) === (x.sku || x.model || '');
+  const p = ctPrice(x, { price: qs('#ctm-price').value.trim(), markup: qs('#ctm-mk').value.trim() });
+  const cfg = (ops && ops.shopCfg) || {};
+  box.innerHTML = [
+    !x.id || !sameSku ? 'Prețul și stocul A2T se citesc după ce salvezi.' : !a ? 'Încă nu am citit prețul de la A2T — salvează sau apasă „Actualizează acum” din Setări magazin.' : a.missing ? '<b style="color:var(--err)">Codul nu a fost găsit pe A2T.</b> Verifică „Cod A2T” sau pune un preț fix.' :
+      `A2T: <b>${fmtLei(a.site)}</b> (preț public, cu TVA) · ${a.inStock ? '<span style="color:var(--ok)">în stoc la A2T</span>' : 'fără stoc la A2T'}`,
+    p ? `Preț pe site: <b style="font-size:14px;color:var(--fg)">${fmtLei(p)}</b>${a && a.site && !(+qs('#ctm-price').value) ? ` (marja ta brută față de prețul public: ${fmtLei(p - a.site)})` : ''}` : '',
+    cfg.on ? '' : '<span style="color:var(--warn)">Magazinul e oprit — prețul nu apare încă pe site (Comenzi → Setări magazin).</span>'
+  ].filter(Boolean).join('<br>');
+}
+['#ctm-sell', '#ctm-sku', '#ctm-mk', '#ctm-price', '#ctm-model'].forEach(k => qs(k).addEventListener('input', ctmPriceInfo));
+qs('#ctm-sell').addEventListener('change', ctmPriceInfo);
+
+const OR_ST = { noua: ['Nouă', 'new'], confirmata: ['Confirmată', 'sent'], expediata: ['Expediată', 'viewed'], livrata: ['Livrată', 'accepted'], anulata: ['Anulată', 'expired'] };
+const OR_PAY = { ramburs: 'Ramburs', op: 'Transfer bancar', ridicare: 'La ridicare' };
+let omDraft = null;
+function renderOrders() {
+  if (!ops) return; const list = qs('#or-list'); if (!list) return;
+  const L = ops.orders || [], cfg = ops.shopCfg;
+  const nNew = L.filter(o => o.status === 'noua').length; const bd = qs('#or-badge'); if (bd) { bd.hidden = !nNew; bd.textContent = nNew; }
+  if (!cfg) { list.innerHTML = '<div class="cl-empty">Serverul nu are încă magazinul online — actualizează serverul (v11.4).</div>'; qs('#or-shopst').innerHTML = ''; qs('#or-stats').innerHTML = ''; return; }
+  const selling = (ops.catalog || []).filter(x => x.visible && x.sell), priced = selling.filter(x => ctPrice(x) > 0);
+  qs('#or-shopst').innerHTML = cfg.on ? `<span style="color:var(--ok);font-weight:700">● Magazinul e pornit</span> · ${priced.length} produse cu preț pe site${selling.length > priced.length ? ` · <span style="color:var(--warn)">${selling.length - priced.length} fără preț (nu apar în coș)</span>` : ''} · transport ${fmtLei(cfg.ship)}${cfg.freeOver ? `, gratuit peste ${fmtLei(cfg.freeOver)}` : ''}`
+    : `<span style="color:var(--warn);font-weight:700">● Magazinul e oprit</span> — pe site produsele apar fără prețuri. Pornește-l din „Setări magazin”. ${selling.length ? `(${selling.length} produse bifate „Se vinde pe site”)` : 'Bifează întâi „Se vinde pe site” la echipamentele pe care vrei să le vinzi.'}`;
+  const month = new Date(); month.setDate(1); month.setHours(0, 0, 0, 0);
+  const okL = L.filter(o => o.status !== 'anulata'), mL = okL.filter(o => o.at >= month.getTime());
+  qs('#or-stats').innerHTML = [[nNew, 'noi'], [L.filter(o => ['confirmata', 'expediata'].includes(o.status)).length, 'în lucru'], [mL.length, 'luna aceasta'], [fmtLei(mL.reduce((t, o) => t + o.total, 0)), 'vânzări luna aceasta']].map(([n, l]) => `<div class="qt-stat"><b>${n}</b> ${l}</div>`).join('');
+  if (!L.length) { list.innerHTML = '<div class="cl-empty">Nu ai primit încă nicio comandă.<br>Când cineva comandă de pe site, primești notificare și comanda apare aici.</div>'; return; }
+  list.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">${L.map(o => { const st = OR_ST[o.status] || ['?', ''];
+    return `<div class="cl-card" role="button" tabindex="0" data-orid="${escapeHtml(o.id)}">
+      <div class="cl-main"><div class="cl-name"><span>CMD-${o.no} · ${escapeHtml(o.c.type === 'pj' && o.c.company ? o.c.company : o.c.name)}</span></div>
+      <div class="cl-sub">${escapeHtml(new Date(o.at).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }))} · ${o.lines.reduce((t, l) => t + l.qty, 0)} buc. · ${escapeHtml(OR_PAY[o.pay] || o.pay)}${o.delivery === 'curier' ? ' · curier ' + escapeHtml(o.c.city || '') : ' · ridicare'}${o.mailErr ? ' · <span style="color:var(--err)">e-mailul de confirmare nu a plecat</span>' : ''}</div></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0"><b style="white-space:nowrap">${fmtLei(o.total)}</b><span class="qpill ${st[1]}">${st[0]}</span></div></div>`; }).join('')}</div>`;
+}
+function openOrder(o) {
+  omDraft = o; const c = o.c, tel = c.phone.replace(/[^\d+]/g, ''), wa = tel.replace(/^\+/, '').replace(/^0/, '40');
+  qs('#om-title').textContent = `Comanda CMD-${o.no}`;
+  const row = (k, v) => v ? `<div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid var(--border)"><span style="color:var(--fg-3);min-width:110px">${k}</span><span style="flex:1">${v}</span></div>` : '';
+  qs('#om-body').innerHTML = `
+    <div class="fg"><label for="om-st">Stare</label><select id="om-st">${Object.entries(OR_ST).map(([k, v]) => `<option value="${k}" ${k === o.status ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></div>
+    <div class="om-act" style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><a class="btn" href="tel:${escapeHtml(tel)}">📞 Sună</a><a class="btn" href="https://wa.me/${escapeHtml(wa)}" target="_blank" rel="noopener">WhatsApp</a><a class="btn" href="mailto:${escapeHtml(c.email)}?subject=${encodeURIComponent('Comanda CMD-' + o.no + ' – SUPRAVEGHERE24h')}">✉️ E-mail</a></div>
+    <div class="cm-sec">Produse</div>
+    ${o.lines.map(l => `<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)"><span style="flex:1">${l.qty} × <b>${escapeHtml(l.name)}</b><br><span class="cm-hint">${escapeHtml(l.sku || '')} · ${{ stoc: 'era în stocul tău', furnizor: 'în stoc la A2T', comanda: 'la comandă' }[l.avail] || ''}</span></span><b style="white-space:nowrap">${fmtLei(l.qty * l.price)}</b></div>`).join('')}
+    ${row('Subtotal', fmtLei(o.sub))}${o.delivery === 'curier' ? row('Transport', o.ship ? fmtLei(o.ship) : 'gratuit') : ''}${o.fee ? row('Taxă ramburs', fmtLei(o.fee)) : ''}${row('<b>Total</b>', `<b>${fmtLei(o.total)}</b>`)}
+    <div class="cm-sec">Client</div>
+    ${row('Nume', escapeHtml(c.name))}${row('Telefon', escapeHtml(c.phone))}${row('E-mail', escapeHtml(c.email))}
+    ${c.type === 'pj' ? row('Firmă', escapeHtml(c.company)) + row('CUI', escapeHtml(c.cui)) + row('Reg. Com.', escapeHtml(c.regcom)) : row('Factură', 'persoană fizică')}
+    ${row('Plata', escapeHtml(OR_PAY[o.pay] || o.pay))}${row(o.delivery === 'curier' ? 'Livrare' : 'Ridicare', o.delivery === 'curier' ? escapeHtml([c.address, c.city, c.county, c.zip].filter(Boolean).join(', ')) : 'din sediu, București')}
+    ${row('Observații', escapeHtml(c.notes))}${row('Trimisă', escapeHtml(new Date(o.at).toLocaleString('ro-RO')))}${row('Termeni', o.terms ? 'acceptați la trimitere' : '')}
+    <div class="fg" style="margin-top:12px"><label for="om-notes">Notițele mele (nu le vede clientul)</label><textarea id="om-notes" rows="3" placeholder="ex. AWB, factura nr., ce s-a vorbit la telefon">${escapeHtml(o.notes || '')}</textarea></div>
+    ${(o.history || []).length > 1 ? `<div class="cm-hint" style="margin-top:8px">${o.history.map(h => `${escapeHtml(new Date(h.t).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }))}: ${escapeHtml((OR_ST[h.st] || [h.st])[0])}`).join(' · ')}</div>` : ''}`;
+  qs('#om-delete').style.display = (getAuth() || {}).role === 'admin' ? '' : 'none';
+  qs('#shopord-modal').classList.remove('hidden');
+}
+const closeOrder = () => { qs('#shopord-modal').classList.add('hidden'); omDraft = null; };
+qs('#or-list').addEventListener('click', e => { const c = e.target.closest('[data-orid]'); if (!c) return; const o = (ops.orders || []).find(x => x.id === c.dataset.orid); if (o) openOrder(o); });
+qs('#or-list').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset.orid) { e.preventDefault(); e.target.click(); } });
+qs('#om-x').addEventListener('click', closeOrder); qs('#om-cancel').addEventListener('click', closeOrder);
+qs('#shopord-modal').addEventListener('click', e => { if (e.target.id === 'shopord-modal') closeOrder(); });
+qs('#om-save').addEventListener('click', async () => {
+  if (!omDraft) return;
+  try { const r = await clApi('/ops/orders/' + encodeURIComponent(omDraft.id), jsonOpt('PUT', { status: qs('#om-st').value, notes: qs('#om-notes').value })); opsApply(r); renderOrders(); closeOrder(); toast('Comandă salvată', 'ok'); } catch (e) { toast(e.message, 'err'); }
+});
+qs('#om-delete').addEventListener('click', async () => {
+  if (!omDraft || !(await confirmDialog({ title: `Ștergi comanda CMD-${omDraft.no}?`, html: 'Dispare definitiv din listă. Pentru o comandă renunțată e mai bine s-o treci „Anulată”.', okLabel: 'Șterge' }))) return;
+  try { opsApply(await clApi('/ops/orders/' + encodeURIComponent(omDraft.id), { method: 'DELETE' })); renderOrders(); closeOrder(); toast('Comandă ștearsă', 'ok'); } catch (e) { toast(e.message, 'err'); }
+});
+function smFill() {
+  const c = ops.shopCfg; qs('#sm-on').checked = !!c.on; qs('#sm-mk').value = c.markup; qs('#sm-ship').value = c.ship; qs('#sm-free').value = c.freeOver;
+  qs('#sm-cod').checked = !!c.cod; qs('#sm-codfee').value = c.codFee || 0; qs('#sm-op').checked = !!c.op; qs('#sm-pickup').checked = !!c.pickup; qs('#sm-note').value = c.note || '';
+  qs('#sm-syncat').textContent = c.syncAt ? 'Ultima actualizare A2T: ' + new Date(c.syncAt).toLocaleString('ro-RO') : 'Prețurile A2T nu au fost citite încă.';
+}
+qs('#or-cfg-btn').addEventListener('click', () => { if (!ops || !ops.shopCfg) return toast('Actualizează serverul (v11.4) ca să pornești magazinul', 'warn'); smFill(); qs('#shop-modal').classList.remove('hidden'); });
+const closeShop = () => qs('#shop-modal').classList.add('hidden');
+qs('#sm-x').addEventListener('click', closeShop); qs('#sm-cancel').addEventListener('click', closeShop);
+qs('#shop-modal').addEventListener('click', e => { if (e.target.id === 'shop-modal') closeShop(); });
+qs('#sm-save').addEventListener('click', async () => {
+  const b = { on: qs('#sm-on').checked, markup: qs('#sm-mk').value, ship: qs('#sm-ship').value, freeOver: qs('#sm-free').value, cod: qs('#sm-cod').checked, codFee: qs('#sm-codfee').value, op: qs('#sm-op').checked, pickup: qs('#sm-pickup').checked, note: qs('#sm-note').value.trim() };
+  if (b.on && !b.cod && !b.op && !b.pickup) return toast('Alege cel puțin o metodă de plată', 'warn');
+  try { opsApply(await clApi('/ops/shop-cfg', jsonOpt('PUT', b))); renderOrders(); renderCatalog(); closeShop(); toast(b.on ? 'Magazinul e pornit — prețurile apar pe site în cel mult un minut' : 'Setări salvate', 'ok'); } catch (e) { toast(e.message, 'err'); }
+});
+qs('#sm-sync').addEventListener('click', async () => {
+  const bt = qs('#sm-sync'); bt.disabled = true; bt.textContent = 'Se citesc prețurile de pe A2T…';
+  try { const r = await clApi('/ops/shop-cfg/sync', { method: 'POST' }); opsApply(r); smFill(); renderCatalog(); renderOrders(); toast(r.err ? r.err : `${r.ok} prețuri actualizate${r.missing ? `, ${r.missing} coduri negăsite pe A2T` : ''}`, r.err || r.missing ? 'warn' : 'ok'); }
+  catch (e) { toast(e.message, 'err'); } finally { bt.disabled = false; bt.textContent = '↻ Actualizează acum prețurile din A2T'; }
+});
+
 
 /* ── Încasări (din abonamentele clienților) ── */
 function payMonthOptions() {
@@ -7791,7 +7951,7 @@ async function openFromLink(href) {
   if (qid) {
     goTab('quotes'); await loadQuotes(true);
     const q = (quotes || []).find(x => x.id === qid); if (q) openQuote(q); else toast('Oferta nu mai există', 'warn');
-  } else if (tab) { if (tab === 'clients' && v === 'docs') { goTab('docs'); return; } if (tab === 'works' || tab === 'stock') { goTab('catalog'); showCtView('stock'); return; } if (tab === 'seap') { const sv = u.searchParams.get('view') === 'bids' ? 'bids' : 'ann'; try { localStorage.setItem('yca_sp_view', sv); } catch {} goTab('seap'); setTimeout(() => showSpView(sv), 50); return; } goTab(tab); }
+  } else if (tab) { if (tab === 'clients' && v === 'docs') { goTab('docs'); return; } if (tab === 'works' || tab === 'stock') { goTab('catalog'); showCtView('stock'); return; } if (tab === 'catalog' && u.searchParams.get('view') === 'orders') { goTab('catalog'); setTimeout(() => showCtView('orders'), 50); return; } if (tab === 'seap') { const sv = u.searchParams.get('view') === 'bids' ? 'bids' : 'ann'; try { localStorage.setItem('yca_sp_view', sv); } catch {} goTab('seap'); setTimeout(() => showSpView(sv), 50); return; } goTab(tab); }
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.type === 'open') openFromLink(e.data.url); });
 (function waitUnlock() {
