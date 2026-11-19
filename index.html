@@ -2423,6 +2423,11 @@ html:not(.unlocked) .app{display:none}
           <div class="fg"><label for="ctm-mk">Adaos propriu (%)</label><input type="number" id="ctm-mk" inputmode="decimal" step="1" placeholder="gol = adaosul implicit"></div>
         </div>
         <div class="fg"><label for="ctm-price">Preț fix pe site (lei)</label><input type="number" id="ctm-price" inputmode="numeric" min="0" step="1" placeholder="gol = automat, din prețul A2T + adaos"></div>
+        <div class="f2">
+          <div class="fg"><label for="ctm-disc">Reducere (%)</label><input type="number" id="ctm-disc" inputmode="numeric" min="0" max="70" step="1" placeholder="0 = fără reducere"></div>
+          <div class="fg"><label for="ctm-discu">Reducerea e valabilă până la</label><input type="date" id="ctm-discu"></div>
+        </div>
+        <div class="cm-hint">Pe site apare prețul tăiat și „-X%”. Prețul tăiat îl calculează serverul: e cel mai mic preț de pe site din cele 30 de zile dinaintea reducerii, cum cere legea. De aceea reducerea apare tăiată doar la produsele care au avut deja preț pe site; până atunci se vede doar prețul redus.</div>
         <div class="cm-hint" id="ctm-priceinfo" style="font-size:12.5px"></div>
       </div>
       <div class="cm-sec">Poză și fișă tehnică</div>
@@ -6782,7 +6787,7 @@ function renderCatalog() {
       ${ph ? `<img data-authsrc="${escapeHtml(ph)}" alt="" style="width:56px;height:56px;object-fit:contain;border-radius:10px;background:#fff;border:1px solid var(--border);flex-shrink:0">` : '<div style="width:56px;height:56px;border-radius:10px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--fg-3);flex-shrink:0;text-align:center">fără poză</div>'}
       <div class="cl-main"><div class="cl-name"><span>${escapeHtml(x.name)}</span></div><div class="cl-sub">${[CT_CAT[x.cat], [x.brand, x.model].filter(Boolean).join(' ')].filter(Boolean).map(escapeHtml).join(' · ')}</div></div>
       <div class="ct-right" style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-        ${(() => { const q = stOf(x), sid = stId[skuN(x.model)]; return q === null ? `<button type="button" class="ct-stk add" data-stnew title="Pune echipamentul în stoc">+ Stoc</button>` : `<span class="ct-stq" data-stid="${escapeHtml(sid)}"><button type="button" data-sd="-1" aria-label="Scade stocul">−</button><button type="button" class="ct-stk ${q > 0 ? 'on' : ''}" data-sedit title="Modifică stocul">Stoc: ${q}</button><button type="button" data-sd="1" aria-label="Crește stocul">+</button></span>`; })()}        ${x.sell ? (() => { const p = ctPrice(x); return `<span class="qpill ${p ? 'sent' : 'clarify'}" style="white-space:nowrap" title="Prețul de vânzare de pe site">${p ? p.toLocaleString('ro-RO') + ' lei' : 'fără preț'}</span>`; })() : ''}${(x.files || []).some(f => f.ext === 'pdf') ? '<span class="qpill" style="white-space:nowrap" title="Are fișă tehnică">PDF</span>' : ''}<span class="qpill ${x.visible ? 'accepted' : ''}" style="white-space:nowrap">${x.visible ? 'Pe site' : 'Ascuns'}</span>
+        ${(() => { const q = stOf(x), sid = stId[skuN(x.model)]; return q === null ? `<button type="button" class="ct-stk add" data-stnew title="Pune echipamentul în stoc">+ Stoc</button>` : `<span class="ct-stq" data-stid="${escapeHtml(sid)}"><button type="button" data-sd="-1" aria-label="Scade stocul">−</button><button type="button" class="ct-stk ${q > 0 ? 'on' : ''}" data-sedit title="Modifică stocul">Stoc: ${q}</button><button type="button" data-sd="1" aria-label="Crește stocul">+</button></span>`; })()}        ${x.sell ? (() => { const p = ctFinal(x), b = ctPrice(x); return `${p && p < b ? `<span class="qpill new" style="white-space:nowrap" title="Reducere activă">-${x.disc}%</span>` : ''}<span class="qpill ${p ? 'sent' : 'clarify'}" style="white-space:nowrap" title="Prețul de vânzare de pe site">${p ? p.toLocaleString('ro-RO') + ' lei' : 'fără preț'}</span>`; })() : ''}${(x.files || []).some(f => f.ext === 'pdf') ? '<span class="qpill" style="white-space:nowrap" title="Are fișă tehnică">PDF</span>' : ''}<span class="qpill ${x.visible ? 'accepted' : ''}" style="white-space:nowrap">${x.visible ? 'Pe site' : 'Ascuns'}</span>
         <button type="button" class="btn" data-mv="-1" aria-label="Mută mai sus" ${i ? '' : 'disabled'} style="min-width:40px;min-height:40px;padding:6px">↑</button>
         <button type="button" class="btn" data-mv="1" aria-label="Mută mai jos" ${i < L.length - 1 ? '' : 'disabled'} style="min-width:40px;min-height:40px;padding:6px">↓</button>
       </div></div>`; }).join('')}</div>`;
@@ -6805,7 +6810,7 @@ function openCatalogModal(x) {
   qs('#ctm-title').textContent = x ? x.name : 'Echipament nou';
   qs('#ctm-vis').checked = x ? !!x.visible : true; qs('#ctm-name').value = x ? x.name : ''; qs('#ctm-brand').value = x ? x.brand || '' : '';
   qs('#ctm-model').value = x ? x.model || '' : ''; qs('#ctm-cat').value = x ? x.cat : 'exterior'; qs('#ctm-specs').value = x ? x.specs || '' : '';
-  qs('#ctm-sell').checked = !!(x && x.sell); qs('#ctm-sku').value = x ? x.sku || '' : ''; qs('#ctm-mk').value = x && x.markup !== '' && x.markup != null ? x.markup : ''; qs('#ctm-price').value = x && x.price ? x.price : ''; ctmPriceInfo();
+  qs('#ctm-sell').checked = !!(x && x.sell); qs('#ctm-sku').value = x ? x.sku || '' : ''; qs('#ctm-mk').value = x && x.markup !== '' && x.markup != null ? x.markup : ''; qs('#ctm-price').value = x && x.price ? x.price : ''; qs('#ctm-disc').value = x && x.disc ? x.disc : ''; qs('#ctm-discu').value = x ? x.discUntil || '' : ''; ctmPriceInfo();
   qs('#ctm-delete').style.display = x ? '' : 'none'; ctFiles(); qs('#catalog-modal').classList.remove('hidden');
   if (!x) setTimeout(() => qs('#ctm-name').focus(), 50);
 }
@@ -6814,7 +6819,7 @@ async function ctmSave(stay) {
   const name = qs('#ctm-name').value.trim(); if (!name) { toast('Scrie denumirea', 'warn'); qs('#ctm-name').focus(); return false; }
   const L = ctSorted();
   const body = { name, brand: qs('#ctm-brand').value.trim(), model: qs('#ctm-model').value.trim(), cat: qs('#ctm-cat').value, tagline: '',
-    specs: qs('#ctm-specs').value.trim(), visible: qs('#ctm-vis').checked, sell: qs('#ctm-sell').checked, sku: qs('#ctm-sku').value.trim(), markup: qs('#ctm-mk').value.trim(), price: qs('#ctm-price').value.trim() || 0, order: ctDraft.id ? (ctDraft.order || 0) : (L.length ? (L[L.length - 1].order || 0) + 1 : 1) };
+    specs: qs('#ctm-specs').value.trim(), visible: qs('#ctm-vis').checked, sell: qs('#ctm-sell').checked, sku: qs('#ctm-sku').value.trim(), markup: qs('#ctm-mk').value.trim(), price: qs('#ctm-price').value.trim() || 0, disc: qs('#ctm-disc').value.trim() || 0, discUntil: qs('#ctm-discu').value, order: ctDraft.id ? (ctDraft.order || 0) : (L.length ? (L[L.length - 1].order || 0) + 1 : 1) };
   try {
     const r = ctDraft.id ? await clApi('/ops/catalog/' + encodeURIComponent(ctDraft.id), jsonOpt('PUT', body)) : await clApi('/ops/catalog', jsonOpt('POST', body));
     opsApply(r); ctDraft = JSON.parse(JSON.stringify(r.item)); renderCatalog(); ctmPriceInfo();
@@ -6867,19 +6872,25 @@ function ctPrice(x, over) {
   const mkRaw = o.markup !== undefined ? o.markup : x.markup; const mk = mkRaw === '' || mkRaw == null ? +cfg.markup || 0 : +mkRaw;
   return Math.ceil(site * (1 + mk / 100));
 }
+function ctFinal(x, over) {   // prețul de vânzare, după reducerea activă
+  const o = over || {}, b = ctPrice(x, o); const d = +(o.disc !== undefined ? o.disc : x.disc) || 0, until = o.discUntil !== undefined ? o.discUntil : x.discUntil;
+  return b && d > 0 && (!until || until >= new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' })) ? Math.ceil(b * (1 - d / 100)) : b;
+}
 function ctmPriceInfo() {
   const box = qs('#ctm-priceinfo'); if (!box) return; qs('#ctm-sellbox').hidden = !qs('#ctm-sell').checked;
   const x = ctDraft || {}; const a = x.a2t; const sameSku = (qs('#ctm-sku').value.trim() || qs('#ctm-model').value.trim()) === (x.sku || x.model || '');
-  const p = ctPrice(x, { price: qs('#ctm-price').value.trim(), markup: qs('#ctm-mk').value.trim() });
+  const ov = { price: qs('#ctm-price').value.trim(), markup: qs('#ctm-mk').value.trim(), disc: qs('#ctm-disc').value.trim(), discUntil: qs('#ctm-discu').value };
+  const p = ctPrice(x, ov), pf = ctFinal(x, ov);
   const cfg = (ops && ops.shopCfg) || {};
   box.innerHTML = [
     !x.id || !sameSku ? 'Prețul și stocul A2T se citesc după ce salvezi.' : !a ? 'Încă nu am citit prețul de la A2T — salvează sau apasă „Actualizează acum” din Setări magazin.' : a.missing ? '<b style="color:var(--err)">Codul nu a fost găsit pe A2T.</b> Verifică „Cod A2T” sau pune un preț fix.' :
       `A2T: <b>${fmtLei(a.site)}</b> (preț public, cu TVA) · ${a.inStock ? '<span style="color:var(--ok)">în stoc la A2T</span>' : 'fără stoc la A2T'}`,
-    p ? `Preț pe site: <b style="font-size:14px;color:var(--fg)">${fmtLei(p)}</b>${a && a.site && !(+qs('#ctm-price').value) ? ` (marja ta brută față de prețul public: ${fmtLei(p - a.site)})` : ''}` : '',
+    pf && pf < p ? `Preț cu reducere: <b style="font-size:14px;color:var(--fg)">${fmtLei(pf)}</b> (preț normal ${fmtLei(p)})` : '',
+    p && !(pf < p) ? `Preț pe site: <b style="font-size:14px;color:var(--fg)">${fmtLei(p)}</b>${a && a.site && !(+qs('#ctm-price').value) ? ` (marja ta brută față de prețul public: ${fmtLei(p - a.site)})` : ''}` : '',
     cfg.on ? '' : '<span style="color:var(--warn)">Magazinul e oprit — prețul nu apare încă pe site (Comenzi → Setări magazin).</span>'
   ].filter(Boolean).join('<br>');
 }
-['#ctm-sell', '#ctm-sku', '#ctm-mk', '#ctm-price', '#ctm-model'].forEach(k => qs(k).addEventListener('input', ctmPriceInfo));
+['#ctm-sell', '#ctm-sku', '#ctm-mk', '#ctm-price', '#ctm-model', '#ctm-disc', '#ctm-discu'].forEach(k => qs(k).addEventListener('input', ctmPriceInfo));
 qs('#ctm-sell').addEventListener('change', ctmPriceInfo);
 
 const OR_ST = { noua: ['Nouă', 'new'], confirmata: ['Confirmată', 'sent'], expediata: ['Expediată', 'viewed'], livrata: ['Livrată', 'accepted'], anulata: ['Anulată', 'expired'] };

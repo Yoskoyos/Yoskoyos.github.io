@@ -1433,6 +1433,9 @@ function cleanOp(coll, b, prev) {
       cat: pick(b.cat, ['exterior', 'interior', 'lift', 'nvr', 'hdd', 'rack', 'retea', 'altele'], 'altele'),
       tagline: str(b.tagline, 400), specs: str(b.specs, 3000), visible: !!b.visible, order: Math.round(num(b.order)),
       sell: !!b.sell, sku: str(b.sku, 60).trim(), markup: b.markup === '' || b.markup == null ? '' : Math.min(500, Math.max(-50, num(b.markup))), price: Math.max(0, Math.round(num(b.price))),
+      disc: Math.min(70, Math.max(0, Math.round(num(b.disc)))), discUntil: ymd(b.discUntil),
+      discStart: Math.round(num(b.disc)) > 0 ? (prev && prev.disc > 0 && prev.discStart && (!prev.discUntil || prev.discUntil >= new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' })) ? prev.discStart : new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' })) : '',
+      ph: prev && Array.isArray(prev.ph) ? prev.ph : [],
       a2t: prev && prev.a2t && (str(b.sku, 60).trim() || str(b.model, 120)) === (prev.sku || prev.model) ? prev.a2t : null };
   }
   if (coll === 'stock') {
@@ -1579,11 +1582,30 @@ async function a2tTick(db) {
 const SHOP_DEF = { on: false, markup: 10, ship: 25, freeOver: 1000, pickup: true, cod: true, op: true, codFee: 0, note: '' };
 const shopCfgOf = u => ({ ...SHOP_DEF, ...(u.shopCfg || {}) });
 const skuKey = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-function shopPrice(x, cfg) {
+const todayBuc = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' });
+function shopBase(x, cfg) {
   if (x.price > 0) return x.price;
   const site = x.a2t && x.a2t.site; if (!site) return 0;
   const mk = x.markup === '' || x.markup == null ? +cfg.markup || 0 : +x.markup;
   return Math.ceil(site * (1 + mk / 100));
+}
+const discOn = x => x.disc > 0 && (!x.discUntil || x.discUntil >= todayBuc());
+function shopPrice(x, cfg) { const b = shopBase(x, cfg); return b && discOn(x) ? Math.ceil(b * (1 - x.disc / 100)) : b; }
+/* Prețul tăiat (OG 99/2000 art. 18^1): cel mai mic preț practicat pe site în cele 30 de zile dinaintea reducerii.
+   Istoricul (x.ph = [{d, p}]) se scrie zilnic cu prețul de vânzare, doar cât timp magazinul e pornit. Fără istoric → fără preț tăiat. */
+function shopRef(x, cfg) {
+  if (!discOn(x) || !x.discStart) return 0;
+  const from = new Date(x.discStart + 'T12:00:00Z'); from.setUTCDate(from.getUTCDate() - 30); const f = from.toISOString().slice(0, 10);
+  const L = (x.ph || []).filter(h => h.d >= f && h.d < x.discStart).map(h => h.p); if (!L.length) return 0;
+  const ref = Math.min(...L); return ref > shopPrice(x, cfg) ? ref : 0;
+}
+function shopRecord(u) {
+  const cfg = shopCfgOf(u); if (!cfg.on) return false; const d = todayBuc(); let ch = false;
+  for (const x of u.catalog || []) { if (!x.sell || !x.visible) continue; const p = shopPrice(x, cfg); if (!p) continue;
+    x.ph = Array.isArray(x.ph) ? x.ph : []; const last = x.ph[x.ph.length - 1];
+    if (last && last.d === d) { if (p < last.p) { last.p = p; ch = true; } } else { x.ph.push({ d, p }); ch = true; }
+    if (x.ph.length > 90) x.ph = x.ph.slice(-90); }
+  return ch;
 }
 function shopAvail(x, u) {
   const k = skuKey(x.sku || x.model); let own = 0;
@@ -1605,12 +1627,14 @@ async function shopSync(u, only) {
   return { ok, missing };
 }
 async function shopTick(db) {
+  { const all = loadOps(); let ch = false; for (const usr of (db.users || []).filter(x => x.role === 'admin')) if (all[usr.username] && shopRecord(all[usr.username])) ch = true; if (ch) saveOps(all); }
   for (const usr of (db.users || []).filter(x => x.role === 'admin')) {
     const all = loadOps(); const u = all[usr.username]; if (!u || !(u.catalog || []).some(x => x.sell)) continue;
     if (Date.now() - ((u.shopCfg || {}).syncAt || 0) < 864e5 - 600e3) continue;
     const r = await shopSync(u); if (r.err) { u.shopCfg.syncAt = Date.now() - 864e5 + 3 * 3600e3; }   // reîncearcă peste ~3 ore
     const cur = loadOps(); const cu = cur[usr.username] = cur[usr.username] || {};
     for (const x of cu.catalog || []) { const y = u.catalog.find(z => z.id === x.id); if (y && y.a2t) x.a2t = y.a2t; }
+    shopRecord(cu);
     cu.shopCfg = { ...(cu.shopCfg || {}), syncAt: u.shopCfg.syncAt }; saveOps(cur);
     console.log(`[magazin] ${usr.username}: ${r.ok} prețuri A2T actualizate${r.missing ? ', ' + r.missing + ' negăsite' : ''}`);
   }
@@ -1805,13 +1829,13 @@ async function handleOps(req, res, pathname) {
   if (parts.length === 1 && req.method === 'GET') return sendJson(res, 200, { ...view(), ...shopView(), offerCfg: userCan(ctx.user, 'quotes') ? (u.offerCfg || null) : null });
   if (coll === 'shop-cfg') {   // setările magazinului online
     if (req.method === 'GET') return sendJson(res, 200, shopView());
-    if (req.method === 'POST' && parts[2] === 'sync') { const r = await shopSync(u); saveOps(all); return sendJson(res, 200, { ...view(), ...shopView(), ...r }); }
+    if (req.method === 'POST' && parts[2] === 'sync') { const r = await shopSync(u); shopRecord(u); saveOps(all); return sendJson(res, 200, { ...view(), ...shopView(), ...r }); }
     if (req.method === 'PUT') { const b = await readJson(req) || {}; const o = shopCfgOf(u);
       u.shopCfg = { ...(u.shopCfg || {}), on: b.on !== undefined ? !!b.on : o.on, markup: b.markup !== undefined ? Math.min(500, Math.max(-50, num(b.markup))) : o.markup,
         ship: b.ship !== undefined ? Math.max(0, num(b.ship)) : o.ship, freeOver: b.freeOver !== undefined ? Math.max(0, num(b.freeOver)) : o.freeOver,
         codFee: b.codFee !== undefined ? Math.max(0, num(b.codFee)) : o.codFee, pickup: b.pickup !== undefined ? !!b.pickup : o.pickup,
         cod: b.cod !== undefined ? !!b.cod : o.cod, op: b.op !== undefined ? !!b.op : o.op, note: b.note !== undefined ? str(b.note, 300) : o.note };
-      saveOps(all); return sendJson(res, 200, shopView()); }
+      shopRecord(u); saveOps(all); return sendJson(res, 200, shopView()); }
   }
   if (coll === 'orders') {   // comenzile din magazinul online
     const o = id && /^[\w-]+$/.test(id) ? (u.orders || []).find(x => x.id === id) : null;
@@ -1857,6 +1881,7 @@ async function handleOps(req, res, pathname) {
     if (it) list[list.indexOf(it)] = x; else list.push(x);
     if (coll === 'works') worksOnDone(u, x);
     if (coll === 'catalog' && x.sell && (x.sku || x.model) && !x.a2t) { try { await shopSync(u, [x.id]); } catch {} }
+    if (coll === 'catalog') shopRecord(u);
     saveOps(all); return reply(200, { item: x });
   }
   if (parts.length === 3 && req.method === 'DELETE') {
@@ -3894,8 +3919,9 @@ function catalogPublic(req, res, pathname) {
   }
   const base = publicBase(req); const u = loadOps()[uname] || {}; const cfg = shopCfgOf(u);
   const out = items.map(x => { const f = (x.files || []).find(y => ['jpg', 'png', 'webp'].includes(y.ext)), pdf = (x.files || []).find(y => y.ext === 'pdf');
-    const price = cfg.on && x.sell ? shopPrice(x, cfg) : 0;
+    const price = cfg.on && x.sell ? shopPrice(x, cfg) : 0, ref = price ? shopRef(x, cfg) : 0;
     return { id: x.id, name: x.name, brand: x.brand, model: x.model, cat: x.cat, tagline: x.tagline, ...(price ? { price, avail: shopAvail(x, u), sku: x.sku || x.model } : {}),
+      ...(ref ? { oldPrice: ref, disc: Math.round((ref - price) / ref * 100), discUntil: x.discUntil || '' } : {}),
       specs: String(x.specs || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 20), photo: f ? `${base}/public/catalog/${x.id}/photo?v=${f.id}` : '', datasheet: pdf ? `${base}/public/catalog/${x.id}/fisa?v=${pdf.id}` : '' }; });
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=60', ...PUB_CORS });
   res.end(JSON.stringify({ items: out, shop: cfg.on ? { on: true, ship: +cfg.ship || 0, freeOver: +cfg.freeOver || 0, codFee: +cfg.codFee || 0, pickup: !!cfg.pickup, cod: !!cfg.cod, op: !!cfg.op, note: cfg.note || '' } : { on: false } }));
@@ -4304,7 +4330,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.4, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.5, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
