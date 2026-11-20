@@ -2498,8 +2498,11 @@ html:not(.unlocked) .app{display:none}
       <label class="cm-check" style="font-weight:700"><input type="checkbox" id="sm-on"> Magazinul e pornit (prețuri și comenzi pe site)</label>
       <div class="cm-hint">Când e oprit, pagina Echipamente arată produsele fără prețuri, cu „Cere ofertă”, ca înainte.</div>
       <div class="cm-sec">Prețuri</div>
-      <div class="fg"><label for="sm-mk">Adaos implicit peste prețul public A2T (%)</label><input type="number" id="sm-mk" inputmode="decimal" step="1"></div>
-      <div class="cm-hint">Prețul de pe site = prețul afișat pe a2t.ro (cu TVA) + adaosul, rotunjit în sus la leu. Cu 0% vinzi la prețul public A2T. Firma nu e plătitoare de TVA, deci prețul afișat e prețul final. Prețurile și stocul A2T se actualizează automat o dată pe zi.</div>
+      <div class="f2">
+        <div class="fg"><label for="sm-base">Adaosul se pune peste</label><select id="sm-base"><option value="inst">prețul meu de instalator A2T</option><option value="site">prețul public de pe a2t.ro</option></select></div>
+        <div class="fg"><label for="sm-mk">Adaos implicit (%)</label><input type="number" id="sm-mk" inputmode="decimal" step="1"></div>
+      </div>
+      <div class="cm-hint">Prețul de pe site = prețul A2T ales (cu TVA) + adaosul, rotunjit în sus la leu. Prețul de instalator e prețul tău de client A2T, cel pe care îl vezi logat pe a2t.ro. Firma nu e plătitoare de TVA, deci prețul afișat e prețul final. Prețurile și stocul A2T se actualizează automat o dată pe zi.</div>
       <button type="button" class="btn" id="sm-sync" style="margin-top:8px">↻ Actualizează acum prețurile din A2T</button>
       <div class="cm-hint" id="sm-syncat"></div>
       <div class="cm-sec">Livrare și plată</div>
@@ -6974,8 +6977,9 @@ function ctPrice(x, over) {
   const cfg = (ops && ops.shopCfg) || { markup: 10 }; const o = over || {};
   const fixed = o.price !== undefined ? +o.price || 0 : +x.price || 0; if (fixed > 0) return fixed;
   const site = x.a2t && x.a2t.site; if (!site) return 0;
+  const base = cfg.base === 'site' ? site : (x.a2t.inst || site);
   const mkRaw = o.markup !== undefined ? o.markup : x.markup; const mk = mkRaw === '' || mkRaw == null ? +cfg.markup || 0 : +mkRaw;
-  return Math.ceil(site * (1 + mk / 100));
+  return Math.ceil(base * (1 + mk / 100));
 }
 function ctFinal(x, over) {   // prețul de vânzare, după reducerea activă
   const o = over || {}, b = ctPrice(x, o); const d = +(o.disc !== undefined ? o.disc : x.disc) || 0, until = o.discUntil !== undefined ? o.discUntil : x.discUntil;
@@ -6989,9 +6993,9 @@ function ctmPriceInfo() {
   const cfg = (ops && ops.shopCfg) || {};
   box.innerHTML = [
     !x.id || !sameSku ? 'Prețul și stocul A2T se citesc după ce salvezi.' : !a ? 'Încă nu am citit prețul de la A2T — salvează sau apasă „Actualizează acum” din Setări magazin.' : a.missing ? '<b style="color:var(--err)">Codul nu a fost găsit pe A2T.</b> Verifică „Cod A2T” sau pune un preț fix.' :
-      `A2T: <b>${fmtLei(a.site)}</b> (preț public, cu TVA) · ${a.inStock ? '<span style="color:var(--ok)">în stoc la A2T</span>' : 'fără stoc la A2T'}`,
+      `A2T: prețul tău de instalator <b>${fmtLei(a.inst || a.site)}</b> · public ${fmtLei(a.site)} (cu TVA) · ${a.inStock ? '<span style="color:var(--ok)">în stoc la A2T</span>' : 'fără stoc la A2T'}`,
     pf && pf < p ? `Preț cu reducere: <b style="font-size:14px;color:var(--fg)">${fmtLei(pf)}</b> (preț normal ${fmtLei(p)})` : '',
-    p && !(pf < p) ? `Preț pe site: <b style="font-size:14px;color:var(--fg)">${fmtLei(p)}</b>${a && a.site && !(+qs('#ctm-price').value) ? ` (marja ta brută față de prețul public: ${fmtLei(p - a.site)})` : ''}` : '',
+    p && !(pf < p) ? `Preț pe site: <b style="font-size:14px;color:var(--fg)">${fmtLei(p)}</b>${a && a.site ? ` · câștigi ${fmtLei((pf || p) - (a.inst || a.site))} pe bucată${(pf || p) > a.site ? ` · <span style="color:var(--warn)">peste prețul public A2T cu ${fmtLei((pf || p) - a.site)}</span>` : ''}` : ''}` : '',
     cfg.on ? '' : '<span style="color:var(--warn)">Magazinul e oprit — prețul nu apare încă pe site (Comenzi → Setări magazin).</span>'
   ].filter(Boolean).join('<br>');
 }
@@ -7055,7 +7059,7 @@ qs('#om-delete').addEventListener('click', async () => {
   try { opsApply(await clApi('/ops/orders/' + encodeURIComponent(omDraft.id), { method: 'DELETE' })); renderOrders(); closeOrder(); toast('Comandă ștearsă', 'ok'); } catch (e) { toast(e.message, 'err'); }
 });
 function smFill() {
-  const c = ops.shopCfg; qs('#sm-on').checked = !!c.on; qs('#sm-mk').value = c.markup; qs('#sm-ship').value = c.ship; qs('#sm-free').value = c.freeOver;
+  const c = ops.shopCfg; qs('#sm-on').checked = !!c.on; qs('#sm-mk').value = c.markup; qs('#sm-base').value = c.base === 'site' ? 'site' : 'inst'; qs('#sm-ship').value = c.ship; qs('#sm-free').value = c.freeOver;
   qs('#sm-cod').checked = !!c.cod; qs('#sm-codfee').value = c.codFee || 0; qs('#sm-op').checked = !!c.op; qs('#sm-pickup').checked = !!c.pickup; qs('#sm-note').value = c.note || '';
   qs('#sm-syncat').textContent = c.syncAt ? 'Ultima actualizare A2T: ' + new Date(c.syncAt).toLocaleString('ro-RO') : 'Prețurile A2T nu au fost citite încă.';
 }
@@ -7064,7 +7068,7 @@ const closeShop = () => qs('#shop-modal').classList.add('hidden');
 qs('#sm-x').addEventListener('click', closeShop); qs('#sm-cancel').addEventListener('click', closeShop);
 qs('#shop-modal').addEventListener('click', e => { if (e.target.id === 'shop-modal') closeShop(); });
 qs('#sm-save').addEventListener('click', async () => {
-  const b = { on: qs('#sm-on').checked, markup: qs('#sm-mk').value, ship: qs('#sm-ship').value, freeOver: qs('#sm-free').value, cod: qs('#sm-cod').checked, codFee: qs('#sm-codfee').value, op: qs('#sm-op').checked, pickup: qs('#sm-pickup').checked, note: qs('#sm-note').value.trim() };
+  const b = { on: qs('#sm-on').checked, base: qs('#sm-base').value, markup: qs('#sm-mk').value, ship: qs('#sm-ship').value, freeOver: qs('#sm-free').value, cod: qs('#sm-cod').checked, codFee: qs('#sm-codfee').value, op: qs('#sm-op').checked, pickup: qs('#sm-pickup').checked, note: qs('#sm-note').value.trim() };
   if (b.on && !b.cod && !b.op && !b.pickup) return toast('Alege cel puțin o metodă de plată', 'warn');
   try { opsApply(await clApi('/ops/shop-cfg', jsonOpt('PUT', b))); renderOrders(); renderCatalog(); closeShop(); toast(b.on ? 'Magazinul e pornit — prețurile apar pe site în cel mult un minut' : 'Setări salvate', 'ok'); } catch (e) { toast(e.message, 'err'); }
 });
@@ -7076,13 +7080,13 @@ async function a2mSearch() {
   const q = qs('#a2m-q').value.trim(); if (!q) return; const box = qs('#a2m-res'); box.innerHTML = '<div class="cm-hint">Caut pe A2T…</div>';
   try {
     const r = await clApi('/ops/a2t-find?q=' + encodeURIComponent(q)); a2mRes = r.items || [];
-    const mk = ((ops && ops.shopCfg) || {}).markup || 0;
+    const mk = ((ops && ops.shopCfg) || {}).markup ?? 20;
     box.innerHTML = (r.missing && r.missing.length ? `<div class="cm-hint" style="color:var(--warn);margin-bottom:8px">Negăsite pe A2T: ${r.missing.map(escapeHtml).join(', ')}</div>` : '') + (a2mRes.length ? `<div style="display:flex;flex-direction:column;gap:6px">${a2mRes.map(x => `
       <label class="cl-card" style="cursor:${x.have ? 'default' : 'pointer'};opacity:${x.have ? .55 : 1};align-items:flex-start">
         <input type="checkbox" data-sku="${escapeHtml(x.sku)}" ${x.have ? 'disabled' : ''} style="width:18px;height:18px;margin-top:3px;accent-color:var(--accent);flex-shrink:0">
         <div class="cl-main"><div class="cl-name" style="white-space:normal"><span>${escapeHtml(x.name)}</span></div>
           <div class="cl-sub">${escapeHtml([x.sku, x.brand, CT_CAT[x.cat]].filter(Boolean).join(' · '))}${x.specs.length ? ` · ${x.specs.length} caracteristici` : ''} · ${x.photoOk ? 'cu poză' : 'fără poză (o pui tu)'}${x.have ? ' · <b>există deja în Echipamente</b>' : ''}</div></div>
-        <div style="text-align:right;flex-shrink:0"><b style="white-space:nowrap">${fmtLei(x.price)}</b><div class="cm-hint" style="white-space:nowrap">la tine ≈ ${fmtLei(Math.ceil(x.price * (1 + mk / 100)))}</div><div class="cm-hint" style="white-space:nowrap;color:${x.inStock ? 'var(--ok)' : 'var(--fg-3)'}">${x.inStock ? 'în stoc A2T' : 'fără stoc A2T'}</div></div>
+        <div style="text-align:right;flex-shrink:0"><b style="white-space:nowrap">${fmtLei(x.price)}</b><div class="cm-hint" style="white-space:nowrap">${x.inst && x.inst < x.price ? 'tu plătești ' + fmtLei(x.inst) + ' · ' : ''}pe site ≈ ${fmtLei(Math.ceil(((((ops && ops.shopCfg) || {}).base === 'site' ? x.price : (x.inst || x.price))) * (1 + mk / 100)))}</div><div class="cm-hint" style="white-space:nowrap;color:${x.inStock ? 'var(--ok)' : 'var(--fg-3)'}">${x.inStock ? 'în stoc A2T' : 'fără stoc A2T'}</div></div>
       </label>`).join('')}</div>` : '<div class="cl-empty">Nimic găsit. Încearcă alte cuvinte sau codul exact de pe A2T.</div>');
     a2mCount();
   } catch (e) { box.innerHTML = `<div class="cl-empty">${escapeHtml(/HTTP 404|Secțiune/.test(e.message) ? 'Actualizează serverul (v11.6) ca să poți căuta pe A2T' : e.message)}</div>`; }

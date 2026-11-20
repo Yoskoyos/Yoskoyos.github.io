@@ -1603,15 +1603,17 @@ async function a2tTick(db) {
 /* ═════════════ Magazin online (pagina Echipamente de pe supraveghere24h.ro) ═════════════
    Preț pe site = preț fix (dacă e pus) sau prețul public A2T (cu TVA) × (1 + adaos%), rotunjit în sus la leu. Firma nu e plătitoare de TVA → prețul afișat e prețul final.
    Prețul și stocul A2T se actualizează zilnic. Comenzile: ops[<proprietar>].orders, numerotate CMD-<n>. */
-const SHOP_DEF = { on: false, markup: 10, ship: 25, freeOver: 1000, pickup: true, cod: true, op: true, codFee: 0, note: '' };
+const a2tInst = (s, site) => { const t = (s.tier_prices || []).map(x => +x.value).filter(v => v > 0 && v <= site); return t.length ? Math.round(Math.min(...t) * 100) / 100 : site; };
+const SHOP_DEF = { on: false, base: 'inst', markup: 20, ship: 25, freeOver: 1000, pickup: true, cod: true, op: true, codFee: 0, note: '' };
 const shopCfgOf = u => ({ ...SHOP_DEF, ...(u.shopCfg || {}) });
 const skuKey = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 const todayBuc = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' });
 function shopBase(x, cfg) {
   if (x.price > 0) return x.price;
   const site = x.a2t && x.a2t.site; if (!site) return 0;
+  const base = cfg.base === 'site' ? site : (x.a2t.inst || site);   // implicit: prețul meu de instalator
   const mk = x.markup === '' || x.markup == null ? +cfg.markup || 0 : +x.markup;
-  return Math.ceil(site * (1 + mk / 100));
+  return Math.ceil(base * (1 + mk / 100));
 }
 const discOn = x => x.disc > 0 && (!x.discUntil || x.discUntil >= todayBuc());
 function shopPrice(x, cfg) { const b = shopBase(x, cfg); return b && discOn(x) ? Math.ceil(b * (1 - x.disc / 100)) : b; }
@@ -1645,7 +1647,7 @@ async function shopSync(u, only) {
   for (const x of L) {
     const s = got[String(x.sku || x.model).trim().toUpperCase()]; const site = s ? +(s.final_price || s.price) || 0 : 0;
     if (!site) { x.a2t = { at: Date.now(), missing: true }; missing++; continue; }
-    x.a2t = { at: Date.now(), site: Math.round(site * 100) / 100, inStock: !!(s.stock && s.stock.is_in_stock && s.stock.qty > 0), name: String(s.name || '').slice(0, 160) }; ok++;
+    x.a2t = { at: Date.now(), site: Math.round(site * 100) / 100, inst: a2tInst(s, site), inStock: !!(s.stock && s.stock.is_in_stock && s.stock.qty > 0), name: String(s.name || '').slice(0, 160) }; ok++;
   }
   u.shopCfg = { ...(u.shopCfg || {}), syncAt: Date.now() };
   return { ok, missing };
@@ -1736,14 +1738,14 @@ function a2tFind(o) {
     const f = [{ terms: { visibility: [3, 4] } }, { terms: { status: [0, 1] } }];
     const query = o.codes ? { bool: { filter: [{ terms: { sku: o.codes } }] } } : { bool: { must: [{ multi_match: { query: o.text, fields: ['name^3', 'sku^2'], operator: 'and', fuzziness: 'AUTO' } }], filter: f } };
     const body = JSON.stringify({ query });
-    const rq = https.request({ host: 'www.a2t.ro', path: `/api/catalog/vue_storefront_catalog_1/product/_search?size=${o.codes ? Math.min(100, o.codes.length + 10) : 40}&_source_include=name,sku,image,url_path,short_description,category,final_price,price,stock.is_in_stock,stock.qty`, method: 'POST', timeout: 20000,
+    const rq = https.request({ host: 'www.a2t.ro', path: `/api/catalog/vue_storefront_catalog_1/product/_search?size=${o.codes ? Math.min(100, o.codes.length + 10) : 40}&_source_include=name,sku,image,url_path,short_description,category,final_price,price,tier_prices,stock.is_in_stock,stock.qty`, method: 'POST', timeout: 20000,
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), 'User-Agent': 'Mozilla/5.0 (compatible; YCA/1.0)', Accept: 'application/json' } }, r => {
       const ch = []; r.on('data', d => ch.push(d));
       r.on('end', () => { let hits = []; try { hits = (JSON.parse(Buffer.concat(ch).toString('utf8')).hits || {}).hits || []; } catch {}
         resolve(hits.map(h => h._source).filter(s => s && s.sku && (+(s.final_price || s.price) > 0) && !/^\[?resigilat|-R\d+$/i.test(String(s.name || '') + ' ' + s.sku) && !/-R\d+$/i.test(s.sku)).map(s => {
           const name = String(s.name || '').replace(/\s+/g, ' ').trim(); const brand = guessBrand(name); const g = guessCats(name, (s.category || []).map(c => c && c.name).filter(Boolean));
           return { sku: s.sku, model: String(s.sku).replace(/\((\d+(\.\d+)?\s*mm)\)$/i, '').trim(), name: name.slice(0, 200), title: name.split(',').slice(0, 2).join(',').trim().slice(0, 160),
-            brand, cat: guessMainCat({ name, model: s.sku, cat: g.cat }), price: Math.round(+(s.final_price || s.price) * 100) / 100, qty: s.stock ? +s.stock.qty || 0 : 0, inStock: !!(s.stock && s.stock.is_in_stock && s.stock.qty > 0),
+            brand, cat: guessMainCat({ name, model: s.sku, cat: g.cat }), price: Math.round(+(s.final_price || s.price) * 100) / 100, inst: a2tInst(s, +(s.final_price || s.price)), qty: s.stock ? +s.stock.qty || 0 : 0, inStock: !!(s.stock && s.stock.is_in_stock && s.stock.qty > 0),
             image: s.image && s.image !== 'no_selection' ? String(s.image) : '', photoOk: !!(s.image && PHOTO_BRANDS.includes(brand)), specs: htmlList(s.short_description).slice(0, 14), url: s.url_path ? 'https://www.a2t.ro/' + s.url_path : '' };
         })); });
     });
@@ -1882,7 +1884,7 @@ async function handleOps(req, res, pathname) {
     if (req.method === 'GET') return sendJson(res, 200, shopView());
     if (req.method === 'POST' && parts[2] === 'sync') { const r = await shopSync(u); shopRecord(u); saveOps(all); return sendJson(res, 200, { ...view(), ...shopView(), ...r }); }
     if (req.method === 'PUT') { const b = await readJson(req) || {}; const o = shopCfgOf(u);
-      u.shopCfg = { ...(u.shopCfg || {}), on: b.on !== undefined ? !!b.on : o.on, markup: b.markup !== undefined ? Math.min(500, Math.max(-50, num(b.markup))) : o.markup,
+      u.shopCfg = { ...(u.shopCfg || {}), base: b.base === 'site' ? 'site' : b.base === 'inst' ? 'inst' : o.base, on: b.on !== undefined ? !!b.on : o.on, markup: b.markup !== undefined ? Math.min(500, Math.max(-50, num(b.markup))) : o.markup,
         ship: b.ship !== undefined ? Math.max(0, num(b.ship)) : o.ship, freeOver: b.freeOver !== undefined ? Math.max(0, num(b.freeOver)) : o.freeOver,
         codFee: b.codFee !== undefined ? Math.max(0, num(b.codFee)) : o.codFee, pickup: b.pickup !== undefined ? !!b.pickup : o.pickup,
         cod: b.cod !== undefined ? !!b.cod : o.cod, op: b.op !== undefined ? !!b.op : o.op, note: b.note !== undefined ? str(b.note, 300) : o.note };
@@ -1904,7 +1906,7 @@ async function handleOps(req, res, pathname) {
       if (u.catalog.some(c => skuKey(c.sku || c.model) === skuKey(x.sku) || skuKey(c.model) === skuKey(x.sku))) { skipped++; continue; }
       const mc = guessMainCat({ name: x.name, model: x.model, cat: x.cat });
       const c = cleanOp('catalog', { name: x.title, brand: x.brand, model: x.model, sku: x.sku, cat: mc, sub: guessSub({ name: x.name, model: x.model, sku: x.sku, cat: mc, specs: x.specs.join(' ') }), specs: x.specs.join('\n'), visible: false, sell: true, order: ++order }, null);
-      c.a2t = { at: Date.now(), site: x.price, inStock: x.inStock, name: x.name };
+      c.a2t = { at: Date.now(), site: x.price, inst: x.inst, inStock: x.inStock, name: x.name };
       u.catalog.push(c); added++;
       if (x.image && PHOTO_BRANDS.includes(x.brand)) {
         const img = await a2tImage(x.image); const ik = img ? fileKind(img, 'poza.jpg') : '';
@@ -4411,7 +4413,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.8, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.9, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
