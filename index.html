@@ -6801,13 +6801,26 @@ function renderStock() {
   if (!S.length) { list.innerHTML = '<div class="cl-empty">Stocul e gol.<br>Apasă „Produs nou” și adaugă ce ai în depozit (camere, HDD-uri, NVR-uri, cablu).</div>'; return; }
   if (!rows.length) { list.innerHTML = `<div class="cl-empty">${term ? 'Niciun produs găsit.' : 'Nu ai niciun produs în stoc acum.'}</div>`; return; }
   let html = low.length && !term ? `<div class="op-banner err">📦 Sub stocul minim: ${low.map(s => `<b>${escapeHtml(s.name)}</b> (${s.qty}/${s.minQty})`).join(', ')}</div>` : '';
-  for (const cat of Object.keys(ST_CAT)) {
-    const g = rows.filter(s => s.cat === cat).sort((a, b) => a.name.localeCompare(b.name, 'ro')); if (!g.length) continue;
-    html += `<div class="cd-grp">${ST_CAT[cat]}</div>` + g.map(s => {
+  // grupare pe categorii + subcategorii: luate din fișa echipamentului (același cod), altfel din categoria stocului
+  const skuN = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); const byModel = {}; for (const c of ops.catalog || []) { const k = skuN(c.model); if (k && !byModel[k]) byModel[k] = c; }
+  const GRP = [['cam', 'Camere'], ['nvr', 'NVR-uri'], ['hdd', 'Stocare'], ['retea', 'Rețea'], ['alimentare', 'Alimentare'], ['rack', 'Montaj și accesorii'], ['monitor', 'Monitoare'], ['altele', 'Altele']];
+  const ST2 = { camera: ['cam', ''], nvr: ['nvr', ''], hdd: ['hdd', ''], switch: ['retea', 'Switch PoE'], cablu: ['rack', 'Cablu'], sursa: ['alimentare', ''], altele: ['altele', ''] };
+  const place = { exterior: 'Exterior', interior: 'Interior', lift: 'Lift' };
+  const grpOf = s => { const c = byModel[skuN(s.model)];
+    if (!c) return ST2[s.cat] || ['altele', ''];
+    if (place[c.cat]) return ['cam', [place[c.cat], ctSubName(c.cat, c.sub)].filter(Boolean).join(' – ')];
+    return [GRP.some(g => g[0] === c.cat) ? c.cat : 'altele', ctSubName(c.cat, c.sub)]; };
+  for (const [gk, gname] of GRP) {
+    const g = rows.map(s => [s, grpOf(s)]).filter(x => x[1][0] === gk).sort((a, b) => (a[1][1] ? 0 : 1) - (b[1][1] ? 0 : 1) || a[1][1].localeCompare(b[1][1], 'ro') || a[0].name.localeCompare(b[0].name, 'ro')); if (!g.length) continue;
+    const subs = new Set(g.map(x => x[1][1])); let last = null;
+    html += `<div class="cd-grp">${gname} <span style="font-weight:600;color:var(--fg-3)">· ${g.reduce((a, x) => a + (x[0].qty || 0), 0)} buc.</span></div>` + g.map(([s, gs]) => {
+      let hd = ''; if ((subs.size > 1 || gs[1]) && gs[1] !== last) { last = gs[1]; hd = `<div style="font-size:12px;font-weight:700;color:var(--fg-2);text-transform:uppercase;letter-spacing:.04em;margin:6px 2px 0">${escapeHtml(gs[1] || 'Altele')}</div>`; }
+      return hd + (() => {
       const isLow = s.minQty && s.qty < s.minQty;
       const sub = [s.model, s.supplier, s.price ? s.price.toLocaleString('ro-RO') + ' lei/' + (s.unit || 'buc') : '', s.minQty ? 'minim ' + s.minQty : ''].filter(Boolean).map(escapeHtml).join(' · ');
       return `<div class="cl-card" role="button" tabindex="0" data-sid="${escapeHtml(s.id)}"><div class="cl-main"><div class="cl-name"><span>${escapeHtml(s.name)}</span></div><div class="cl-sub">${sub || '&nbsp;'}</div></div>
         <div class="st-qty"><button type="button" data-d="-1" aria-label="Scade">−</button><b class="${isLow ? 'low' : ''}">${s.qty} <small style="font-weight:600;color:var(--fg-3)">${escapeHtml(s.unit || 'buc')}</small></b><button type="button" data-d="1" aria-label="Adaugă">+</button></div></div>`;
+      })();
     }).join('');
   }
   list.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">${html}</div>`;
