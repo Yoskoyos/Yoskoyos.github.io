@@ -1424,6 +1424,7 @@ function guessMainCat(x) {   // corectează categoria mare pentru produsele puse
   const t = (x.name + ' ' + (x.model || '')).toLowerCase();
   if (x.cat === 'retea' || x.cat === 'altele' || x.cat === 'rack') {
     if (/\bups\b|sursa|alimentator|adaptor alimentare/.test(t)) return 'alimentare';
+    if (/cablu|\butp\b|\bftp\b/.test(t) && !/switch/.test(t)) return 'rack';
     if (/monitor/.test(t)) return 'monitor';
     if (/micro ?sd|card de memorie|card microsd/.test(t)) return 'hdd';
     if (x.cat === 'altele' && /cablu|doz|mufa|rj45|suport|clem|tub|canal/.test(t)) return 'rack';
