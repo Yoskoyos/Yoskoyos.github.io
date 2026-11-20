@@ -1779,6 +1779,7 @@ html:not(.unlocked) .app{display:none}
         <div class="section-hdr">
           <div class="section-title sec-t"><span class="intg-ic" style="background:#F38020"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></span><span>Statistici site · supraveghere24h.ro</span></div>
           <select class="cl-chip" id="an-days" style="margin-left:auto;padding-right:10px" aria-label="Perioada"><option value="0" selected>De la lansare (1 nov.)</option><option value="1">Ultimele 24 de ore</option><option value="7">Ultimele 7 zile</option><option value="30">Ultimele 30 de zile</option></select>
+          <select class="cl-chip" id="an-ro" style="padding-right:10px" aria-label="Țara vizitatorilor"><option value="1">Doar din România</option><option value="0">Din toate țările</option></select>
         </div>
         <div id="an-body"><div class="cl-empty">Se încarcă…</div></div>
       </div>
@@ -7258,14 +7259,15 @@ function anChart(body, D, m) {
 }
 async function loadAnalytics() {
   const body = qs('#an-body'); if (!body || anBusy || !getAuth()) return; anBusy = true;
-  const days = +qs('#an-days').value;
+  const days = +qs('#an-days').value, ro = qs('#an-ro').value === '1'; try { localStorage.setItem('yca_an_ro', ro ? '1' : '0'); } catch {}
   const I = { users: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>',
     eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>', layers: '<path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>',
     inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/>' };
   const ic = n => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${I[n]}</svg>`;
   const N = n => Number(n || 0).toLocaleString('ro-RO');
   try {
-    const a = await clApi('/analytics?days=' + days);
+    const a = await clApi('/analytics?days=' + days + (ro ? '&ro=1' : ''));
+    if (ro && a.configured && a.ro === undefined) toast('Pentru filtrul „Doar din România” actualizează serverul la v11.7', 'warn');
     if (!a.configured) { body.innerHTML = '<div class="cm-hint">Conectează Cloudflare din <b>Setări → Statistici site</b> ca să vezi aici câți oameni intră pe site, ce pagini citesc și de unde vin.</div>'; return; }
     const since = Math.max(Date.parse(a.since || 0) || 0, days ? Date.now() - days * 864e5 : 0);
     const qn = (quotes || []).filter(q => q.createdAt >= since), offers = qn.filter(q => q.kind !== 'contact').length, msgs = qn.length - offers;
@@ -7278,7 +7280,13 @@ async function loadAnalytics() {
       <div class="an-kpi"><div class="an-kpi-l">${ic('inbox')}Cereri primite</div><div class="an-kpi-v">${N(leads)}</div><div class="an-kpi-s">${offers} ${offers === 1 ? 'ofertă' : 'oferte'} · ${msgs} ${msgs === 1 ? 'mesaj' : 'mesaje'} · ${conv.toFixed(1).replace('.', ',')}% din vizite</div></div></div>`;
     // grafic: „lollipop” pe zile (ca în exemplul video) — tije care cresc din bază, una după alta; comutator Vizite / Pagini
     let chart;
-    const D = a.daily || [];
+    const D = (() => {   // și zilele fără vizite, cu zero (Cloudflare nu trimite zilele goale)
+      const got = new Map((a.daily || []).map(d => [d.date, d])); if (!got.size) return [];
+      const first = [...got.keys()].sort()[0], end = new Date().toISOString().slice(0, 10), out = [];
+      const start = days ? new Date(Date.now() - (days - 1) * 864e5).toISOString().slice(0, 10) : first;
+      for (let t = new Date((start < first && !days ? first : start) + 'T12:00:00Z'); t.toISOString().slice(0, 10) <= end; t.setUTCDate(t.getUTCDate() + 1)) {
+        const k = t.toISOString().slice(0, 10); out.push(got.get(k) || { date: k, views: 0, visits: 0 }); }
+      return out; })();
     if (D.length < 2) chart = `<div class="an-empty">Graficul pe zile apare de mâine,<br>după prima zi întreagă de date.</div>`;
     else chart = `<div class="an-sumrow" id="an-sum"></div><div class="an-chartwrap" id="an-cw"></div>`;
     // drumul spre ofertă
@@ -7317,6 +7325,8 @@ async function loadAnalytics() {
   finally { anBusy = false; }
 }
 qs('#an-days').addEventListener('change', loadAnalytics);
+try { qs('#an-ro').value = localStorage.getItem('yca_an_ro') === '0' ? '0' : '1'; } catch {}
+qs('#an-ro').addEventListener('change', loadAnalytics);
 document.querySelectorAll('.nav-tab[data-tab="stats"]').forEach(t => t.addEventListener('click', () => { if (!quotes) loadQuotes(true).then(loadAnalytics); else loadAnalytics(); }));
 qs('#an-open').addEventListener('click', () => { document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('on')); document.querySelectorAll('.panel').forEach(x => x.classList.remove('on')); qs('#panel-stats').classList.add('on'); window.scrollTo(0, 0); loadAnalytics(); });
 function intgPill(id, st, txt) { const p = qs(id); p.className = 'intg-pill ' + st; p.querySelector('span').textContent = txt; }

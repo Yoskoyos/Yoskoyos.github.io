@@ -2052,15 +2052,15 @@ async function cfSiteTag(cf) {
   cf.siteTag = hit.site_tag; try { fs.writeFileSync(CF_FILE, JSON.stringify(cf, null, 2), { mode: 0o600 }); } catch {}
   return cf.siteTag;
 }
-async function cfStats(days) {
+async function cfStats(days, ro) {
   const cf = loadCf(); if (!cf) return { configured: false };
-  const key = 'd' + days, c = cfCache.get(key);
+  const key = 'd' + days + (ro ? 'ro' : ''), c = cfCache.get(key);
   if (c && Date.now() - c.t < 10 * 60e3) return c.v;
   const siteTag = await cfSiteTag(cf);
   const since = Date.parse(cf.since || '2026-11-01T19:25:00Z');            // lansarea site-ului: nu numărăm nimic de dinainte
   const to = new Date(), from = new Date(Math.max(since, days ? Date.now() - days * 864e5 : 0));
   // vizitele venite din aplicație (proprietarul) nu se numără; dacă filtrul nu e acceptat, reîncercăm fără el
-  const base = [{ datetime_geq: from.toISOString(), datetime_leq: to.toISOString() }, ...(siteTag ? [{ siteTag }] : []), { bot: 0 }];
+  const base = [{ datetime_geq: from.toISOString(), datetime_leq: to.toISOString() }, ...(siteTag ? [{ siteTag }] : []), { bot: 0 }, ...(ro ? [{ countryName: 'RO' }] : [])];   // ro = doar vizitele din România (roboții din alte țări nu se numără)
   let filter = { AND: [...base, { refererHost_neq: 'app.supraveghere24h.ro' }] };
   const g = (alias, dims, limit, order) => `${alias}: rumPageloadEventsAdaptiveGroups(filter: $filter, limit: ${limit}${order ? `, orderBy: [${order}]` : ''}) { count sum { visits }${dims ? ` dimensions { ${dims} }` : ''} }`;
   const query = `query($accountTag: string, $filter: AccountRumPageloadEventsAdaptiveGroupsFilter_InputObject) { viewer { accounts(filter: { accountTag: $accountTag }) {
@@ -2068,12 +2068,13 @@ async function cfStats(days) {
     ${g('refs', 'refererHost', 10, 'sum_visits_DESC')} ${g('countries', 'countryName', 8, 'sum_visits_DESC')} ${g('devices', 'deviceType', 5, 'sum_visits_DESC')} } } }`;
   let r = await cfApi('POST', '/graphql', cf.token, { query, variables: { accountTag: cf.accountId, filter } });
   if (((r.json && r.json.errors) || []).some(e => /refererHost/i.test(e.message || ''))) { filter = { AND: base }; r = await cfApi('POST', '/graphql', cf.token, { query, variables: { accountTag: cf.accountId, filter } }); }
+  if (ro && ((r.json && r.json.errors) || []).some(e => /countryName/i.test(e.message || ''))) { const f2 = { AND: filter.AND.filter(x => !('countryName' in x)) }; r = await cfApi('POST', '/graphql', cf.token, { query, variables: { accountTag: cf.accountId, filter: f2 } }); ro = false; }
   const errs = (r.json && r.json.errors) || [];
   if (errs.length) throw new Error('Cloudflare: ' + errs[0].message);
   const a = (((r.json.data || {}).viewer || {}).accounts || [])[0] || {};
   const row = (x, k) => ({ name: k ? (x.dimensions || {})[k] : '', views: x.count || 0, visits: (x.sum || {}).visits || 0 });
   const tot = (a.total || [])[0] || {};
-  const v = { configured: true, days, since: new Date(since).toISOString(), from: from.toISOString(), to: to.toISOString(), visits: (tot.sum || {}).visits || 0, views: tot.count || 0,
+  const v = { configured: true, days, ro: !!ro, since: new Date(since).toISOString(), from: from.toISOString(), to: to.toISOString(), visits: (tot.sum || {}).visits || 0, views: tot.count || 0,
     daily: (a.daily || []).map(x => ({ date: x.dimensions.date, views: x.count || 0, visits: (x.sum || {}).visits || 0 })),
     pages: (a.pages || []).map(x => row(x, 'requestPath')), refs: (a.refs || []).map(x => row(x, 'refererHost')),
     countries: (a.countries || []).map(x => row(x, 'countryName')), devices: (a.devices || []).map(x => row(x, 'deviceType')) };
@@ -2099,7 +2100,7 @@ async function handleAnalytics(req, res, pathname, parsed) {
   }
   if (pathname === '/analytics' && req.method === 'GET') {
     const days = [0, 1, 7, 30].includes(+parsed.query.days) ? +parsed.query.days : 7;   // 0 = de la lansare
-    try { return sendJson(res, 200, await cfStats(days)); } catch (e) { return sendJson(res, 502, { error: e.message }); }
+    try { return sendJson(res, 200, await cfStats(days, parsed.query.ro === '1')); } catch (e) { return sendJson(res, 502, { error: e.message }); }
   }
   return sendJson(res, 405, { error: 'Operație necunoscută' });
 }
@@ -4378,7 +4379,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.6, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.7, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
