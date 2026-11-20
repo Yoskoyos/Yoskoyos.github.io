@@ -2420,7 +2420,10 @@ html:not(.unlocked) .app{display:none}
         <div class="fg"><label for="ctm-brand">Marcă</label><input type="text" id="ctm-brand" list="ctm-brands" placeholder="ex. HiLook" autocomplete="off"><datalist id="ctm-brands"><option value="HiLook"><option value="Hikvision"><option value="Dahua"><option value="Safer"></datalist></div>
         <div class="fg"><label for="ctm-model">Model</label><input type="text" id="ctm-model" placeholder="ex. IPC-B140HA-LUC" autocomplete="off"></div>
       </div>
-      <div class="fg"><label for="ctm-cat">Unde se folosește</label><select id="ctm-cat"><option value="exterior">Cameră exterior</option><option value="interior">Cameră interior</option><option value="lift">Cameră lift</option><option value="nvr">Recorder (NVR)</option><option value="hdd">Hard disk</option><option value="rack">Accesorii: rack / protecție</option><option value="retea">Accesorii: rețea / alimentare</option><option value="altele">Accesorii: altele</option></select></div>
+      <div class="f2">
+        <div class="fg"><label for="ctm-cat">Categoria</label><select id="ctm-cat"><optgroup label="Camere"><option value="exterior">Cameră de exterior</option><option value="interior">Cameră de interior</option><option value="lift">Cameră pentru lift</option></optgroup><option value="nvr">Înregistrator (NVR)</option><option value="hdd">Stocare</option><option value="retea">Rețea</option><option value="alimentare">Alimentare</option><option value="rack">Montaj și accesorii</option><option value="monitor">Monitor</option><option value="altele">Altele</option></select></div>
+        <div class="fg"><label for="ctm-sub">Tipul</label><select id="ctm-sub"></select></div>
+      </div>
       <div class="fg"><label for="ctm-specs">Caracteristici (câte una pe rând)</label><textarea id="ctm-specs" rows="5" placeholder="Rezoluție 4 MP (2560 × 1440)&#10;Lentilă 2,8 mm&#10;Infraroșu și lumină albă până la 40 m&#10;Protecție IP67"></textarea></div>
       <div class="cm-sec">Vânzare pe site</div>
       <label class="cm-check" style="font-weight:700"><input type="checkbox" id="ctm-sell"> Se vinde pe site (cu preț și „Adaugă în coș”)</label>
@@ -6707,7 +6710,7 @@ document.querySelectorAll('.nav-tab[data-tab="catalog"]').forEach(t => t.addEven
 
 /* ── Factură de la furnizor → stoc + echipamente ── */
 let purDraft = null;
-const PUR_CT = { exterior: 'Cameră exterior', interior: 'Cameră interior', lift: 'Cameră lift', nvr: 'Recorder (NVR)', hdd: 'Hard disk', rack: 'Rack / protecție', retea: 'Rețea / alimentare', altele: 'Altele' };
+const PUR_CT = { exterior: 'Cameră exterior', interior: 'Cameră interior', lift: 'Cameră lift', nvr: 'Înregistrator (NVR)', hdd: 'Stocare', retea: 'Rețea', alimentare: 'Alimentare', rack: 'Montaj și accesorii', monitor: 'Monitor', altele: 'Altele' };
 qs('#st-inv-btn').addEventListener('click', () => qs('#st-inv-file').click());
 qs('#ct-inv-btn').addEventListener('click', () => qs('#st-inv-file').click());
 qs('#st-inv-file').addEventListener('change', async e => {
@@ -6831,7 +6834,12 @@ qs('#sm-delete').addEventListener('click', async () => {
 });
 
 /* ── Echipamente prezentate pe site ── */
-const CT_CAT = { exterior: 'Cameră exterior', interior: 'Cameră interior', lift: 'Cameră lift', nvr: 'Recorder (NVR)', hdd: 'Hard disk', rack: 'Accesorii: rack / protecție', retea: 'Accesorii: rețea / alimentare', altele: 'Accesorii: altele' };
+const CT_CAT = { exterior: 'Cameră exterior', interior: 'Cameră interior', lift: 'Cameră lift', nvr: 'Înregistrator (NVR)', hdd: 'Stocare', retea: 'Rețea', alimentare: 'Alimentare', rack: 'Montaj și accesorii', monitor: 'Monitor', altele: 'Altele' };
+const CT_SUB = { cam: [['bullet', 'Bullet'], ['dome', 'Dome / turret'], ['ptz', 'Rotativă (PTZ)'], ['wifi', 'Wi-Fi'], ['kit', 'Kit complet']], hdd: [['hdd', 'Hard disk'], ['microsd', 'Card microSD']],
+  retea: [['switch', 'Switch PoE'], ['router', 'Router / Wi-Fi']], alimentare: [['sursa', 'Sursă'], ['alimentator', 'Alimentator'], ['ups', 'UPS']], rack: [['doza', 'Doză de joncțiune'], ['rack', 'Rack / cutie'], ['cablu', 'Cablu'], ['accesorii', 'Accesorii de montaj']] };
+const ctSubList = c => CT_SUB[['exterior', 'interior', 'lift'].includes(c) ? 'cam' : c] || [];
+const ctSubName = (c, s) => (ctSubList(c).find(x => x[0] === s) || [])[1] || '';
+function ctmSubFill(sel) { const L = ctSubList(qs('#ctm-cat').value); const box = qs('#ctm-sub'); box.innerHTML = L.length ? L.map(([k, v]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${v}</option>`).join('') : '<option value="">—</option>'; box.disabled = !L.length; }
 let ctDraft = null;
 const ctSorted = () => ((ops && ops.catalog) || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0) || a.createdAt - b.createdAt);
 function ctPhoto(it) {
@@ -6852,7 +6860,7 @@ function renderCatalog() {
   list.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">${D.map((x) => { const ph = ctPhoto(x), i = pos.get(x.id);
     return `<div class="cl-card" role="button" tabindex="0" data-ctid="${escapeHtml(x.id)}" style="align-items:center">
       ${ph ? `<img data-authsrc="${escapeHtml(ph)}" alt="" style="width:56px;height:56px;object-fit:contain;border-radius:10px;background:#fff;border:1px solid var(--border);flex-shrink:0">` : '<div style="width:56px;height:56px;border-radius:10px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--fg-3);flex-shrink:0;text-align:center">fără poză</div>'}
-      <div class="cl-main"><div class="cl-name"><span>${escapeHtml(x.name)}</span></div><div class="cl-sub">${[CT_CAT[x.cat], [x.brand, x.model].filter(Boolean).join(' ')].filter(Boolean).map(escapeHtml).join(' · ')}</div></div>
+      <div class="cl-main"><div class="cl-name"><span>${escapeHtml(x.name)}</span></div><div class="cl-sub">${[CT_CAT[x.cat] + (ctSubName(x.cat, x.sub) ? ' – ' + ctSubName(x.cat, x.sub) : ''), [x.brand, x.model].filter(Boolean).join(' ')].filter(Boolean).map(escapeHtml).join(' · ')}</div></div>
       <div class="ct-right" style="display:flex;align-items:center;gap:6px;flex-shrink:0">
         ${(() => { const q = stOf(x), sid = stId[skuN(x.model)]; return q === null ? `<button type="button" class="ct-stk add" data-stnew title="Pune echipamentul în stoc">+ Stoc</button>` : `<span class="ct-stq" data-stid="${escapeHtml(sid)}"><button type="button" data-sd="-1" aria-label="Scade stocul">−</button><button type="button" class="ct-stk ${q > 0 ? 'on' : ''}" data-sedit title="Modifică stocul">Stoc: ${q}</button><button type="button" data-sd="1" aria-label="Crește stocul">+</button></span>`; })()}        ${x.sell ? (() => { const p = ctFinal(x), b = ctPrice(x); return `${p && p < b ? `<span class="qpill new" style="white-space:nowrap" title="Reducere activă">-${x.disc}%</span>` : ''}<span class="qpill ${p ? 'sent' : 'clarify'}" style="white-space:nowrap" title="Prețul de vânzare de pe site">${p ? p.toLocaleString('ro-RO') + ' lei' : 'fără preț'}</span>`; })() : ''}${(x.files || []).some(f => f.ext === 'pdf') ? '<span class="qpill" style="white-space:nowrap" title="Are fișă tehnică">PDF</span>' : ''}<span class="qpill ${x.visible ? 'accepted' : ''}" style="white-space:nowrap">${x.visible ? 'Pe site' : 'Ascuns'}</span>
         <button type="button" class="btn" data-mv="-1" aria-label="Mută mai sus" ${i ? '' : 'disabled'} style="min-width:40px;min-height:40px;padding:6px">↑</button>
@@ -6876,7 +6884,7 @@ function openCatalogModal(x) {
   ctDraft = x ? JSON.parse(JSON.stringify(x)) : { id: null, files: [] };
   qs('#ctm-title').textContent = x ? x.name : 'Echipament nou';
   qs('#ctm-vis').checked = x ? !!x.visible : true; qs('#ctm-name').value = x ? x.name : ''; qs('#ctm-brand').value = x ? x.brand || '' : '';
-  qs('#ctm-model').value = x ? x.model || '' : ''; qs('#ctm-cat').value = x ? x.cat : 'exterior'; qs('#ctm-specs').value = x ? x.specs || '' : '';
+  qs('#ctm-model').value = x ? x.model || '' : ''; qs('#ctm-cat').value = x ? x.cat : 'exterior'; ctmSubFill(x ? x.sub : ''); qs('#ctm-specs').value = x ? x.specs || '' : '';
   qs('#ctm-sell').checked = !!(x && x.sell); qs('#ctm-sku').value = x ? x.sku || '' : ''; qs('#ctm-mk').value = x && x.markup !== '' && x.markup != null ? x.markup : ''; qs('#ctm-price').value = x && x.price ? x.price : ''; qs('#ctm-disc').value = x && x.disc ? x.disc : ''; qs('#ctm-discu').value = x ? x.discUntil || '' : ''; ctmPriceInfo();
   qs('#ctm-delete').style.display = x ? '' : 'none'; ctFiles(); qs('#catalog-modal').classList.remove('hidden');
   if (!x) setTimeout(() => qs('#ctm-name').focus(), 50);
@@ -6885,7 +6893,7 @@ function closeCatalogModal() { qs('#catalog-modal').classList.add('hidden'); ctD
 async function ctmSave(stay) {
   const name = qs('#ctm-name').value.trim(); if (!name) { toast('Scrie denumirea', 'warn'); qs('#ctm-name').focus(); return false; }
   const L = ctSorted();
-  const body = { name, brand: qs('#ctm-brand').value.trim(), model: qs('#ctm-model').value.trim(), cat: qs('#ctm-cat').value, tagline: '',
+  const body = { name, brand: qs('#ctm-brand').value.trim(), model: qs('#ctm-model').value.trim(), cat: qs('#ctm-cat').value, sub: qs('#ctm-sub').value, tagline: '',
     specs: qs('#ctm-specs').value.trim(), visible: qs('#ctm-vis').checked, sell: qs('#ctm-sell').checked, sku: qs('#ctm-sku').value.trim(), markup: qs('#ctm-mk').value.trim(), price: qs('#ctm-price').value.trim() || 0, disc: qs('#ctm-disc').value.trim() || 0, discUntil: qs('#ctm-discu').value, order: ctDraft.id ? (ctDraft.order || 0) : (L.length ? (L[L.length - 1].order || 0) + 1 : 1) };
   try {
     const r = ctDraft.id ? await clApi('/ops/catalog/' + encodeURIComponent(ctDraft.id), jsonOpt('PUT', body)) : await clApi('/ops/catalog', jsonOpt('POST', body));
@@ -6959,6 +6967,7 @@ function ctmPriceInfo() {
 }
 ['#ctm-sell', '#ctm-sku', '#ctm-mk', '#ctm-price', '#ctm-model', '#ctm-disc', '#ctm-discu'].forEach(k => qs(k).addEventListener('input', ctmPriceInfo));
 qs('#ctm-sell').addEventListener('change', ctmPriceInfo);
+qs('#ctm-cat').addEventListener('change', () => ctmSubFill(''));
 
 const OR_ST = { noua: ['Nouă', 'new'], confirmata: ['Confirmată', 'sent'], expediata: ['Expediată', 'viewed'], livrata: ['Livrată', 'accepted'], anulata: ['Anulată', 'expired'] };
 const OR_PAY = { ramburs: 'Ramburs', op: 'Transfer bancar', ridicare: 'La ridicare' };

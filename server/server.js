@@ -1407,6 +1407,29 @@ function loadOps() { try { const c = JSON.parse(fs.readFileSync(OPS_FILE, 'utf8'
 function saveOps(all) { const tmp = OPS_FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(all, null, 2), { mode: 0o600 }); fs.renameSync(tmp, OPS_FILE); }
 const pick = (v, list, def) => list.includes(v) ? v : def;
 const hhmm = v => /^\d{2}:\d{2}$/.test(String(v || '')) ? String(v) : '';
+/* Echipamente: categoria mare (cat) + tipul (sub). Camerele păstrează locul de montaj în cat (exterior / interior / lift). */
+const CAT_MAIN = ['exterior', 'interior', 'lift', 'nvr', 'hdd', 'retea', 'alimentare', 'rack', 'monitor', 'altele'];
+const CAT_SUB = { cam: ['bullet', 'dome', 'ptz', 'wifi', 'kit'], hdd: ['hdd', 'microsd'], retea: ['switch', 'router'], alimentare: ['sursa', 'alimentator', 'ups'], rack: ['doza', 'rack', 'cablu', 'accesorii'] };
+function guessSub(x) {
+  const t = (x.name + ' ' + (x.model || '') + ' ' + (x.sku || '') + ' ' + String(x.specs || '').slice(0, 400)).toLowerCase();
+  if (['exterior', 'interior', 'lift'].includes(x.cat)) return /\bkit\b|^iks-|\biks-/.test(t) ? 'kit' : /wi-?fi|wireless|guardian/.test(t) ? 'wifi'
+    : /rotativ|\bptz?\b|pan.?tilt|speed dome|-2de|sd\d|control pt/.test(t) ? 'ptz' : /dome|turret|eyeball|ipc-t\d|ipc-d\d|hdw|hdbw|-2cd1[13]/.test(t) ? 'dome' : 'bullet';
+  if (x.cat === 'hdd') return /micro ?sd|card/.test(t) ? 'microsd' : 'hdd';
+  if (x.cat === 'retea') return /switch|poe/.test(t) ? 'switch' : /router|wi-?fi/.test(t) ? 'router' : 'switch';
+  if (x.cat === 'alimentare') return /\bups\b/.test(t) ? 'ups' : /alimentator|adaptor/.test(t) ? 'alimentator' : 'sursa';
+  if (x.cat === 'rack') return /doz|jonc|junction/.test(t) ? 'doza' : /\brack\b|cutie|carcas/.test(t) ? 'rack' : /cablu|utp|ftp/.test(t) ? 'cablu' : 'accesorii';
+  return '';
+}
+function guessMainCat(x) {   // corectează categoria mare pentru produsele puse la grămadă
+  const t = (x.name + ' ' + (x.model || '')).toLowerCase();
+  if (x.cat === 'retea' || x.cat === 'altele' || x.cat === 'rack') {
+    if (/\bups\b|sursa|alimentator|adaptor alimentare/.test(t)) return 'alimentare';
+    if (/monitor/.test(t)) return 'monitor';
+    if (/micro ?sd|card de memorie|card microsd/.test(t)) return 'hdd';
+    if (x.cat === 'altele' && /cablu|doz|mufa|rj45|suport|clem|tub|canal/.test(t)) return 'rack';
+  }
+  return x.cat;
+}
 function cleanOp(coll, b, prev) {
   const base = { id: prev ? prev.id : newId(), files: prev ? (prev.files || []) : [], createdAt: prev ? prev.createdAt : Date.now(), updatedAt: Date.now() };
   if (coll === 'works') {
@@ -1430,7 +1453,7 @@ function cleanOp(coll, b, prev) {
   }
   if (coll === 'catalog') {   // echipamentele prezentate pe site (pagina Echipamente)
     return { ...base, name: str(b.name, 160).trim(), brand: str(b.brand, 60), model: str(b.model, 120),
-      cat: pick(b.cat, ['exterior', 'interior', 'lift', 'nvr', 'hdd', 'rack', 'retea', 'altele'], 'altele'),
+      cat: pick(b.cat, CAT_MAIN, 'altele'), sub: pick(b.sub, Object.values(CAT_SUB).flat().concat(''), ''),
       tagline: str(b.tagline, 400), specs: str(b.specs, 3000), visible: !!b.visible, order: Math.round(num(b.order)),
       sell: !!b.sell, sku: str(b.sku, 60).trim(), markup: b.markup === '' || b.markup == null ? '' : Math.min(500, Math.max(-50, num(b.markup))), price: Math.max(0, Math.round(num(b.price))),
       disc: Math.min(70, Math.max(0, Math.round(num(b.disc)))), discUntil: ymd(b.discUntil),
@@ -1626,7 +1649,13 @@ async function shopSync(u, only) {
   u.shopCfg = { ...(u.shopCfg || {}), syncAt: Date.now() };
   return { ok, missing };
 }
+function catalogMigrate(u) {   // v11.8: împarte pe subcategorii produsele existente (o singură dată)
+  if (!u || u.catV >= 2 || !Array.isArray(u.catalog)) return false;
+  for (const x of u.catalog) { x.cat = guessMainCat(x); if (!x.sub) x.sub = guessSub(x); }
+  u.catV = 2; return true;
+}
 async function shopTick(db) {
+  { const all = loadOps(); let ch = false; for (const k of Object.keys(all)) if (catalogMigrate(all[k])) ch = true; if (ch) saveOps(all); }
   { const all = loadOps(); let ch = false; for (const usr of (db.users || []).filter(x => x.role === 'admin')) if (all[usr.username] && shopRecord(all[usr.username])) ch = true; if (ch) saveOps(all); }
   for (const usr of (db.users || []).filter(x => x.role === 'admin')) {
     const all = loadOps(); const u = all[usr.username]; if (!u || !(u.catalog || []).some(x => x.sell)) continue;
@@ -1713,7 +1742,7 @@ function a2tFind(o) {
         resolve(hits.map(h => h._source).filter(s => s && s.sku && (+(s.final_price || s.price) > 0) && !/^\[?resigilat|-R\d+$/i.test(String(s.name || '') + ' ' + s.sku) && !/-R\d+$/i.test(s.sku)).map(s => {
           const name = String(s.name || '').replace(/\s+/g, ' ').trim(); const brand = guessBrand(name); const g = guessCats(name, (s.category || []).map(c => c && c.name).filter(Boolean));
           return { sku: s.sku, model: String(s.sku).replace(/\((\d+(\.\d+)?\s*mm)\)$/i, '').trim(), name: name.slice(0, 200), title: name.split(',').slice(0, 2).join(',').trim().slice(0, 160),
-            brand, cat: g.cat, price: Math.round(+(s.final_price || s.price) * 100) / 100, qty: s.stock ? +s.stock.qty || 0 : 0, inStock: !!(s.stock && s.stock.is_in_stock && s.stock.qty > 0),
+            brand, cat: guessMainCat({ name, model: s.sku, cat: g.cat }), price: Math.round(+(s.final_price || s.price) * 100) / 100, qty: s.stock ? +s.stock.qty || 0 : 0, inStock: !!(s.stock && s.stock.is_in_stock && s.stock.qty > 0),
             image: s.image && s.image !== 'no_selection' ? String(s.image) : '', photoOk: !!(s.image && PHOTO_BRANDS.includes(brand)), specs: htmlList(s.short_description).slice(0, 14), url: s.url_path ? 'https://www.a2t.ro/' + s.url_path : '' };
         })); });
     });
@@ -1841,6 +1870,7 @@ async function handleOps(req, res, pathname) {
   if (!coll0 && ctx.user.role === 'client') return sendJson(res, 403, { error: 'Nu ai acces la această secțiune' });
   const uname = ctx.uname;
   const all = loadOps(); const u = all[uname] = all[uname] || {}; for (const c of OPS_COLLS) if (!Array.isArray(u[c])) u[c] = [];
+  if (catalogMigrate(u)) saveOps(all);
   const parts = pathname.split('/').filter(Boolean);       // ops/<coll>[/id[/files[/fid]]]
   const coll = parts[1], id = parts[2], fid = parts[4];
   const OPS_PERM = { works: 'works', stock: 'works', gdpr: 'clients', catalog: 'catalog', offers: 'quotes' };
@@ -1871,7 +1901,8 @@ async function handleOps(req, res, pathname) {
     let added = 0, photos = 0, skipped = 0; let order = u.catalog.reduce((m, c) => Math.max(m, c.order || 0), 0);
     for (const x of got) {
       if (u.catalog.some(c => skuKey(c.sku || c.model) === skuKey(x.sku) || skuKey(c.model) === skuKey(x.sku))) { skipped++; continue; }
-      const c = cleanOp('catalog', { name: x.title, brand: x.brand, model: x.model, sku: x.sku, cat: x.cat, specs: x.specs.join('\n'), visible: false, sell: true, order: ++order }, null);
+      const mc = guessMainCat({ name: x.name, model: x.model, cat: x.cat });
+      const c = cleanOp('catalog', { name: x.title, brand: x.brand, model: x.model, sku: x.sku, cat: mc, sub: guessSub({ name: x.name, model: x.model, sku: x.sku, cat: mc, specs: x.specs.join(' ') }), specs: x.specs.join('\n'), visible: false, sell: true, order: ++order }, null);
       c.a2t = { at: Date.now(), site: x.price, inStock: x.inStock, name: x.name };
       u.catalog.push(c); added++;
       if (x.image && PHOTO_BRANDS.includes(x.brand)) {
@@ -3969,7 +4000,7 @@ function catalogPublic(req, res, pathname) {
   const base = publicBase(req); const u = loadOps()[uname] || {}; const cfg = shopCfgOf(u);
   const out = items.map(x => { const f = (x.files || []).find(y => ['jpg', 'png', 'webp'].includes(y.ext)), pdf = (x.files || []).find(y => y.ext === 'pdf');
     const price = cfg.on && x.sell ? shopPrice(x, cfg) : 0, ref = price ? shopRef(x, cfg) : 0;
-    return { id: x.id, name: x.name, brand: x.brand, model: x.model, cat: x.cat, tagline: x.tagline, ...(price ? { price, avail: shopAvail(x, u), sku: x.sku || x.model } : {}),
+    return { id: x.id, name: x.name, brand: x.brand, model: x.model, cat: x.cat, sub: x.sub || guessSub(x), tagline: x.tagline, ...(price ? { price, avail: shopAvail(x, u), sku: x.sku || x.model } : {}),
       ...(ref ? { oldPrice: ref, disc: Math.round((ref - price) / ref * 100), discUntil: x.discUntil || '' } : {}),
       specs: String(x.specs || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 20), photo: f ? `${base}/public/catalog/${x.id}/photo?v=${f.id}` : '', datasheet: pdf ? `${base}/public/catalog/${x.id}/fisa?v=${pdf.id}` : '' }; });
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=60', ...PUB_CORS });
@@ -4379,7 +4410,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.7, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.8, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
