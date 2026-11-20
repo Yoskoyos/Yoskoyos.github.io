@@ -374,6 +374,11 @@ html[data-role="staff"] [data-adm],html[data-role="client"] [data-adm],html[data
 .fg input,.fg select{background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:9px 12px;font-size:13px;color:var(--fg);font-family:var(--mono);outline:none;-webkit-appearance:none;transition:border .15s;width:100%}
 .fg input:focus,.fg select:focus{border-color:var(--accent)}
 .fg input::placeholder{color:var(--fg-3)}
+#pv2-modal .modal-body>*{flex-shrink:0}
+#pv2-kind{display:flex;width:100%}#pv2-kind button{flex:1 1 auto;justify-content:center;white-space:nowrap}
+.pv2-r input{background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:9px 10px;font-size:13px;color:var(--fg);font-family:var(--sans);outline:none;width:100%;box-sizing:border-box}
+.pv2-r input:focus{border-color:var(--accent)}.pv2-r input::placeholder{color:var(--fg-3)}
+@media(max-width:700px){.pv2-r{grid-template-columns:1fr 1fr!important}.pv2-r .r-del{grid-column:1/-1}}
 .f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .form-actions{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--border);background:var(--bg-2)}
 .btn{padding:9px 16px;border-radius:var(--r-sm);font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--bg-3);color:var(--fg);flex:1;font-family:var(--sans);display:flex;align-items:center;justify-content:center;gap:6px;transition:all .15s}
@@ -2847,7 +2852,7 @@ html:not(.unlocked) .app{display:none}
   </div>
 </div>
 
-<div class="overlay hidden" id="pv2-modal" role="dialog" aria-modal="true" aria-labelledby="pv2-title">
+<div class="overlay hidden" id="pv2-modal" data-noi18n role="dialog" aria-modal="true" aria-labelledby="pv2-title">
   <div class="modal" style="max-width:820px">
     <div class="modal-hdr"><div class="modal-title" id="pv2-title">Proces-verbal</div><div class="modal-x" id="pv2-x" role="button" aria-label="Închide">✕</div></div>
     <div class="modal-body">
