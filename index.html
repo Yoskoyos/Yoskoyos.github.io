@@ -1759,6 +1759,7 @@ html:not(.unlocked) .app{display:none}
           <div class="section-title sec-t"><span class="intg-ic" style="background:#0EA5E9"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg></span><span>Produse pe site</span></div>
           <div class="section-action" id="ct-inv-btn" style="margin-left:auto" title="Încarcă factura de la furnizor: produsele intră în stoc și, dacă sunt noi, aici"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 15V3M7 8l5-5 5 5M5 21h14"/></svg>Factură furnizor</div>
           <div class="section-action" id="ct-a2t-btn" title="Caută produse pe A2T și adaugă-le aici, cu caracteristici, preț și stoc"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>Din A2T</div>
+          <div class="section-action" id="ct-photo-btn" title="Caută pe site-ul producătorului (Hikvision, HiLook) pozele produselor care nu au poză">Poze lipsă</div>
           <div class="section-action" id="ct-add-btn"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Echipament nou</div>
         </div>
         <div class="cm-hint" style="margin-bottom:12px">Ce bifezi „Pe site” apare pe pagina <a href="https://supraveghere24h.ro/echipamente.html" target="_blank" rel="noopener">supraveghere24h.ro/echipamente</a>, în ordinea de aici, cu poză și caracteristici. Ce bifezi și „Se vinde pe site” apare cu preț și buton „Adaugă în coș” (când magazinul e pornit, din Comenzi → Setări magazin). Cantitățile din stoc și costurile nu apar pe site.</div>
@@ -7107,6 +7108,13 @@ qs('#a2m-add').addEventListener('click', async () => {
   try { const r = await clApi('/ops/a2t-import', jsonOpt('POST', { skus })); opsApply(r); renderCatalog(); renderOrders(); a2mClose(); qs('#a2m-res').innerHTML = ''; qs('#a2m-q').value = '';
     toast(`${r.added} produse adăugate (ascunse)${r.photos ? `, ${r.photos} cu poză` : ''}${r.skipped ? ` · ${r.skipped} existau deja` : ''}. Verifică-le și bifează „Arată pe site”.`, 'ok'); }
   catch (e) { toast(e.message, 'err'); a2mCount(); }
+});
+qs('#ct-photo-btn').addEventListener('click', async () => {
+  const bt = qs('#ct-photo-btn'); if (bt.dataset.busy) return; bt.dataset.busy = '1'; bt.textContent = 'Se caută pozele…';
+  try { const r = await clApi('/ops/photo-find', jsonOpt('POST', {})); opsApply(r); renderCatalog();
+    toast(r.tried ? `${r.found} din ${r.tried} poze găsite la producător${r.miss.length ? ' · fără poză: ' + r.miss.slice(0, 6).join(', ') + (r.miss.length > 6 ? '…' : '') : ''}` : 'Toate produsele Hikvision / HiLook au deja poză', r.found ? 'ok' : 'warn'); }
+  catch (e) { toast(/404|inexistent|Not found/i.test(e.message) ? 'Actualizează serverul la versiunea 12.0 ca să meargă căutarea pozelor' : e.message, 'err'); }
+  finally { delete bt.dataset.busy; bt.textContent = 'Poze lipsă'; }
 });
 qs('#sm-sync').addEventListener('click', async () => {
   const bt = qs('#sm-sync'); bt.disabled = true; bt.textContent = 'Se citesc prețurile de pe A2T…';

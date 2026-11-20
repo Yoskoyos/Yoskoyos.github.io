@@ -1784,6 +1784,43 @@ function a2tImage(imgPath) {
     rq.on('timeout', () => rq.destroy()); rq.on('error', () => resolve(null));
   });
 }
+// Poza de la producător (hikvision.com) pentru Hikvision / HiLook: căutare după cod → pagina produsului → imaginea oficială
+function webGet(u, max, hops) {
+  return new Promise(resolve => {
+    let rq; try { rq = https.get(u, { timeout: 20000, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; YCA/1.0)', Accept: '*/*' } }, r => {
+      if ([301, 302, 303, 307, 308].includes(r.statusCode) && r.headers.location && (hops || 0) < 4) { r.resume(); return resolve(webGet(new URL(r.headers.location, u).href, max, (hops || 0) + 1)); }
+      if (r.statusCode !== 200) { r.resume(); return resolve(null); }
+      const ch = []; let n = 0; r.on('data', d => { n += d.length; if (n <= (max || 8e6)) ch.push(d); else rq.destroy(); }); r.on('end', () => resolve(Buffer.concat(ch)));
+    }); } catch { return resolve(null); }
+    rq.on('timeout', () => rq.destroy()); rq.on('error', () => resolve(null));
+  });
+}
+const MFR_PHOTO_BRANDS = ['Hikvision', 'HiLook'];
+async function hikPhoto(model) {
+  const m = String(model || '').trim(); if (!m) return null;
+  const cands = [...new Set([m, m.replace(/\([^)]*mm\)/gi, ''), m.replace(/\([^)]*\)/g, ''), m.replace(/\([^)]*\)/g, '').replace(/-(?:[A-Z]|\d+MM)$/i, '')].map(x => x.trim()).filter(Boolean))];
+  for (const c of cands) {
+    const j = await webGet('https://www.hikvision.com/content/hikvision/en/search/jcr:content/root/responsivegrid/new_filter_search.json?keyword=' + encodeURIComponent(c) + '&subcategory=Products&start=&num=10&daterange=undefined', 3e6);
+    if (!j) continue;
+    const urls = [...new Set(j.toString('utf8').match(/\/en\/products\/[^"?\\]+/g) || [])];
+    const want = normSku(c); const page = urls.find(x => normSku(x.replace(/\/$/, '').split('/').pop()) === want);
+    if (!page) continue;
+    const h = await webGet('https://www.hikvision.com' + page, 5e6); if (!h) continue;
+    const imgs = [...new Set(h.toString('utf8').match(/https?:\/\/assets\.hikvision\.com\/prd\/(?:public|normal)\/all\/image\/[^"'\s)<>]+?\.(?:png|jpe?g|webp)/gi) || [])].filter(x => !/Dimension|structsize|drawingview/i.test(x));
+    const pick = imgs.find(x => /左侧|leftside/i.test(x)) || imgs.find(x => /mainview|主图/i.test(x)) || imgs[0];
+    if (!pick) continue;
+    const img = await webGet(encodeURI(decodeURI(pick)), 8e6); const ik = img ? fileKind(img, 'poza.png') : '';
+    if (img && ['jpg', 'png', 'webp'].includes(ik)) return { img, ext: ik };
+  }
+  return null;
+}
+async function mfrPhoto(c, dir) {   // pune poza producătorului la un echipament fără poză; întoarce true dacă a reușit
+  if ((c.files || []).some(f => ['jpg', 'png', 'webp'].includes(f.ext)) || !MFR_PHOTO_BRANDS.includes(c.brand)) return false;
+  const r = await hikPhoto(c.model || c.sku); if (!r) return false;
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const f = { id: newId(), ext: r.ext, name: String(c.model || 'poza').replace(/[^\w.-]+/g, '-') + '.' + r.ext, size: r.img.length, uploadedAt: Date.now() };
+  fs.writeFileSync(path.join(dir, f.id + '.' + r.ext), r.img, { mode: 0o600 }); c.files = [f].concat(c.files || []); c.updatedAt = Date.now(); return true;
+}
 const normSku = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 async function handlePurchase(req, res, pathname) {
   const ctx = requireUser(req, res, 'works'); if (!ctx) return;
@@ -1868,8 +1905,8 @@ async function handlePurchase(req, res, pathname) {
   return sendJson(res, 405, { error: 'Operație necunoscută' });
 }
 async function handleOps(req, res, pathname) {
-  const coll0 = (/^\/ops\/(works|stock|gdpr|catalog|offers|offer-cfg|a2t-stock|shop-cfg|orders|a2t-find|a2t-import)/.exec(pathname) || [])[1];
-  const ctx = requireUser(req, res, coll0 ? ({ works: 'works', stock: 'works', gdpr: 'clients', catalog: 'catalog', offers: 'quotes', 'offer-cfg': 'quotes', 'a2t-stock': 'quotes', 'shop-cfg': 'catalog', orders: 'catalog', 'a2t-find': 'catalog', 'a2t-import': 'catalog' })[coll0] : null); if (!ctx) return;
+  const coll0 = (/^\/ops\/(works|stock|gdpr|catalog|offers|offer-cfg|a2t-stock|shop-cfg|orders|a2t-find|a2t-import|photo-find)/.exec(pathname) || [])[1];
+  const ctx = requireUser(req, res, coll0 ? ({ works: 'works', stock: 'works', gdpr: 'clients', catalog: 'catalog', offers: 'quotes', 'offer-cfg': 'quotes', 'a2t-stock': 'quotes', 'shop-cfg': 'catalog', orders: 'catalog', 'a2t-find': 'catalog', 'a2t-import': 'catalog', 'photo-find': 'catalog' })[coll0] : null); if (!ctx) return;
   if (!coll0 && ctx.user.role === 'client') return sendJson(res, 403, { error: 'Nu ai acces la această secțiune' });
   const uname = ctx.uname;
   const all = loadOps(); const u = all[uname] = all[uname] || {}; for (const c of OPS_COLLS) if (!Array.isArray(u[c])) u[c] = [];
@@ -1916,8 +1953,17 @@ async function handleOps(req, res, pathname) {
           fs.writeFileSync(path.join(cdir, f.id + '.' + ik), img, { mode: 0o600 }); c.files = [f]; photos++;
         }
       }
+      try { if (await mfrPhoto(c, path.join(OPS_DIR, uname.replace(/[^\w.-]/g, '_'), 'catalog', c.id))) photos++; } catch {}
     }
     saveOps(all); return sendJson(res, 200, { ...view(), ...shopView(), added, photos, skipped });
+  }
+  if (coll === 'photo-find' && req.method === 'POST') {   // caută pozele producătorului pentru echipamentele fără poză (Hikvision / HiLook)
+    const b = await readJson(req) || {}; const only = Array.isArray(b.ids) ? b.ids.map(String) : null;
+    const L = u.catalog.filter(c => (!only || only.includes(c.id)) && MFR_PHOTO_BRANDS.includes(c.brand) && !(c.files || []).some(f => ['jpg', 'png', 'webp'].includes(f.ext))).slice(0, 40);
+    let found = 0; const miss = [];
+    for (const c of L) { let ok = false; try { ok = await mfrPhoto(c, path.join(OPS_DIR, uname.replace(/[^\w.-]/g, '_'), 'catalog', c.id)); } catch {} if (ok) found++; else miss.push(c.model || c.name); }
+    if (found) saveOps(all);
+    return sendJson(res, 200, { ...view(), tried: L.length, found, miss });
   }
   if (coll === 'orders') {   // comenzile din magazinul online
     const o = id && /^[\w-]+$/.test(id) ? (u.orders || []).find(x => x.id === id) : null;
@@ -4413,7 +4459,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 11.9, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.0, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
