@@ -2847,6 +2847,49 @@ html:not(.unlocked) .app{display:none}
   </div>
 </div>
 
+<div class="overlay hidden" id="pv2-modal" role="dialog" aria-modal="true" aria-labelledby="pv2-title">
+  <div class="modal" style="max-width:820px">
+    <div class="modal-hdr"><div class="modal-title" id="pv2-title">Proces-verbal</div><div class="modal-x" id="pv2-x" role="button" aria-label="Închide">✕</div></div>
+    <div class="modal-body">
+      <div class="seg" id="pv2-kind" role="tablist" style="flex-wrap:wrap"><button type="button" data-k="receptie">Recepție montaj</button><button type="button" class="on" data-k="garantie">Înlocuire în garanție</button><button type="button" data-k="adaugare">Echipamente adăugate</button></div>
+      <div id="pv2-rec" class="cm-hint" hidden style="font-size:13px">Procesul-verbal de recepție, pentru un sistem nou montat. Aplicația citește camerele și hard diskul din NVR-ul clientului și le trece în document.</div>
+      <div id="pv2-form">
+        <div class="f2">
+          <div class="fg"><label for="pv2-nr">Nr. proces-verbal</label><input type="text" id="pv2-nr" autocomplete="off"></div>
+          <div class="fg"><label for="pv2-date">Data</label><input type="date" id="pv2-date"></div>
+        </div>
+        <div class="f2">
+          <div class="fg"><label for="pv2-contract">Contract nr. (și data)</label><input type="text" id="pv2-contract" placeholder="ex. 12 din 03.05.2026" autocomplete="off"></div>
+          <div class="fg"><label for="pv2-addr">Adresa (bloc, scară)</label><input type="text" id="pv2-addr" autocomplete="off"></div>
+        </div>
+        <div class="f2">
+          <div class="fg"><label for="pv2-repr">Reprezentantul beneficiarului</label><input type="text" id="pv2-repr" autocomplete="off"></div>
+          <div class="fg"><label for="pv2-calit">În calitate de</label><input type="text" id="pv2-calit" list="pv2-calits" autocomplete="off"><datalist id="pv2-calits"><option value="Președinte"><option value="Administrator"><option value="Reprezentant"></datalist></div>
+        </div>
+        <div class="cm-sec" id="pv2-rows-h">Echipamente înlocuite</div>
+        <div id="pv2-rows" style="display:flex;flex-direction:column;gap:8px"></div>
+        <button type="button" class="btn" id="pv2-add" style="margin-top:8px">+ Încă un echipament</button>
+        <datalist id="pv2-stock"></datalist>
+        <label class="cm-check" id="pv2-hdd-l" style="margin-top:12px"><input type="checkbox" id="pv2-hdd"> S-a înlocuit hard diskul: trec în PV că înregistrările de pe cel vechi nu se mai pot recupera</label>
+        <div id="pv2-abon-box" hidden>
+          <div class="cm-sec">Abonament (opțional)</div>
+          <div class="f2">
+            <div class="fg"><label for="pv2-abon">Abonament lunar nou (lei)</label><input type="number" id="pv2-abon" inputmode="decimal" min="0" placeholder="gol = nu se schimbă"></div>
+            <div class="fg"><label for="pv2-abon-from">Începând cu</label><input type="date" id="pv2-abon-from"></div>
+          </div>
+          <div class="fg"><label for="pv2-act">Act adițional nr. (dacă ați semnat unul)</label><input type="text" id="pv2-act" autocomplete="off"></div>
+          <div class="cm-hint">Schimbarea abonamentului se face prin act adițional la contract. Procesul-verbal doar o menționează.</div>
+        </div>
+        <div class="fg" style="margin-top:10px"><label for="pv2-obs">Observații</label><textarea id="pv2-obs" rows="2" placeholder="ex. camera de la intrarea în scara 2 era arsă după furtună"></textarea></div>
+        <label class="cm-check" style="margin-top:10px"><input type="checkbox" id="pv2-work" checked> Salvează intervenția la Lucrări și scade din stoc echipamentele montate</label>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="pv2-cancel" type="button">Anulează</button>
+      <button class="btn primary" id="pv2-go" type="button">Generează procesul-verbal</button>
+    </div>
+  </div>
+</div>
 <div class="overlay hidden" id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text">
   <div class="modal cf-modal">
     <div class="cf-body">
@@ -8793,6 +8836,7 @@ async function docxFill(tplBuf, val, stamp, dflt) {
     if (!rels.includes('rIdStampYca')) rels = rels.replace('</Relationships>', '<Relationship Id="rIdStampYca" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/stampila_yca.png"/></Relationships>');
     zip.file('word/_rels/document.xml.rels', rels);
   }
+  xml = xml.replace(/<w:tr[ >](?:(?!<\/w:tr>)[\s\S])*?\{\{M_([A-H])_NR\}\}(?:(?!<\/w:tr>)[\s\S])*?<\/w:tr>/g, (m, r) => val['M_' + r + '_NR'] ? m : '');   // rândurile de tabel nefolosite
   xml = xml.replace(/\{\{([A-Z_]+)\}\}/g, (m, k) => val[k] ? esc(val[k]) : (dflt && dflt[k]) ? esc(dflt[k]) : (/^[QM]_/.test(k) ? '' : '……………………'));
   zip.file('word/document.xml', xml);
   return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
@@ -8887,7 +8931,88 @@ async function genPV() {
   } catch (e) { toast(e.message, 'err'); }
   finally { btn.disabled = false; btn.textContent = old; }
 }
-qs('#cm-pv').addEventListener('click', genPV);
+qs('#cm-pv').addEventListener('click', () => openPv2());
+/* ═══ Procese-verbale de intervenție: înlocuire în garanție / echipamente adăugate (Word, din șablon) ═══ */
+let pv2Kind = 'garantie';
+const PV2_ROWS = 'ABCDEFGH'.split('');
+function pv2Row(k, r) {
+  r = r || {}; const f = (cls, ph, v, o = '') => `<input type="text" class="${cls}" placeholder="${ph}" value="${escapeHtml(v || '')}" ${o} style="min-width:0">`;
+  return `<div class="pv2-r" style="display:grid;grid-template-columns:${k === 'garantie' ? '1.3fr 1fr 1.3fr .8fr' : '1.3fr 1.2fr .45fr .9fr'} auto;gap:6px;align-items:center">` +
+    (k === 'garantie' ? f('r-out', 'Scos: model, serie', r.out) + f('r-def', 'Defect constatat', r.def) + f('r-in', 'Montat: model, serie', r.in, 'list="pv2-stock"') + f('r-loc', 'Loc / canal', r.loc)
+      : f('r-in', 'Echipament', r.in, 'list="pv2-stock"') + f('r-ser', 'Model, serie', r.ser) + `<input type="number" class="r-qty" min="1" value="${escapeHtml(String(r.qty || 1))}" aria-label="Cantitate">` + f('r-loc', 'Loc de montaj', r.loc)) +
+    `<button type="button" class="btn r-del" aria-label="Șterge rândul" style="min-width:40px;padding:6px">✕</button></div>`;
+}
+function pv2Rows() { return [...document.querySelectorAll('#pv2-rows .pv2-r')].map(d => { const g = c => { const e = d.querySelector('.' + c); return e ? e.value.trim() : ''; };
+  return { out: g('r-out'), def: g('r-def'), in: g('r-in'), ser: g('r-ser'), qty: Math.max(1, Math.round(+g('r-qty') || 1)), loc: g('r-loc') }; }).filter(r => r.in || r.out); }
+function pv2SetKind(k) {
+  const keep = pv2Rows(); pv2Kind = k;
+  document.querySelectorAll('#pv2-kind button').forEach(b => b.classList.toggle('on', b.dataset.k === k));
+  qs('#pv2-rec').hidden = k !== 'receptie'; qs('#pv2-form').hidden = k === 'receptie';
+  qs('#pv2-go').textContent = k === 'receptie' ? 'Continuă' : 'Generează procesul-verbal';
+  if (k === 'receptie') return;
+  qs('#pv2-rows-h').textContent = k === 'garantie' ? 'Echipamente înlocuite' : 'Echipamente adăugate';
+  qs('#pv2-hdd-l').hidden = k !== 'garantie'; qs('#pv2-abon-box').hidden = k !== 'adaugare';
+  qs('#pv2-rows').innerHTML = (keep.length ? keep : [{}]).map(r => pv2Row(k, r)).join('');
+}
+async function openPv2() {
+  const c = cmDraft; if (!c || !c.id) return;
+  if (!ops) { try { await loadOps(true); } catch {} }
+  qs('#pv2-stock').innerHTML = ((ops && ops.stock) || []).filter(x => x.name).map(x => `<option value="${escapeHtml(x.name + (x.model ? ' (' + x.model + ')' : ''))}">`).join('');
+  const lastCtr = lsGet('yca_pv2c_' + c.id, '') || ((c.contracts || []).map(f => (/Contract\s+(\d+)/i.exec(f.name || '') || [])[1]).filter(Boolean).pop() || '');
+  qs('#pv2-nr').value = lsGet('yca_pv_next', '1'); qs('#pv2-date').value = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' });
+  qs('#pv2-contract').value = lastCtr; qs('#pv2-addr').value = c.address || '';
+  const [rp, rl] = String(c.contact || '').split(/\s+[—-]\s+/); qs('#pv2-repr').value = rp || ''; qs('#pv2-calit').value = rl || (c.kind === 'pj' && !/asocia/i.test(c.name) ? 'Administrator' : 'Președinte');
+  ['#pv2-obs', '#pv2-abon', '#pv2-abon-from', '#pv2-act'].forEach(k => qs(k).value = ''); qs('#pv2-hdd').checked = false; qs('#pv2-work').checked = true;
+  qs('#pv2-rows').innerHTML = ''; pv2SetKind(pv2Kind === 'receptie' ? 'garantie' : pv2Kind);
+  qs('#pv2-title').textContent = 'Proces-verbal — ' + c.name; qs('#pv2-modal').classList.remove('hidden');
+}
+const closePv2 = () => qs('#pv2-modal').classList.add('hidden');
+qs('#pv2-x').addEventListener('click', closePv2); qs('#pv2-cancel').addEventListener('click', closePv2);
+qs('#pv2-modal').addEventListener('click', e => { if (e.target.id === 'pv2-modal') closePv2(); });
+document.querySelectorAll('#pv2-kind button').forEach(b => b.addEventListener('click', () => pv2SetKind(b.dataset.k)));
+qs('#pv2-add').addEventListener('click', () => { if (document.querySelectorAll('#pv2-rows .pv2-r').length >= 8) return toast('Maxim 8 rânduri pe un proces-verbal', 'warn'); qs('#pv2-rows').insertAdjacentHTML('beforeend', pv2Row(pv2Kind)); });
+qs('#pv2-rows').addEventListener('click', e => { const b = e.target.closest('.r-del'); if (!b) return; b.closest('.pv2-r').remove(); if (!qs('#pv2-rows .pv2-r')) qs('#pv2-rows').innerHTML = pv2Row(pv2Kind); });
+const pv2Dmy = d => /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d.slice(8, 10) + '.' + d.slice(5, 7) + '.' + d.slice(0, 4) : '';
+function pv2StockOf(text) {   // echipamentul din stoc după denumire sau model
+  const n = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); const t = n(text); if (!t) return null;
+  return ((ops && ops.stock) || []).find(x => (x.model && t.includes(n(x.model))) || n(x.name + (x.model ? ' (' + x.model + ')' : '')) === t) || null;
+}
+qs('#pv2-go').addEventListener('click', async () => {
+  const c = cmDraft; if (!c || !c.id) return;
+  if (pv2Kind === 'receptie') { closePv2(); return genPV(); }
+  const rows = pv2Rows(); if (!rows.length) return toast('Completează cel puțin un echipament', 'warn');
+  if (pv2Kind === 'garantie' && rows.some(r => !r.out || !r.in)) return toast('La fiecare rând completează echipamentul scos și cel montat', 'warn');
+  const bt = qs('#pv2-go'), old = bt.textContent; bt.disabled = true; bt.textContent = 'Se generează…';
+  try {
+    const nr = qs('#pv2-nr').value.trim(), dIso = qs('#pv2-date').value, abon = +qs('#pv2-abon').value || 0;
+    const val = { NR: nr, DATA: pv2Dmy(dIso), BENEF: c.name || '', SEDIU: c.address || '', CIF: c.code || '', REPR: qs('#pv2-repr').value.trim(), CALIT: qs('#pv2-calit').value.trim() || 'Reprezentant',
+      CONTRACT: qs('#pv2-contract').value.trim(), IMOBIL: qs('#pv2-addr').value.trim(), OBS: qs('#pv2-obs').value.trim() || '—' };
+    rows.forEach((r, i) => { const L = PV2_ROWS[i]; val['M_' + L + '_NR'] = String(i + 1); val['M_' + L + '_OUT'] = r.out; val['M_' + L + '_DEF'] = r.def; val['M_' + L + '_IN'] = r.in; val['M_' + L + '_SER'] = r.ser; val['M_' + L + '_QTY'] = String(r.qty); val['M_' + L + '_LOC'] = r.loc; });
+    if (pv2Kind === 'garantie' && qs('#pv2-hdd').checked) val.M_HDDNOTE = 'Beneficiarul a fost informat că înregistrările stocate pe hard diskul defect nu mai pot fi recuperate.';
+    if (pv2Kind === 'adaugare' && abon) val.M_ABON = `Începând cu ${pv2Dmy(qs('#pv2-abon-from').value) || 'data prezentului proces-verbal'}, abonamentul lunar devine ${abon.toLocaleString('ro-RO')} lei${qs('#pv2-act').value.trim() ? ', conform actului adițional nr. ' + qs('#pv2-act').value.trim() : ', conform actului adițional la contract'}.`;
+    const r = await fetch(`pv-${pv2Kind}-template.docx?v=1`, { cache: 'no-store' }); if (!r.ok) throw new Error('Nu găsesc șablonul de proces-verbal');
+    const blob = await docxFill(await r.arrayBuffer(), val, await ctrStamp(), { CONTRACT: '……………', REPR: '……………………', CIF: '……………', SEDIU: '……………………', IMOBIL: '……………………' });
+    const label = pv2Kind === 'garantie' ? 'Proces-verbal garantie' : 'Proces-verbal completare';
+    const name = (label + ' ' + nr + ' - ' + c.name).replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() + '.docx';
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+    if (/^\d+$/.test(nr)) lsSet('yca_pv_next', String(+nr + 1)); if (val.CONTRACT) lsSet('yca_pv2c_' + c.id, val.CONTRACT);
+    const msgs = ['Proces-verbal descărcat'];
+    try { const up = await clApi(`/clients/${encodeURIComponent(c.id)}/contracts?kind=pv&name=${encodeURIComponent(name)}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: blob });
+      cmDraft.contracts = up.client.contracts; const i = clients.findIndex(x => x.id === up.client.id); if (i >= 0) clients[i].contracts = up.client.contracts; renderCmFiles(); msgs.push('salvat în fișa clientului'); } catch {}
+    if (qs('#pv2-work').checked) {
+      try {
+        const parts = rows.map(x => { const st = pv2StockOf(x.in); return st ? { stockId: st.id, name: st.name, qty: pv2Kind === 'garantie' ? 1 : x.qty } : null; }).filter(Boolean);
+        const desc = rows.map((x, i) => pv2Kind === 'garantie' ? `${i + 1}. scos ${x.out}${x.def ? ' (' + x.def + ')' : ''} → montat ${x.in}${x.loc ? ', ' + x.loc : ''}` : `${i + 1}. ${x.qty} × ${x.in}${x.ser ? ' – ' + x.ser : ''}${x.loc ? ', ' + x.loc : ''}`).join('\n');
+        opsApply(await clApi('/ops/works', jsonOpt('POST', { title: (pv2Kind === 'garantie' ? 'Înlocuire în garanție – ' : 'Echipamente adăugate – ') + c.name, type: pv2Kind === 'garantie' ? 'interventie' : 'montaj', status: 'done',
+          clientId: c.id, clientName: c.name, date: dIso, doneDate: dIso, description: desc, solution: `Proces-verbal nr. ${nr}${val.OBS !== '—' ? '. ' + val.OBS : ''}`, parts })));
+        msgs.push(parts.length ? `${parts.length} ${parts.length === 1 ? 'echipament scăzut' : 'echipamente scăzute'} din stoc` : 'lucrare salvată (echipamentele nu erau în stoc)');
+        try { renderWorks(); renderStock(); } catch {}
+      } catch (e) { msgs.push('lucrarea nu s-a salvat: ' + e.message); }
+    }
+    closePv2(); toast(msgs.join(' · '), 'ok');
+  } catch (e) { toast(e.message, 'err'); }
+  finally { bt.disabled = false; bt.textContent = old; }
+});
 
 qs('#ctr-x').addEventListener('click', closeCtrModal); qs('#ctr-cancel').addEventListener('click', closeCtrModal);
 qs('#ctr-modal').addEventListener('click', e => { if (e.target.id === 'ctr-modal') closeCtrModal(); });
