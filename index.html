@@ -260,6 +260,8 @@ html[data-role="client"] .nvr-web-btn{display:none!important}
 .ch-free span{font-family:var(--sans);font-size:9px;font-weight:600;letter-spacing:.02em}
 @container (max-width:60px){.ch-free span{display:none}}
 .ch-cell img.ch-thumb{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;border-radius:4px}
+.ch-ip{display:block;font-family:var(--mono);font-size:8px;font-weight:600;opacity:.85;line-height:1.2;letter-spacing:0}
+.ch-cell.err,.ch-cell.ok{flex-direction:column}
 .ch-cell .ch-lbl{position:absolute;bottom:2px;left:3px;font-size:7px;font-family:var(--mono);font-weight:700;color:#fff;text-shadow:0 0 4px #000,0 0 4px #000;pointer-events:none;z-index:1}
 
 /* HDD */
@@ -3324,6 +3326,8 @@ function checkNvr(nvr){
               result._ipPerCh[ch] = online;
               if (online) onlineCnt++;
               // motivul pentru care NVR-ul nu se poate conecta la cameră (ex. passwordError, networkUnreachable)
+              const ipM = txt.match(/<ipAddress\b[^>]*>\s*([^<\s]+)\s*<\/ipAddress>/);   // IP-ul camerei în rețeaua NVR-ului
+              if (ipM) (result._camIp || (result._camIp = {}))[ch] = ipM[1];
               const dM = txt.match(/<chanDetectResult\b[^>]*>\s*([^<]+?)\s*<\/chanDetectResult>/);
               if (!online && dM) (result._ipReason || (result._ipReason = {}))[ch] = dM[1];
             }
@@ -3383,7 +3387,8 @@ function checkNvr(nvr){
         }
         result.camsKnown = !!ipKnown;   // true doar dacă NVR-ul a trimis efectiv lista camerelor
         result.camReasons = result._ipReason || {};
-        delete result._ipReason;
+        result.camIp = result._camIp || {};
+        delete result._ipReason; delete result._camIp;
         delete result._ipPerCh;
 
         resolve(result);
@@ -3448,7 +3453,7 @@ async function checkAll(){
     }
     nvrs[idx].cams = res.cams;
     nvrs[idx].authFail = !!res.authFail;
-    if (res.online && res.camsKnown) nvrs[idx].camReasons = res.camReasons || {};
+    if (res.online && res.camsKnown) { nvrs[idx].camReasons = res.camReasons || {}; if (res.camIp && Object.keys(res.camIp).length) nvrs[idx].camIp = res.camIp; }
     if (res.uptime     !== null) nvrs[idx].uptime     = res.uptime;
     if (res.ram        !== null) nvrs[idx].ram         = res.ram;
     if (res.deviceTime !== null) nvrs[idx].deviceTime  = res.deviceTime;
@@ -3642,13 +3647,14 @@ function nvrCardHTML(n, showDetail){
         ? (recVal === true  ? ' · Înregistrează' : recVal === false ? ' · Înregistrare oprită!' : '')
         : '';
       const recClass = recVal === false && s === 'ok' ? 'rec-stopped' : '';
+      const cip = (n.camIp || {})[ch] || '', cipT = cip ? ' · IP ' + cip : '', cipH = cip ? `<span class="ch-ip">${escapeHtml(cip)}</span>` : '';
       if (s === 'free' && n.pendCh && ch in n.pendCh) {
         const pw = camReasonLabel(n.pendCh[ch]);
-        return `<div class="ch-cell free pend" data-pend="${ch}" role="button" tabindex="0" title="CH${ch}: cameră adăugată în NVR, dar offline de când e în aplicație${pw ? ' — ' + pw : ''}. Apasă ca s-o urmărești."><span class="ch-free"><b>CH${ch}</b><span>Offline · neurmărită</span></span></div>`;
+        return `<div class="ch-cell free pend" data-pend="${ch}" data-ip="${escapeHtml(cip)}" role="button" tabindex="0" title="CH${ch}${cipT}: cameră adăugată în NVR, dar offline de când e în aplicație${pw ? ' — ' + pw : ''}. Apasă ca s-o urmărești."><span class="ch-free"><b>CH${ch}</b><span>Offline · neurmărită</span>${cipH}</span></div>`;
       }
       if (s === 'free') return `<div class="ch-cell free" title="CH${ch}: nicio cameră conectată pe acest canal (sau camera n-a răspuns niciodată)"><span class="ch-free"><b>CH${ch}</b><span>Neconectat</span></span></div>`;
       const why = s === 'err' ? camReasonLabel((n.camReasons || {})[ch]) : '';
-      return `<div class="ch-cell ${s} ${recClass}" title="CH${ch}: ${s==='ok'?'Online':s==='err'?'Offline' + (why ? ' — ' + why : ''):'—'}${recTitle}" data-nch="${ch}">${recIcon}CH${ch}${why ? `<span class="ch-why">${escapeHtml(why)}</span>` : ''}</div>`;
+      return `<div class="ch-cell ${s} ${recClass}" title="CH${ch}${cipT}: ${s==='ok'?'Online':s==='err'?'Offline' + (why ? ' — ' + why : ''):'—'}${recTitle}" data-nch="${ch}" data-ip="${escapeHtml(cip)}">${recIcon}CH${ch}${why ? `<span class="ch-why">${escapeHtml(why)}</span>` : ''}${cipH}</div>`;
     }).join('');
     const stoppedRec = Object.entries(recMap).filter(([ch,v]) => v===false && n.cams[+ch-1]==='ok').length;
     chGrid = `<div style="margin-top:8px">
@@ -3774,7 +3780,7 @@ function loadChThumbs(container){
         cell.classList.remove('nothumb');
         if (!cell.querySelector('img.ch-thumb')) {
           cell.innerHTML = '';
-          const lbl = document.createElement('span'); lbl.className='ch-lbl'; lbl.textContent='CH'+ch;
+          const lbl = document.createElement('span'); lbl.className='ch-lbl'; lbl.textContent='CH'+ch + (cell.dataset.ip ? ' · ' + cell.dataset.ip : '');
           cell.appendChild(img); cell.appendChild(lbl);
         } else {
           cell.querySelector('img.ch-thumb').src = img.src;
