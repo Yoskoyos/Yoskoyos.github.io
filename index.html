@@ -1768,6 +1768,12 @@ html:not(.unlocked) .app{display:none}
           <select class="cl-chip" id="ct-fcat" aria-label="Categoria"><option value="">Toate categoriile</option></select>
           <select class="cl-chip" id="ct-fsub" aria-label="Tipul" hidden></select>
           <select class="cl-chip" id="ct-fst" aria-label="Starea"><option value="">Toate</option><option value="on">Pe site</option><option value="off">Ascunse</option><option value="sell">De vânzare</option><option value="noprice">Fără preț</option><option value="nophoto">Fără poză</option></select></div>
+        <div id="ct-bulk" hidden style="position:sticky;top:8px;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;margin:0 0 10px;border-radius:12px;background:var(--fg);color:var(--bg);box-shadow:0 6px 20px rgba(0,0,0,.18)">
+          <b id="ct-bulk-n" style="margin-right:auto">0 selectate</b>
+          <button type="button" class="btn" data-bulk="show" style="background:#16A34A;color:#fff;border:0">Arată pe site</button>
+          <button type="button" class="btn" data-bulk="hide">Ascunde</button>
+          <button type="button" class="btn" data-bulk="clear">Anulează</button>
+        </div>
         <div class="cl-list" id="ct-list"><div class="cl-empty">Se încarcă…</div></div>
       </div>
       </div>
@@ -6866,6 +6872,7 @@ qs('#sm-delete').addEventListener('click', async () => {
 });
 
 /* ── Echipamente prezentate pe site ── */
+const ctSel = new Set();   // produsele bifate pentru acțiuni în masă (Arată pe site / Ascunde)
 const CT_CAT = { exterior: 'Cameră exterior', interior: 'Cameră interior', lift: 'Cameră lift', nvr: 'Înregistrator (NVR)', hdd: 'Stocare', retea: 'Rețea', alimentare: 'Alimentare', rack: 'Montaj și accesorii', monitor: 'Monitor', altele: 'Altele' };
 const CT_SUB = { cam: [['bullet', 'Bullet'], ['dome', 'Dome / turret'], ['ptz', 'Rotativă (PTZ)'], ['wifi', 'Wi-Fi'], ['kit', 'Kit complet']], hdd: [['hdd', 'Hard disk'], ['microsd', 'Card microSD']],
   retea: [['switch', 'Switch PoE'], ['router', 'Router / Wi-Fi']], alimentare: [['sursa', 'Sursă'], ['alimentator', 'Alimentator'], ['ups', 'UPS']], rack: [['doza', 'Doză de joncțiune'], ['rack', 'Rack / cutie'], ['cablu', 'Cablu'], ['accesorii', 'Accesorii de montaj']] };
@@ -6908,8 +6915,13 @@ function renderCatalog() {
   const D = D0.filter(ctPass);
   if (!D.length) { list.innerHTML = '<div class="cl-empty">Niciun produs pentru filtrele alese.</div>'; return; }
   qs('#ct-stats').innerHTML += `<label class="qt-stat ct-sort" style="margin-left:auto;cursor:pointer">Ordine: <select id="ct-sort" style="border:0;background:transparent;font:inherit;color:var(--fg);font-weight:700;cursor:pointer"><option value="stock" ${ctSort === 'stock' ? 'selected' : ''}>în stoc primele</option><option value="site" ${ctSort === 'site' ? 'selected' : ''}>ca pe site</option></select></label>`;
+  for (const id of [...ctSel]) if (!L.some(x => x.id === id)) ctSel.delete(id);
+  const allSel = D.length && D.every(x => ctSel.has(x.id));
+  qs('#ct-stats').innerHTML += `<label class="qt-stat" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px"><input type="checkbox" id="ct-selall" ${allSel ? 'checked' : ''} style="width:18px;height:18px;accent-color:#16A34A">Selectează toate (${D.length})</label>`;
+  ctBulkUi(); window._ctD = D;
   list.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">${D.map((x) => { const ph = ctPhoto(x), i = pos.get(x.id);
-    return `<div class="cl-card" role="button" tabindex="0" data-ctid="${escapeHtml(x.id)}" style="align-items:center">
+    return `<div class="cl-card" role="button" tabindex="0" data-ctid="${escapeHtml(x.id)}" style="align-items:center${ctSel.has(x.id) ? ';outline:2px solid #16A34A;outline-offset:-2px' : ''}">
+      <label data-sel style="display:flex;align-items:center;justify-content:center;min-width:36px;min-height:44px;margin:-6px 0 -6px -4px;cursor:pointer" title="Selectează"><input type="checkbox" ${ctSel.has(x.id) ? 'checked' : ''} style="width:20px;height:20px;accent-color:#16A34A;cursor:pointer" aria-label="Selectează ${escapeHtml(x.name)}"></label>
       ${ph ? `<img data-authsrc="${escapeHtml(ph)}" alt="" style="width:56px;height:56px;object-fit:contain;border-radius:10px;background:#fff;border:1px solid var(--border);flex-shrink:0">` : '<div style="width:56px;height:56px;border-radius:10px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--fg-3);flex-shrink:0;text-align:center">fără poză</div>'}
       <div class="cl-main"><div class="cl-name"><span>${escapeHtml(x.name)}</span></div><div class="cl-sub">${[CT_CAT[x.cat] + (ctSubName(x.cat, x.sub) ? ' – ' + ctSubName(x.cat, x.sub) : ''), [x.brand, x.model].filter(Boolean).join(' ')].filter(Boolean).map(escapeHtml).join(' · ')}</div></div>
       <div class="ct-right" style="display:flex;align-items:center;gap:6px;flex-shrink:0">
@@ -6954,8 +6966,24 @@ async function ctmSave(stay) {
   } catch (e) { toast(/Secțiune|HTTP 404/.test(e.message) ? 'Serverul nu are încă secțiunea Echipamente — actualizează serverul (v7.2)' : e.message, 'err'); return false; }
 }
 qs('#ct-add-btn').addEventListener('click', () => openCatalogModal(null));
+function ctBulkUi() { const b = qs('#ct-bulk'); if (!b) return; b.hidden = !ctSel.size; b.style.display = ctSel.size ? 'flex' : 'none'; qs('#ct-bulk-n').textContent = ctSel.size + (ctSel.size === 1 ? ' selectat' : ' selectate'); }
+qs('#ct-stats').addEventListener('change', e => { if (e.target.id !== 'ct-selall') return; const D = window._ctD || []; if (e.target.checked) D.forEach(x => ctSel.add(x.id)); else D.forEach(x => ctSel.delete(x.id)); renderCatalog(); });
+qs('#ct-bulk').addEventListener('click', async e => {
+  const b = e.target.closest('[data-bulk]'); if (!b) return; const act = b.dataset.bulk;
+  if (act === 'clear') { ctSel.clear(); renderCatalog(); return; }
+  const vis = act === 'show'; const L = ops.catalog.filter(x => ctSel.has(x.id) && !!x.visible !== vis);
+  if (!L.length) { toast(vis ? 'Toate cele selectate sunt deja pe site' : 'Toate cele selectate sunt deja ascunse', 'warn'); return; }
+  const btns = qs('#ct-bulk').querySelectorAll('button'); btns.forEach(x => x.disabled = true); let ok = 0, err = '';
+  for (const x of L) { b.textContent = `Se salvează ${ok + 1}/${L.length}…`;
+    try { const r = await clApi('/ops/catalog/' + encodeURIComponent(x.id), jsonOpt('PUT', { ...x, visible: vis })); opsApply(r); ok++; } catch (er) { err = er.message; } }
+  btns.forEach(x => x.disabled = false); b.textContent = vis ? 'Arată pe site' : 'Ascunde';
+  ctSel.clear(); renderCatalog();
+  toast(`${ok} produse ${vis ? 'puse pe site' : 'ascunse'}${err ? ' · eroare: ' + err : ''}`, err ? 'warn' : 'ok');
+});
 qs('#ct-list').addEventListener('click', async e => {
-  const c = e.target.closest('[data-ctid]'); if (!c) return; const L = ctSorted(); const i = L.findIndex(x => x.id === c.dataset.ctid); if (i < 0) return;
+  const c = e.target.closest('[data-ctid]'); if (!c) return;
+  if (e.target.closest('[data-sel]')) { e.stopPropagation(); if (e.target.tagName !== 'INPUT') return; const id = c.dataset.ctid; if (e.target.checked) ctSel.add(id); else ctSel.delete(id); renderCatalog(); return; }
+  const L = ctSorted(); const i = L.findIndex(x => x.id === c.dataset.ctid); if (i < 0) return;
   const sq = e.target.closest('[data-sd],[data-sedit],[data-stnew]');
   if (sq) { e.stopPropagation(); const x = L[i];
     try {
