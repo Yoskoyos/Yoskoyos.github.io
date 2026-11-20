@@ -262,6 +262,7 @@ html[data-role="client"] .nvr-web-btn{display:none!important}
 .ch-cell img.ch-thumb{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;border-radius:4px}
 .ch-ip{display:block;font-family:var(--mono);font-size:8px;font-weight:600;opacity:.85;line-height:1.2;letter-spacing:0}
 .ch-cell.err,.ch-cell.ok{flex-direction:column}
+.ch-lbl-ip{display:block;font-weight:600;opacity:.9;white-space:nowrap}
 .ch-cell .ch-lbl{position:absolute;bottom:2px;left:3px;font-size:7px;font-family:var(--mono);font-weight:700;color:#fff;text-shadow:0 0 4px #000,0 0 4px #000;pointer-events:none;z-index:1}
 
 /* HDD */
@@ -3780,7 +3781,7 @@ function loadChThumbs(container){
         cell.classList.remove('nothumb');
         if (!cell.querySelector('img.ch-thumb')) {
           cell.innerHTML = '';
-          const lbl = document.createElement('span'); lbl.className='ch-lbl'; lbl.textContent='CH'+ch + (cell.dataset.ip ? ' · ' + cell.dataset.ip : '');
+          const lbl = document.createElement('span'); lbl.className='ch-lbl'; lbl.textContent='CH'+ch; if (cell.dataset.ip) { const ipl = document.createElement('span'); ipl.className = 'ch-lbl-ip'; ipl.textContent = cell.dataset.ip; lbl.appendChild(ipl); }
           cell.appendChild(img); cell.appendChild(lbl);
         } else {
           cell.querySelector('img.ch-thumb').src = img.src;
