@@ -2858,7 +2858,7 @@ html:not(.unlocked) .app{display:none}
     <div class="modal-body">
       <div class="cm-hint" style="font-size:12.5px;margin-bottom:6px">Alege tipul de proces-verbal:</div>
       <div class="seg" id="pv2-kind" role="tablist" style="flex-wrap:wrap"><button type="button" data-k="receptie">📋 Recepție montaj (sistem nou)</button><button type="button" class="on" data-k="garantie">🔧 Înlocuire în garanție</button><button type="button" data-k="adaugare">➕ Echipamente adăugate</button></div>
-      <div id="pv2-rec" class="cm-hint" hidden style="font-size:13px;margin-top:8px">Procesul-verbal de recepție, ca până acum, pentru un sistem nou montat. Apasă „Continuă”: aplicația verifică NVR-ul clientului și trece camerele și hard diskul în document.</div>
+      <div id="pv2-rec" class="cm-hint" hidden style="font-size:13px;margin-top:8px">Procesul-verbal de recepție, ca până acum, pentru un sistem nou montat. Apasă „Recepție montaj” sau „Continuă”: aplicația verifică NVR-ul clientului și trece camerele și hard diskul în document.</div>
       <div id="pv2-form">
         <div class="f2">
           <div class="fg"><label for="pv2-nr">Nr. proces-verbal</label><input type="text" id="pv2-nr" autocomplete="off"></div>
@@ -8977,7 +8977,7 @@ async function openPv2() {
 const closePv2 = () => qs('#pv2-modal').classList.add('hidden');
 qs('#pv2-x').addEventListener('click', closePv2); qs('#pv2-cancel').addEventListener('click', closePv2);
 qs('#pv2-modal').addEventListener('click', e => { if (e.target.id === 'pv2-modal') closePv2(); });
-document.querySelectorAll('#pv2-kind button').forEach(b => b.addEventListener('click', () => pv2SetKind(b.dataset.k)));
+document.querySelectorAll('#pv2-kind button').forEach(b => b.addEventListener('click', () => { if (b.dataset.k === 'receptie') { closePv2(); return genPV(); } pv2SetKind(b.dataset.k); }));   // recepția nu are formular: pornește direct
 qs('#pv2-add').addEventListener('click', () => { if (document.querySelectorAll('#pv2-rows .pv2-r').length >= 8) return toast('Maxim 8 rânduri pe un proces-verbal', 'warn'); qs('#pv2-rows').insertAdjacentHTML('beforeend', pv2Row(pv2Kind)); });
 qs('#pv2-rows').addEventListener('click', e => { const b = e.target.closest('.r-del'); if (!b) return; b.closest('.pv2-r').remove(); if (!qs('#pv2-rows .pv2-r')) qs('#pv2-rows').innerHTML = pv2Row(pv2Kind); });
 const pv2Dmy = d => /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d.slice(8, 10) + '.' + d.slice(5, 7) + '.' + d.slice(0, 4) : '';
