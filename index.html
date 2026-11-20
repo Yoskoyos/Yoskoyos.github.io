@@ -2851,8 +2851,9 @@ html:not(.unlocked) .app{display:none}
   <div class="modal" style="max-width:820px">
     <div class="modal-hdr"><div class="modal-title" id="pv2-title">Proces-verbal</div><div class="modal-x" id="pv2-x" role="button" aria-label="Închide">✕</div></div>
     <div class="modal-body">
-      <div class="seg" id="pv2-kind" role="tablist" style="flex-wrap:wrap"><button type="button" data-k="receptie">Recepție montaj</button><button type="button" class="on" data-k="garantie">Înlocuire în garanție</button><button type="button" data-k="adaugare">Echipamente adăugate</button></div>
-      <div id="pv2-rec" class="cm-hint" hidden style="font-size:13px">Procesul-verbal de recepție, pentru un sistem nou montat. Aplicația citește camerele și hard diskul din NVR-ul clientului și le trece în document.</div>
+      <div class="cm-hint" style="font-size:12.5px;margin-bottom:6px">Alege tipul de proces-verbal:</div>
+      <div class="seg" id="pv2-kind" role="tablist" style="flex-wrap:wrap"><button type="button" data-k="receptie">📋 Recepție montaj (sistem nou)</button><button type="button" class="on" data-k="garantie">🔧 Înlocuire în garanție</button><button type="button" data-k="adaugare">➕ Echipamente adăugate</button></div>
+      <div id="pv2-rec" class="cm-hint" hidden style="font-size:13px;margin-top:8px">Procesul-verbal de recepție, ca până acum, pentru un sistem nou montat. Apasă „Continuă”: aplicația verifică NVR-ul clientului și trece camerele și hard diskul în document.</div>
       <div id="pv2-form">
         <div class="f2">
           <div class="fg"><label for="pv2-nr">Nr. proces-verbal</label><input type="text" id="pv2-nr" autocomplete="off"></div>
@@ -8963,7 +8964,9 @@ async function openPv2() {
   qs('#pv2-contract').value = lastCtr; qs('#pv2-addr').value = c.address || '';
   const [rp, rl] = String(c.contact || '').split(/\s+[—-]\s+/); qs('#pv2-repr').value = rp || ''; qs('#pv2-calit').value = rl || (c.kind === 'pj' && !/asocia/i.test(c.name) ? 'Administrator' : 'Președinte');
   ['#pv2-obs', '#pv2-abon', '#pv2-abon-from', '#pv2-act'].forEach(k => qs(k).value = ''); qs('#pv2-hdd').checked = false; qs('#pv2-work').checked = true;
-  qs('#pv2-rows').innerHTML = ''; pv2SetKind(pv2Kind === 'receptie' ? 'garantie' : pv2Kind);
+  qs('#pv2-rows').innerHTML = '';
+  const hasRec = (c.contracts || []).some(f => /^Proces-verbal\s+\d/i.test(f.name || ''));   // fără PV de recepție încă → începem cu recepția
+  pv2SetKind(hasRec ? (pv2Kind === 'receptie' ? 'garantie' : pv2Kind) : 'receptie');
   qs('#pv2-title').textContent = 'Proces-verbal — ' + c.name; qs('#pv2-modal').classList.remove('hidden');
 }
 const closePv2 = () => qs('#pv2-modal').classList.add('hidden');
