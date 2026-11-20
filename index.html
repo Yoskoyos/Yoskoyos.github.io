@@ -6789,13 +6789,16 @@ function renderStock() {
   const S = ops.stock, low = S.filter(s => s.minQty && s.qty < s.minQty);
   const sb = qs('#st-nav-badge'); if (sb) { sb.style.display = low.length ? '' : 'none'; sb.textContent = low.length; sb.title = 'Produse sub stocul minim'; }
   const val = S.reduce((a, s) => a + (s.price || 0) * (s.qty || 0), 0);
-  qs('#st-stats').innerHTML = [[S.length, 'produse'], [S.reduce((a, s) => a + (s.qty || 0), 0), 'bucăți'], [low.length, 'sub minim'], [Math.round(val).toLocaleString('ro-RO') + ' lei', 'valoare stoc']]
+  qs('#st-stats').innerHTML = [[S.filter(s => (s.qty || 0) > 0).length, 'produse în stoc'], [S.reduce((a, s) => a + (s.qty || 0), 0), 'bucăți'], [low.length, 'sub minim'], [Math.round(val).toLocaleString('ro-RO') + ' lei', 'valoare stoc']]
     .map(([n, l]) => `<div class="qt-stat"><b>${n}</b> ${l}</div>`).join('');
   const term = qs('#st-search').value.trim().toLowerCase();
-  const rows = S.filter(s => !term || [s.name, s.model, s.supplier, s.serials, s.notes].join(' ').toLowerCase().includes(term));
+  let stAll = false; try { stAll = localStorage.getItem('yca_st_all') === '1'; } catch {}
+  const zero = S.filter(s => !((s.qty || 0) > 0)).length;
+  if (zero) qs('#st-stats').innerHTML += `<button type="button" class="qt-stat" id="st-zero" style="margin-left:auto;cursor:pointer;border:0;font:inherit;color:inherit">${stAll ? 'Ascunde' : 'Arată'} <b>${zero}</b> fără stoc</button>`;
+  const rows = S.filter(s => (stAll || term || (s.qty || 0) > 0) && (!term || [s.name, s.model, s.supplier, s.serials, s.notes].join(' ').toLowerCase().includes(term)));
   const list = qs('#st-list');
   if (!S.length) { list.innerHTML = '<div class="cl-empty">Stocul e gol.<br>Apasă „Produs nou” și adaugă ce ai în depozit (camere, HDD-uri, NVR-uri, cablu).</div>'; return; }
-  if (!rows.length) { list.innerHTML = '<div class="cl-empty">Niciun produs găsit.</div>'; return; }
+  if (!rows.length) { list.innerHTML = `<div class="cl-empty">${term ? 'Niciun produs găsit.' : 'Nu ai niciun produs în stoc acum.'}</div>`; return; }
   let html = low.length && !term ? `<div class="op-banner err">📦 Sub stocul minim: ${low.map(s => `<b>${escapeHtml(s.name)}</b> (${s.qty}/${s.minQty})`).join(', ')}</div>` : '';
   for (const cat of Object.keys(ST_CAT)) {
     const g = rows.filter(s => s.cat === cat).sort((a, b) => a.name.localeCompare(b.name, 'ro')); if (!g.length) continue;
@@ -6824,6 +6827,7 @@ async function stSave(id, body) {
 }
 qs('#st-add-btn').addEventListener('click', () => openStockModal(null));
 qs('#st-search').addEventListener('input', renderStock);
+qs('#st-stats').addEventListener('click', e => { if (!e.target.closest('#st-zero')) return; try { localStorage.setItem('yca_st_all', localStorage.getItem('yca_st_all') === '1' ? '0' : '1'); } catch {} renderStock(); });
 qs('#st-list').addEventListener('click', async e => {
   const c = e.target.closest('[data-sid]'); if (!c) return; const s = ops.stock.find(x => x.id === c.dataset.sid); if (!s) return;
   const b = e.target.closest('[data-d]');
