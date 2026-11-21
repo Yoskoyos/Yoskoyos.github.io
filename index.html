@@ -260,6 +260,7 @@ html[data-role="client"] .nvr-web-btn{display:none!important}
 .ch-free span{font-family:var(--sans);font-size:9px;font-weight:600;letter-spacing:.02em}
 @container (max-width:60px){.ch-free span{display:none}}
 .ch-cell img.ch-thumb{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;border-radius:4px}
+.cm-file .esign{border:0;background:var(--accent-soft,rgba(2,132,199,.1));color:var(--accent-ink,#0284c7);font:inherit;font-size:12.5px;font-weight:700;padding:6px 10px;border-radius:8px;cursor:pointer;white-space:nowrap}
 .sig-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .sig-tile{border:1.5px dashed var(--border-2);border-radius:12px;background:var(--bg-2);min-height:92px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;padding:8px;font:inherit;color:var(--fg-2);text-align:center}
 .sig-tile b{font-size:13px;color:var(--fg)}.sig-tile small{font-size:11.5px;color:var(--fg-3)}
@@ -4763,14 +4764,15 @@ function renderCmFiles() {
   const row = f => {
     const href = `${getProxyBase()}/clients/${encodeURIComponent(cmDraft.id)}/contracts/${encodeURIComponent(f.id)}?token=${encodeURIComponent(auth ? auth.token : '')}`;
     const isW = f.kind === 'garantie';
-    const meta = [f.signedAt ? 'semnat ' + fmtDate(f.signedAt) : '', f.validUntil ? (isW ? 'garanție până ' : 'valabil până ') + fmtDate(f.validUntil) : '', (f.size < 1048576 ? Math.max(1, Math.round(f.size / 1024)) + ' KB' : (f.size / 1048576).toFixed(1) + ' MB')].filter(Boolean).join(' · ');
+    const es = f.esign || {};
+    const meta = [es.status === 'signed' ? '✍️ semnat electronic de ' + (es.signer || 'client') : es.status === 'pending' ? '⏳ trimis spre semnare, așteaptă clientul' : '', f.signedAt && es.status !== 'signed' ? 'semnat ' + fmtDate(f.signedAt) : '', f.validUntil ? (isW ? 'garanție până ' : 'valabil până ') + fmtDate(f.validUntil) : '', (f.size < 1048576 ? Math.max(1, Math.round(f.size / 1024)) + ' KB' : (f.size / 1048576).toFixed(1) + ' MB')].filter(Boolean).join(' · ');
     const expired = f.validUntil && f.validUntil < todayYmd();
     const icon = (f.ext === 'jpg' || f.ext === 'png')
       ? '<path d="M21 19V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2z"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>'
       : '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/>';
     return `<div class="cm-file"><svg class="cm-file-ic" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" style="${isW ? 'color:var(--ok)' : ''}">${icon}</svg>
       <div class="cm-file-main"><div class="cm-file-name">${escapeHtml(f.name)}</div><div class="cm-file-meta">${escapeHtml(meta)}${expired ? ' · <b style="color:var(--err)">expirat' + (isW ? 'ă' : '') + '</b>' : ''}</div></div>
-      <a href="${escapeHtml(href)}" target="_blank" rel="noopener">Deschide</a><button type="button" class="del" data-fid="${escapeHtml(f.id)}" aria-label="Șterge">Șterge</button></div>`;
+      <a href="${escapeHtml(href)}" target="_blank" rel="noopener">Deschide</a>${f.ext === 'docx' && es.status !== 'signed' ? `<button type="button" class="esign" data-esign="${escapeHtml(f.id)}" title="Trimite clientului un link ca să semneze pe telefon sau calculator">📲 Semnare</button>` : ''}<button type="button" class="del" data-fid="${escapeHtml(f.id)}" aria-label="Șterge">Șterge</button></div>`;
   };
   const contracts = all.filter(f => f.kind !== 'garantie'), wars = all.filter(f => f.kind === 'garantie');
   qs('#cm-files').innerHTML = contracts.length ? contracts.map(row).join('') : '<div class="cm-hint">Niciun contract încărcat.</div>';
@@ -4933,7 +4935,26 @@ async function cmDeleteFile(e) {
     renderCmFiles(); renderClients();
   } catch (err) { toast(err.message, 'err'); }
 }
-qs('#cm-files').addEventListener('click', cmDeleteFile);
+qs('#cm-files').addEventListener('click', e => { const b = e.target.closest('[data-esign]'); if (b) { e.stopPropagation(); return esignSend(b.dataset.esign, b); } cmDeleteFile(e); });
+async function esignSend(fid, btn) {   // link de semnare pentru client (WhatsApp / e-mail / copiat)
+  const c = cmDraft; if (!c || !c.id) return; const f = (c.contracts || []).find(x => x.id === fid); if (!f) return;
+  btn.disabled = true;
+  try {
+    const r = await clApi(`/clients/${encodeURIComponent(c.id)}/contracts/${encodeURIComponent(fid)}/sign`, jsonOpt('POST', { to: c.phone || c.email || '' }));
+    cmDraft.contracts = r.client.contracts; const i = (clients || []).findIndex(x => x.id === c.id); if (i >= 0) clients[i].contracts = r.client.contracts; renderCmFiles();
+    const doc = f.name.replace(/\.docx$/i, ''), msg = `Bună ziua! Vă trimit spre semnare documentul „${doc}”. Îl puteți citi și semna direct de pe telefon sau calculator, aici: ${r.url}\n\nMulțumesc, Dima Florin – SUPRAVEGHERE24h, 0763 354 355`;
+    const ph = ofWaPhone(c.phone || '');
+    const html = `Linkul e valabil <b>30 de zile</b>. Când clientul semnează, primești notificare, iar documentul semnat se salvează singur aici, în fișa clientului.
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+      ${ph ? `<a class="btn primary" style="text-decoration:none" href="https://wa.me/${ph}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">WhatsApp la ${escapeHtml(c.phone)}</a>` : ''}
+      ${c.email ? `<a class="btn" style="text-decoration:none" href="mailto:${escapeHtml(c.email)}?subject=${encodeURIComponent('Document spre semnare – ' + doc)}&body=${encodeURIComponent(msg)}">E-mail la ${escapeHtml(c.email)}</a>` : ''}
+      <button type="button" class="btn" id="esign-copy">Copiază linkul</button></div>
+      <div class="cm-hint" style="margin-top:10px;word-break:break-all">${escapeHtml(r.url)}</div>`;
+    setTimeout(() => { const cp = qs('#esign-copy'); if (cp) cp.addEventListener('click', async () => { try { await navigator.clipboard.writeText(r.url); toast('Link copiat', 'ok'); } catch { toast('Copiază linkul de mai jos', 'warn'); } }); }, 50);
+    await confirmDialog({ title: '📲 Trimite spre semnare', html, okLabel: 'Gata', cancelLabel: 'Închide', tone: 'watch' });
+  } catch (e) { toast(/HTTP 40[45]|necunoscut|jszip/i.test(e.message) ? 'Actualizează serverul la versiunea 12.3 ca să meargă semnarea la distanță' : e.message, 'err'); }
+  finally { btn.disabled = false; }
+}
 qs('#cm-wfiles').addEventListener('click', cmDeleteFile);
 
 /* ═══════════════════════════════════════
@@ -9136,6 +9157,11 @@ async function genContract() {
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
     if (val.LICENTA) lsSet('yca_ctr_lic', val.LICENTA);
     if (/^\d+$/.test(val.NR)) lsSet('yca_ctr_next', String(+val.NR + 1));
+    if (ctrClient && ctrClient.id) try {   // îl păstrăm și în fișa clientului (de acolo se poate trimite spre semnare)
+      const up = await clApi(`/clients/${encodeURIComponent(ctrClient.id)}/contracts?kind=contract&name=${encodeURIComponent(name)}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: blob });
+      const i = (clients || []).findIndex(x => x.id === up.client.id); if (i >= 0) clients[i].contracts = up.client.contracts;
+      if (cmDraft && cmDraft.id === up.client.id) { cmDraft.contracts = up.client.contracts; renderCmFiles(); }
+    } catch {}
     closeCtrModal(); toast('Contract generat: ' + name, 'ok');
     if (ctrQuote && val.NR) {   // notăm pe ofertă numărul contractului
       try { const r = await clApi('/quotes/' + encodeURIComponent(ctrQuote.id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contractNo: val.NR }) });

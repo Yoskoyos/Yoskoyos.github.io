@@ -1221,6 +1221,145 @@ function clientFromQuote(q, msg) {
   return q.clientId || '';
 }
 
+/* ───────────── Semnare la distanță: clientul semnează contractul / procesul-verbal pe telefon (link /s/<token>) ─────────────
+   signs.json: { list: [{ token, owner, clientId, fileId, docName, kind, createdAt, expires, status: pending|signed, signer, signedAt, ip, ua }] }
+   Documentul e fișierul Word din fișa clientului; la semnare, semnătura intră peste linia „Semnătura” a beneficiarului + un rând de evidență la final. */
+const SIGNS_FILE = path.join(BASE_DIR, 'signs.json');
+function loadSigns() { try { const x = JSON.parse(fs.readFileSync(SIGNS_FILE, 'utf8')); return x && Array.isArray(x.list) ? x : { list: [] }; } catch { return { list: [] }; } }
+function saveSigns(x) { x.list = x.list.filter(r => r.status === 'signed' || r.expires > Date.now() - 90 * 864e5).slice(-2000); const t = SIGNS_FILE + '.tmp'; fs.writeFileSync(t, JSON.stringify(x, null, 1), { mode: 0o600 }); fs.renameSync(t, SIGNS_FILE); }
+let _jszip; function esignZip() { if (_jszip === undefined) { try { _jszip = require('jszip'); } catch { _jszip = null; } } return _jszip; }
+const ESIGN_RUN = (i, x, y) => `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${251680000 + i}" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>${x}</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>${y}</wp:posOffset></wp:positionV><wp:extent cx="1500000" cy="500000"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="${980 + i}" name="SemnaturaBeneficiar ${i}"/><wp:cNvGraphicFramePr/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${980 + i}" name="semnatura-beneficiar.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdSigBenE"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1500000" cy="500000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>`;
+async function esignApply(buf, png, note) {
+  const JSZip = esignZip(); const zip = await JSZip.loadAsync(buf);
+  let xml = await zip.file('word/document.xml').async('string'); let k = 0;
+  xml = xml.replace(/<w:p[ >](?:(?!<\/w:p>)[\s\S])*?<\/w:p>/g, p => {
+    if (/SemnaturaBeneficiar|Semnatura \d+" \/?>[\s\S]*rIdSigBen"/.test(p)) return p;
+    const txt = p.replace(/<[^>]+>/g, ''); const cnt = (txt.match(/Semnătura(:| și ștampila)/g) || []).length; if (!cnt) return p;
+    const long = /Semnătura și ștampila/.test(txt), stamp = /name="Stampila|rIdStampYca|rIdSigMe/.test(p);
+    let run = '';
+    if (cnt >= 2) run = ESIGN_RUN(++k, 3302000 + 760000, -80000);
+    else if (!stamp) run = ESIGN_RUN(++k, long ? 1350000 : 760000, -80000);
+    return run ? p.replace(/^(<w:p[^>]*>(?:<w:pPr>[\s\S]*?<\/w:pPr>)?)/, '$1' + run) : p;
+  });
+  const esc = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const para = `<w:p><w:pPr><w:spacing w:before="240"/></w:pPr><w:r><w:rPr><w:sz w:val="15"/><w:color w:val="6B7487"/></w:rPr><w:t xml:space="preserve">${esc(note)}</w:t></w:r></w:p>`;
+  const i = xml.lastIndexOf('<w:sectPr'); xml = i > 0 ? xml.slice(0, i) + para + xml.slice(i) : xml.replace('</w:body>', para + '</w:body>');
+  zip.file('word/document.xml', xml); zip.file('word/media/semnatura_beneficiar_e.png', png);
+  let rels = await zip.file('word/_rels/document.xml.rels').async('string');
+  if (!rels.includes('rIdSigBenE')) rels = rels.replace('</Relationships>', '<Relationship Id="rIdSigBenE" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/semnatura_beneficiar_e.png"/></Relationships>');
+  zip.file('word/_rels/document.xml.rels', rels);
+  let ct = await zip.file('[Content_Types].xml').async('string');
+  if (!/Extension="png"/i.test(ct)) { ct = ct.replace(/(<Types[^>]*>)/, '$1<Default Extension="png" ContentType="image/png"/>'); zip.file('[Content_Types].xml', ct); }
+  return { buf: await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }), placed: k };
+}
+// Word → HTML simplu (paragrafe, bold, tabele), ca clientul să citească documentul pe telefon înainte de semnare
+function docxToHtml(xml) {
+  const ent = t => t.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+  const run = r => { const t = [...r.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>|<w:tab\/>|<w:br\/>/g)].map(m => m[0].startsWith('<w:tab') ? ' ' : m[0].startsWith('<w:br') ? '\n' : ent(m[1])).join('');
+    if (!t) return ''; const e = escHtml(t).replace(/\n/g, '<br>'); return /<w:b(\/>|\s+w:val="(1|true)")/.test(r) ? `<b>${e}</b>` : e; };
+  const para = p => { if (/<w:drawing>/.test(p) && !/<w:t[ >]/.test(p)) return ''; const h = [...p.matchAll(/<w:r[ >][\s\S]*?<\/w:r>/g)].map(m => run(m[0])).join('');
+    const c = /<w:jc w:val="center"/.test(p); return h.trim() ? `<p${c ? ' style="text-align:center"' : ''}>${h}</p>` : ''; };
+  const body = (xml.match(/<w:body>([\s\S]*)<\/w:body>/) || [])[1] || '';
+  let out = '', i = 0; const re = /<w:tbl>[\s\S]*?<\/w:tbl>|<w:p[ >][\s\S]*?<\/w:p>/g; let m;
+  while ((m = re.exec(body))) {
+    if (m[0].startsWith('<w:tbl')) out += '<table>' + [...m[0].matchAll(/<w:tr[ >][\s\S]*?<\/w:tr>/g)].map(r => '<tr>' + [...r[0].matchAll(/<w:tc>[\s\S]*?<\/w:tc>/g)].map(c => '<td>' + [...c[0].matchAll(/<w:p[ >][\s\S]*?<\/w:p>/g)].map(x => para(x[0])).join('') + '</td>').join('') + '</tr>').join('') + '</table>';
+    else out += para(m[0]);
+    if (++i > 4000) break;
+  }
+  return out;
+}
+function esignFind(token) {
+  const S = loadSigns(), r = S.list.find(x => x.token === token); if (!r) return null;
+  const all = loadClients(), cl = (all[r.owner] || []).find(c => c.id === r.clientId), f = cl && (cl.contracts || []).find(x => x.id === r.fileId);
+  return { S, r, all, cl, f, fp: f ? path.join(CONTRACTS_DIR, r.owner.replace(/[^\w.-]/g, '_'), cl.id, f.id + '.' + (f.ext || 'docx')) : '' };
+}
+async function handleSignPublic(req, res, pathname) {
+  const m = /^\/s\/([a-f0-9]{32})(\/doc|\/sign|\/html)?$/.exec(pathname); if (!m) return sendHtml(res, 404, 'Link invalid');
+  const h = esignFind(m[1]);
+  const gone = msg => sendHtml(res, 404, `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Document indisponibil</title><p style="font:16px Arial;padding:40px 20px;text-align:center">${msg}<br><br>Ne găsiți la 0763 354 355.</p>`);
+  if (!h || !h.f) return gone('Documentul nu mai este disponibil.');
+  const { S, r, all, cl, f, fp } = h;
+  if (m[2] === '/doc' && req.method === 'GET') {
+    let data; try { data = fs.readFileSync(fp); } catch { return gone('Documentul nu mai este disponibil.'); }
+    const ascii = f.name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '');
+    res.writeHead(200, { 'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'Content-Length': data.length, 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex',
+      'Content-Disposition': `${/[?&]dl=1/.test(req.url) ? 'attachment' : 'inline'}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(f.name)}` });
+    return res.end(data);
+  }
+  if (m[2] === '/html' && req.method === 'GET') {
+    let h = ''; try { const JSZip = esignZip(); if (JSZip) { const z = await JSZip.loadAsync(fs.readFileSync(fp)); h = docxToHtml(await z.file('word/document.xml').async('string')); } } catch {}
+    res.writeHead(h ? 200 : 500, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' }); return res.end(h);
+  }
+  if (m[2] === '/sign' && req.method === 'POST') {
+    if (pubLimited(req, 20)) return sendJson(res, 429, { error: 'Prea multe încercări. Reîncercați peste o oră.' });
+    if (r.status === 'signed') return sendJson(res, 409, { error: 'Documentul a fost deja semnat.' });
+    if (r.expires < Date.now()) return sendJson(res, 410, { error: 'Linkul a expirat. Cereți un link nou.' });
+    if (!esignZip()) return sendJson(res, 503, { error: 'Semnarea nu e disponibilă acum. Încercați mai târziu.' });
+    const b = await readJson(req) || {};
+    const name = str(b.name, 120).trim(); if (name.length < 3) return sendJson(res, 400, { error: 'Scrieți numele complet.' });
+    if (!b.agree) return sendJson(res, 400, { error: 'Bifați că ați citit documentul și sunteți de acord.' });
+    const d = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(String(b.png || '')); if (!d) return sendJson(res, 400, { error: 'Semnătura lipsește.' });
+    const png = Buffer.from(d[1], 'base64'); if (png.length < 200 || png.length > 600000 || png.slice(0, 4).toString('hex') !== '89504e47') return sendJson(res, 400, { error: 'Semnătura nu e validă. Semnați din nou.' });
+    const ip = nlIp(req), ua = str(req.headers['user-agent'], 300), when = new Date();
+    const dt = when.toLocaleString('ro-RO', { timeZone: 'Europe/Bucharest' });
+    let out; try { out = await esignApply(fs.readFileSync(fp), png, `Semnat electronic de ${name}, pentru ${cl.name}, la ${dt}, prin linkul trimis${r.sentTo ? ' la ' + r.sentTo : ''} de YCA SOLUTIONS S.R.L. · IP ${ip} · cod ${r.token.slice(0, 10)}`); }
+    catch (e) { return sendJson(res, 500, { error: 'Documentul nu a putut fi semnat. Încercați din nou.' }); }
+    fs.writeFileSync(fp, out.buf, { mode: 0o600 });
+    f.size = out.buf.length; f.signedAt = when.toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' }); if (!/semnat/i.test(f.name)) f.name = f.name.replace(/\.docx$/i, '') + ' - semnat.docx';
+    f.esign = { token: r.token, status: 'signed', sentAt: (f.esign || {}).sentAt || r.createdAt, signedAt: when.getTime(), signer: name };
+    cl.updatedAt = Date.now(); saveClients(all);
+    Object.assign(r, { status: 'signed', signer: name, signedAt: when.getTime(), ip, ua, sigSha: crypto.createHash('sha256').update(png).digest('hex'), docSha: crypto.createHash('sha256').update(out.buf).digest('hex') }); saveSigns(S);
+    try { const db = loadDb(), ow = (db.users || []).find(u => u.username === r.owner); if (ow) notifyOwner(db, ow, `✍️ <b>${escHtml(name)}</b> a semnat „${escHtml(f.name)}” — ${escHtml(cl.name)}`, '/?tab=clients'); } catch {}
+    return sendJson(res, 200, { ok: true });
+  }
+  if (req.method !== 'GET') return sendJson(res, 405, { error: 'Operație necunoscută' });
+  if (r.status !== 'signed' && r.expires < Date.now()) return gone('Linkul pentru semnare a expirat.');
+  if (r.status !== 'signed' && !r.openedAt) { r.openedAt = Date.now(); saveSigns(S); }
+  return sendHtml(res, 200, esignPage(r, f, cl));
+}
+function esignPage(r, f, cl) {
+  const e = escHtml, signed = r.status === 'signed';
+  return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Semnare document – SUPRAVEGHERE24h</title>
+<style>*{box-sizing:border-box}body{margin:0;background:#eef2f7;font:15px/1.55 -apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#14202E}
+.top{background:#0D1F33;color:#fff;padding:14px 16px;display:flex;align-items:center;gap:12px}.top img{height:34px;background:#fff;border-radius:6px;padding:3px 6px}.top b{font-size:15px}.top span{opacity:.7;font-size:12.5px;display:block}
+.wrap{max-width:820px;margin:0 auto;padding:16px}.card{background:#fff;border:1px solid #E1E6EC;border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 10px 30px -20px rgba(13,31,51,.35)}
+h1{font-size:19px;margin:0 0 4px;color:#0D1F33}.mut{color:#5B6B7C;font-size:13.5px}
+#doc{max-height:60vh;overflow:auto;border:1px solid #E1E6EC;border-radius:10px;padding:18px 16px;font-family:Georgia,'Times New Roman',serif;font-size:14px;background:#fff}
+#doc p{margin:0 0 8px}#doc table{border-collapse:collapse;width:100%;font-size:12.5px;margin:6px 0 10px}#doc td,#doc th{border:1px solid #d5dbe3;padding:4px 6px;vertical-align:top}#doc img{max-width:160px;height:auto}#doc h1,#doc h2,#doc h3{font-family:inherit;color:#0D1F33}
+.pad{position:relative;border:1.5px solid #CBD5E1;border-radius:12px;background:#fff;touch-action:none;margin-top:8px}.pad canvas{display:block;width:100%;aspect-ratio:3/1;touch-action:none;cursor:crosshair}
+.base{position:absolute;left:6%;right:6%;bottom:26%;border-bottom:1.5px solid #CBD5E1;pointer-events:none}.ph{position:absolute;left:7%;bottom:28%;color:#94A3B8;font-size:13px;pointer-events:none}
+label.f{display:block;font-weight:700;font-size:13.5px;margin:12px 0 4px}input[type=text]{width:100%;font:inherit;padding:12px;border:1.5px solid #CBD5E1;border-radius:10px}
+.chk{display:flex;gap:10px;align-items:flex-start;margin:14px 0 4px;font-size:14px}.chk input{width:20px;height:20px;margin-top:2px;accent-color:#F5A100;flex-shrink:0}
+.row{display:flex;gap:10px;margin-top:14px}.btn{flex:1;border:0;border-radius:12px;padding:15px;font:700 16px inherit;cursor:pointer}.go{background:#F5A100;color:#0D1F33}.sec{background:#EEF2F7;color:#0D1F33;flex:0 0 auto;padding:15px 18px}
+.btn:disabled{opacity:.6}.err{color:#B42318;font-size:14px;margin-top:10px;min-height:1em}.ok{text-align:center;padding:26px 16px}.ok .ic{font-size:46px}.dl{display:inline-block;margin-top:12px;color:#0D1F33;font-weight:700}</style></head><body>
+<div class="top"><img src="/q-logo.png" alt="" onerror="this.remove()"><div><b>YCA SOLUTIONS S.R.L. · SUPRAVEGHERE24h</b><span>Semnare electronică a documentului</span></div></div>
+<div class="wrap">
+<div class="card"><h1>${e(f.name.replace(/\.docx$/i, ''))}</h1><div class="mut">Pentru: <b>${e(cl.name)}</b> · document trimis de YCA SOLUTIONS S.R.L.</div></div>
+<div class="card"><div class="mut" style="margin-bottom:8px">Citiți documentul înainte de semnare. <a href="/s/${r.token}/doc?dl=1">Descarcă documentul (Word)</a></div><div id="doc">Se încarcă documentul…</div></div>
+${signed ? `<div class="card ok"><div class="ic">✅</div><h1>Document semnat</h1><div class="mut">Semnat de <b>${e(r.signer)}</b> la ${e(new Date(r.signedAt).toLocaleString('ro-RO', { timeZone: 'Europe/Bucharest' }))}.</div><a class="dl" href="/s/${r.token}/doc?dl=1">⬇ Descarcă documentul semnat</a></div>` : `
+<div class="card" id="sg"><h1>Semnătura beneficiarului</h1><div class="mut">Semnați cu degetul (telefon) sau cu mouse-ul (calculator), în chenarul de mai jos.</div>
+<label class="f" for="nm">Numele și prenumele celui care semnează</label><input type="text" id="nm" autocomplete="name" placeholder="ex. Popescu Ion, președinte">
+<div class="pad"><canvas id="cv"></canvas><div class="base"></div><span class="ph" id="ph">Semnați aici</span></div>
+<label class="chk"><input type="checkbox" id="ag"><span>Am citit documentul și sunt de acord cu el. Semnătura mea de mai sus are aceeași valoare ca semnătura de pe hârtie.</span></label>
+<div class="row"><button class="btn sec" id="cl" type="button">Șterge</button><button class="btn go" id="go" type="button">✍️ Semnez documentul</button></div><div class="err" id="er"></div></div>`}
+<div class="mut" style="text-align:center;font-size:12px">Întrebări? 0763 354 355 · contact@supraveghere24h.ro</div></div>
+<script>(function(){var T=${JSON.stringify(r.token)};
+fetch('/s/'+T+'/html',{cache:'no-store'}).then(function(r){if(!r.ok)throw 0;return r.text()}).then(function(x){if(!x)throw 0;document.getElementById('doc').innerHTML=x}).catch(function(){document.getElementById('doc').innerHTML='Documentul nu poate fi afișat aici. <a href="/s/'+T+'/doc?dl=1">Descărcați-l</a> și citiți-l înainte de semnare.'});
+var cv=document.getElementById('cv');if(!cv)return;var ctx,ink=false,last=null,w=2.4;
+function setup(){var r=cv.getBoundingClientRect(),d=Math.max(1,window.devicePixelRatio||1);cv.width=Math.round(r.width*d);cv.height=Math.round(r.width/3*d);ctx=cv.getContext('2d');ctx.setTransform(d,0,0,d,0,0);ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=ctx.fillStyle='#0b2a5b';ink=false;document.getElementById('ph').style.display='';}
+setup();window.addEventListener('resize',function(){if(!ink)setup();});
+function pt(e){var r=cv.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top,t:e.timeStamp};}
+cv.addEventListener('pointerdown',function(e){e.preventDefault();cv.setPointerCapture(e.pointerId);last=pt(e);w=2.4;ctx.beginPath();ctx.arc(last.x,last.y,1.1,0,7);ctx.fill();ink=true;document.getElementById('ph').style.display='none';});
+cv.addEventListener('pointermove',function(e){if(!last)return;e.preventDefault();var L=e.getCoalescedEvents?e.getCoalescedEvents():[e];for(var i=0;i<L.length;i++){var p=pt(L[i]),d=Math.hypot(p.x-last.x,p.y-last.y),v=d/Math.max(1,p.t-last.t);w=Math.max(1.3,Math.min(3.4,w*.7+(3.4-Math.min(2.2,v*1.6))*.3));ctx.lineWidth=w;ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p;}});
+['pointerup','pointercancel','pointerleave'].forEach(function(n){cv.addEventListener(n,function(){last=null;});});
+document.getElementById('cl').onclick=setup;
+function png(){var d=ctx.getImageData(0,0,cv.width,cv.height).data,x0=cv.width,y0=cv.height,x1=0,y1=0;for(var y=0;y<cv.height;y+=2)for(var x=0;x<cv.width;x+=2)if(d[(y*cv.width+x)*4+3]>20){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
+var pad=8,W=Math.min(cv.width,x1-x0+pad*2),H=Math.min(cv.height,y1-y0+pad*2),o=document.createElement('canvas');o.width=Math.min(1200,Math.max(W,H*3));o.height=Math.round(o.width/3);var k=Math.min(o.width/W,o.height/H);o.getContext('2d').drawImage(cv,Math.max(0,x0-pad),Math.max(0,y0-pad),W,H,(o.width-W*k)/2,(o.height-H*k)/2,W*k,H*k);return o.toDataURL('image/png');}
+document.getElementById('go').onclick=function(){var er=document.getElementById('er'),nm=document.getElementById('nm').value.trim(),b=this;er.textContent='';
+if(nm.length<3){er.textContent='Scrieți numele și prenumele.';return;}if(!ink){er.textContent='Semnați în chenar.';return;}if(!document.getElementById('ag').checked){er.textContent='Bifați că ați citit documentul și sunteți de acord.';return;}
+b.disabled=true;b.textContent='Se semnează…';fetch('/s/'+T+'/sign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:nm,agree:true,png:png()})}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'Eroare');return j;});}).then(function(){location.reload();}).catch(function(e){er.textContent=e.message;b.disabled=false;b.textContent='✍️ Semnez documentul';});};})();</script></body></html>`;
+}
+
 async function handleClients(req, res, pathname) {
   const ctx = requireUser(req, res, 'clients'); if (!ctx) return;
   const uname = ctx.uname;
@@ -1262,7 +1401,7 @@ async function handleClients(req, res, pathname) {
       const kind = q.kind === 'garantie' ? 'garantie' : q.kind === 'pv' ? 'pv' : 'contract';
       const head = buf.slice(0, 8);
       const ext = head.slice(0, 5).toString('latin1') === '%PDF-' ? 'pdf'
-                : (kind === 'pv' && head[0] === 0x50 && head[1] === 0x4B) ? 'docx'
+                : ((kind === 'pv' || kind === 'contract') && head[0] === 0x50 && head[1] === 0x4B) ? 'docx'
                 : (kind === 'garantie' && head[0] === 0xFF && head[1] === 0xD8 && head[2] === 0xFF) ? 'jpg'
                 : (kind === 'garantie' && head.slice(0, 4).toString('hex') === '89504e47') ? 'png' : null;
       if (!ext) return sendJson(res, 400, { error: kind === 'garantie' ? 'Fișierul trebuie să fie PDF, JPG sau PNG' : kind === 'pv' ? 'Fișierul trebuie să fie PDF sau Word (.docx)' : 'Fișierul nu e PDF' });
@@ -1273,6 +1412,20 @@ async function handleClients(req, res, pathname) {
       fs.writeFileSync(path.join(dir, f.id + '.' + ext), buf, { mode: 0o600 });
       cl.contracts = (cl.contracts || []).concat(f); cl.updatedAt = Date.now(); saveClients(all);
       return sendJson(res, 200, { contract: f, client: cl });
+    }
+    if (parts.length === 5 && parts[4] === 'sign' && req.method === 'POST') {   // trimite documentul spre semnare la client (link public)
+      if (!/^[\w-]+$/.test(cid || '')) return sendJson(res, 400, { error: 'ID invalid' });
+      const f = (cl.contracts || []).find(x => x.id === cid);
+      if (!f || f.ext !== 'docx') return sendJson(res, 400, { error: 'Se pot trimite spre semnare doar documentele Word generate din aplicație' });
+      if (!esignZip()) return sendJson(res, 503, { error: 'Lipsește modulul jszip pe server — rulează actualizarea serverului' });
+      const b = await readJson(req) || {};
+      const S = loadSigns(); let r = S.list.find(x => x.owner === uname && x.clientId === cl.id && x.fileId === f.id && x.status === 'pending');
+      if (!r) { r = { token: crypto.randomBytes(16).toString('hex'), owner: uname, clientId: cl.id, clientName: cl.name, fileId: f.id, docName: f.name, kind: f.kind,
+        createdAt: Date.now(), expires: Date.now() + 30 * 864e5, status: 'pending', sentTo: str(b.to, 200) }; S.list.push(r); }
+      else { r.expires = Date.now() + 30 * 864e5; if (b.to) r.sentTo = str(b.to, 200); }
+      saveSigns(S);
+      f.esign = { token: r.token, status: 'pending', sentAt: Date.now() }; cl.updatedAt = Date.now(); saveClients(all);
+      return sendJson(res, 200, { url: publicBase(req) + '/s/' + r.token, client: cl });
     }
     if (parts.length === 4) {
       if (!/^[\w-]+$/.test(cid || '')) return sendJson(res, 400, { error: 'ID invalid' });
@@ -4480,7 +4633,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.2, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.3, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
@@ -4516,6 +4669,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/public/reviews' && req.method === 'GET') return reviewsPublic(req, res);
     if (pathname === '/reviews/config') return await handleReviewsConfig(req, res);
     if ((pathname === '/public/catalog' || /^\/public\/catalog\/[\w-]+\/(photo|fisa)$/.test(pathname)) && req.method === 'GET') return catalogPublic(req, res, pathname);
+    if (/^\/s\/[a-f0-9]{32}(\/doc|\/sign|\/html)?$/.test(pathname)) return await handleSignPublic(req, res, pathname);
     if (/^\/of\/[a-f0-9]{24}(\.pdf)?$/.test(pathname) && req.method === 'GET') {   // oferta trimisă clientului (link public: pagină sau PDF)
       const isPdf = pathname.endsWith('.pdf'), tok = pathname.slice(4, 28), all = loadOps(); let hit = null;
       for (const [un, u] of Object.entries(all)) { const o = (u.offers || []).find(x => x.pubToken === tok); if (o) { hit = { un, o }; break; } }

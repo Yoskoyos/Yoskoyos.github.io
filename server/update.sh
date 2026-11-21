@@ -44,6 +44,7 @@ if [ -n "$NG" ] && ! grep -q "proxy_read_timeout 900s" "$NG"; then
   if nginx -t >/dev/null 2>&1; then systemctl reload nginx; echo "nginx: timeout 15 min pentru înregistrări"; else cp /root/nginx-nvr-proxy.conf.bak3 "$NG"; echo "ATENȚIE: nu am putut mări timeout-ul nginx (restaurat)"; fi
 fi
 [ -d node_modules/nodemailer ] || npm install --silent nodemailer@latest >/dev/null 2>&1 || true
+[ -d node_modules/jszip ] || { echo "Instalez modulul pentru semnarea documentelor..."; npm install --silent jszip@3 >/dev/null 2>&1 || echo "ATENȚIE: jszip nu s-a instalat — semnarea la distanță nu va merge"; }
 [ -d node_modules/web-push ] || { echo "Instalez modulul pentru notificări push..."; npm install --silent web-push@latest >/dev/null 2>&1 || echo "ATENȚIE: web-push nu s-a instalat — notificările push nu vor merge"; }
 # portul 8443: interfața web a NVR-urilor deschisă din aplicație (deja logată)
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then ufw allow 8443/tcp >/dev/null 2>&1 && echo "firewall: port 8443 deschis"; fi

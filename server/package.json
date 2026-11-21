@@ -6,6 +6,7 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "jsonwebtoken": "^9.0.3",
+    "jszip": "^3.10.1",
     "nodemailer": "*",
     "web-push": "*"
   }
