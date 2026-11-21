@@ -9064,13 +9064,13 @@ const sigMine = () => { try { const d = localStorage.getItem('yca_sig_me'); retu
 const sigB64 = d => Uint8Array.from(atob(d.split(',')[1]), c => c.charCodeAt(0));
 function sigReset() { SIG.ben = null; SIG.me = null; SIG.benUrl = ''; SIG.meUrl = ''; const m = sigMine(); if (m) { SIG.me = sigB64(m); SIG.meUrl = m; } document.querySelectorAll('[data-sigset]').forEach(sigRender); }
 function sigRender(box) {
-  const t = (k, who, sub) => `<button type="button" class="sig-tile${SIG[k] ? ' on' : ''}" data-sigk="${k}">${SIG[k] ? `<img src="${SIG[k + 'Url']}" alt="">` : '<span style="font-size:22px">✍️</span>'}<b>${who}</b><small>${SIG[k] ? 'semnat · apasă ca să refaci' : sub}</small></button>`;
-  box.innerHTML = t('ben', 'Beneficiarul', 'apasă ca să semneze clientul') + t('me', 'Eu (prestator)', 'semnătura ta, lângă ștampilă');
+  const t = (k, who, sub, role) => `<button type="button" class="sig-tile${SIG[k] ? ' on' : ''}" data-sigk="${k}">${SIG[k] ? `<img src="${SIG[k + 'Url']}" alt="">` : '<span style="font-size:22px">✍️</span>'}<b>${who}</b><small>${SIG[k] ? role + ' · semnat · apasă ca să refaci' : sub}</small></button>`;
+  box.innerHTML = t('ben', 'Beneficiarul', 'apasă ca să semneze clientul', 'beneficiar') + t('me', 'Dima Florin', 'prestator · semnătura ta, lângă ștampilă', 'prestator');
 }
 document.addEventListener('click', e => { const b = e.target.closest('[data-sigk]'); if (!b) return; sigOpen(b.dataset.sigk, b.closest('[data-sigset]')); });
 function sigOpen(k, box) {
   sigTarget = k; sigSet = box;
-  qs('#sig-title').textContent = k === 'ben' ? 'Semnătura beneficiarului' : 'Semnătura mea (prestator)';
+  qs('#sig-title').textContent = k === 'ben' ? 'Semnătura beneficiarului' : 'Semnătura – Dima Florin (prestator)';
   qs('#sig-keep-l').style.display = k === 'me' ? '' : 'none'; qs('#sig-keep').checked = k === 'me' && !!sigMine();
   qs('#sig-modal').classList.remove('hidden'); requestAnimationFrame(sigSetup);
 }
