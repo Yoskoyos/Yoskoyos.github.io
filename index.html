@@ -613,9 +613,12 @@ body.sa-open{overflow:hidden}
 #ct-list .cl-sub{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #ct-list .ct-right{grid-column:1/-1;display:flex!important;flex-wrap:wrap;gap:6px!important;justify-content:flex-start;align-items:center;padding-top:8px;border-top:1px solid var(--border)}
 #ct-list .ct-right .qpill{font-size:12px;padding:4px 9px}
-#ct-list .ct-right .btn[data-mv]{flex:0 0 36px!important;width:36px;min-width:36px!important;height:36px;min-height:36px!important;padding:0!important;font-size:15px;border-radius:9px}
-#ct-list .ct-right .btn[data-mv="-1"]{margin-left:auto}
-#ct-list .ct-stq button[data-sd]{width:32px;height:32px}
+#ct-list .ct-right .btn[data-mv]{flex:0 0 34px!important;width:34px;min-width:34px!important;height:34px;min-height:34px!important;padding:0!important;font-size:15px;border-radius:9px}
+#ct-list .ct-mv{margin-left:auto;gap:5px!important}
+#ct-list .ct-right .qpill{padding:4px 8px}
+#ct-list .ct-stk{padding:4px 7px}
+#ct-list .ct-stq{gap:3px}
+#ct-list .ct-stq button[data-sd]{width:30px;height:30px}
 #ct-list .ct-pdf{display:none}
 }
 .ct-stq{display:inline-flex;align-items:center;gap:4px}.ct-stq button[data-sd]{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--bg-1);font-size:16px;font-weight:700;cursor:pointer;color:var(--fg);line-height:1}
@@ -6945,8 +6948,8 @@ function renderCatalog() {
       <div class="cl-main"><div class="cl-name"><span>${escapeHtml(x.name)}</span></div><div class="cl-sub">${[CT_CAT[x.cat] + (ctSubName(x.cat, x.sub) ? ' – ' + ctSubName(x.cat, x.sub) : ''), [x.brand, x.model].filter(Boolean).join(' ')].filter(Boolean).map(escapeHtml).join(' · ')}</div></div>
       <div class="ct-right" style="display:flex;align-items:center;gap:6px;flex-shrink:0">
         ${(() => { const q = stOf(x), sid = stId[skuN(x.model)]; return q === null ? `<button type="button" class="ct-stk add" data-stnew title="Pune echipamentul în stoc">+ Stoc</button>` : `<span class="ct-stq" data-stid="${escapeHtml(sid)}"><button type="button" data-sd="-1" aria-label="Scade stocul">−</button><button type="button" class="ct-stk ${q > 0 ? 'on' : ''}" data-sedit title="Modifică stocul">Stoc: ${q}</button><button type="button" data-sd="1" aria-label="Crește stocul">+</button></span>`; })()}        ${x.sell ? (() => { const p = ctFinal(x), b = ctPrice(x); return `${p && p < b ? `<span class="qpill new" style="white-space:nowrap" title="Reducere activă">-${x.disc}%</span>` : ''}<span class="qpill ${p ? 'sent' : 'clarify'}" style="white-space:nowrap" title="Prețul de vânzare de pe site">${p ? p.toLocaleString('ro-RO') + ' lei' : 'fără preț'}</span>`; })() : ''}${(x.files || []).some(f => f.ext === 'pdf') ? '<span class="qpill ct-pdf" style="white-space:nowrap" title="Are fișă tehnică">PDF</span>' : ''}<span class="qpill ${x.visible ? 'accepted' : ''}" style="white-space:nowrap">${x.visible ? 'Pe site' : 'Ascuns'}</span>
-        <button type="button" class="btn" data-mv="-1" aria-label="Mută mai sus" ${i ? '' : 'disabled'} style="min-width:40px;min-height:40px;padding:6px">↑</button>
-        <button type="button" class="btn" data-mv="1" aria-label="Mută mai jos" ${i < L.length - 1 ? '' : 'disabled'} style="min-width:40px;min-height:40px;padding:6px">↓</button>
+        <span class="ct-mv" style="display:inline-flex;gap:6px"><button type="button" class="btn" data-mv="-1" aria-label="Mută mai sus" ${i ? '' : 'disabled'} style="min-width:40px;min-height:40px;padding:6px">↑</button>
+        <button type="button" class="btn" data-mv="1" aria-label="Mută mai jos" ${i < L.length - 1 ? '' : 'disabled'} style="min-width:40px;min-height:40px;padding:6px">↓</button></span>
       </div></div>`; }).join('')}</div>`;
   hydrateAuthImgs(list);
 }
