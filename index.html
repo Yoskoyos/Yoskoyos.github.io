@@ -8599,9 +8599,10 @@ tr{page-break-inside:avoid}thead{display:table-header-group}
 .tot{border:1px solid var(--line);border-radius:10px;overflow:hidden}.tot div{display:flex;justify-content:space-between;padding:6px 12px;font-size:9.2pt}.tot div+div{border-top:1px solid var(--line)}
 .tot .gr{background:var(--navy);color:#fff;padding:11px 12px;align-items:center}.tot .gr span{font-size:8pt;letter-spacing:.14em;font-weight:800}.tot .gr b{font-size:16pt;font-weight:800}
 .tot .note{font-size:7.6pt;color:var(--mute);justify-content:flex-end;background:#fafbfd}
-.sig{display:grid;grid-template-columns:1fr 1fr;gap:10mm;margin-top:10mm;page-break-inside:avoid}.sig div{font-size:8.8pt;color:var(--mute)}.sig b{color:var(--navy);font-size:9.5pt}
-.sig .ln{border-bottom:1px solid #c9d0db;height:16mm;margin:3px 0 4px}
-.ft{margin-top:9mm;padding-top:4mm;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-size:7.6pt;color:var(--mute)}.ft b{color:var(--or)}
+.sig{display:grid;grid-template-columns:1fr 1fr;gap:10mm;margin-top:7mm;page-break-inside:avoid}.sig div{font-size:8.8pt;color:var(--mute)}.sig b{color:var(--navy);font-size:9.5pt}
+.sig .ln{border-bottom:1px solid #c9d0db;height:13mm;margin:3px 0 4px}
+.ft{margin-top:6mm;padding-top:4mm;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-size:7.6pt;color:var(--mute)}.ft b{color:var(--or)}
+html.fitp .sheet{width:186mm!important;min-height:0!important;padding:0!important;margin:0!important;box-shadow:none!important}
 @media print{html{background:#fff}.bar{display:none}.sheet{width:auto;min-height:0;margin:0;padding:0;box-shadow:none;overflow:visible}.sheet:before{display:none}.hd{border-top:5px solid var(--or);padding-top:8px}}
 @media screen and (max-width:820px){.sheet{width:auto;margin:0;padding:18px 14px}.parties,.sum,.sig{grid-template-columns:1fr}.hl{grid-template-columns:1fr 1fr}.hero{flex-direction:column;align-items:flex-start}.meta{justify-content:flex-start}}
 </style></head><body>
@@ -8623,6 +8624,7 @@ ${grp(['echipament', 'material'], 'Echipamente și materiale', '📦')}${grp(['m
 <div class="sig"><div>Ofertant<br><b>YCA SOLUTIONS S.R.L.</b><div class="ln"></div>Dima Florin, Administrator</div><div>Acceptat de beneficiar<br><b>${esc(o.clientName)}</b><div class="ln"></div>Nume, semnătură și dată</div></div>
 <div class="ft"><span><b>SUPRAVEGHERE24h</b> · securitate rezidențială non-stop</span><span>Întrebări? 0763 354 355 · contact@supraveghere24h.ro</span></div>
 </div>
+<script>(function(){var s=document.querySelector('.sheet');function fit(){document.documentElement.classList.add('fitp');s.style.zoom='';var h=s.scrollHeight,a=273*96/25.4;document.documentElement.classList.remove('fitp');var z=h>a&&h<a/0.62?Math.floor(a/h*1000)/1000:1;s.style.zoom=z<1?z:'';}function un(){s.style.zoom='';}window.addEventListener('beforeprint',fit);window.addEventListener('afterprint',un);})();<\/script>
 ${web ? '' : '<script>window.onload=()=>setTimeout(()=>window.print(),700)<\/script>'}</body></html>`;
   return html;
 }
@@ -8649,6 +8651,10 @@ async function ofMakePdf(o) {
     const sc = 2, cv = await html2canvas(sheet, { scale: sc, useCORS: true, backgroundColor: '#ffffff', logging: false });
     const { jsPDF } = window.jspdf, pdf = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     const pxW = sheet.offsetWidth, pageH = pxW * 297 / 210, H = sheet.offsetHeight; let y = 0, first = true;
+    if (H <= pageH / 0.62) {   // încape pe o singură foaie A4 (micșorată, dacă e nevoie, până la 62%)
+      const k = Math.min(1, pageH / H), w = 210 * k, h = H * 210 / pxW * k;
+      pdf.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', (210 - w) / 2, 0, w, h); y = H;
+    }
     while (y < H - 2) {
       let end = Math.min(H, y + pageH);
       if (end < H) { const cand = safe.filter(v => v > y + 80 && v <= end); if (cand.length) end = cand[cand.length - 1] + 2; }
