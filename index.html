@@ -9233,10 +9233,14 @@ async function genPV() {
     btn.textContent = 'Se generează…';
     const d = new Date(), dd = String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
     const nr = lsGet('yca_pv_next', '1');
-    const val = { NR: nr, DATA: dd, ASOC: String(c.name || '').replace(/^asocia[tț]ia\s+de\s+proprietari\s*/i, ''), SEDIU: c.address || '', CIF: c.code || '',
-      PRES: String(c.contact || '').split(/\s+[—-]\s+/)[0], IMOBIL: c.address || '', Q_CAM: qCam ? String(qCam) : (c.equip && +c.equip.cams ? String(c.equip.cams) : ''),
+    // beneficiarul exact cum e în fișa clientului: asociație, firmă sau persoană fizică
+    const bName = String(c.name || '').trim(), isAsoc = /asocia[tț]i/i.test(bName), isPF = c.kind === 'pf' && !isAsoc;
+    const repr = String(c.contact || '').split(/\s+[—-]\s+/)[0].trim(), calit = isAsoc ? 'Președinte' : 'Administrator', dots = '……………………';
+    const val = { NR: nr, DATA: dd, BENEF: bName, ASOC: bName, SEDIU: c.address || '', CIF: c.code || '', PRES: repr,
+      BENEF_DET: isPF ? `, domiciliat(ă) în ${c.address || dots}, denumit(ă) în continuare ` : `, cu sediul în ${c.address || dots}, CIF ${c.code || dots}, reprezentată prin ${repr || dots}, în calitate de ${calit}, denumită în continuare `,
+      REPR_LINE: isPF ? ' ' : `${calit}: ${repr || dots}`, IMOBIL: c.address || '', Q_CAM: qCam ? String(qCam) : (c.equip && +c.equip.cams ? String(c.equip.cams) : ''),
       Q_NVR: sel.length ? String(sel.length) : '', HDD_TB: hddN && tbAll ? String(Math.round(tbAll / hddN)) : '', Q_HDD: hddN ? String(hddN) : '' };
-    const r = await fetch('pv-template.docx?v=1', { cache: 'no-store' }); if (!r.ok) throw new Error('Nu găsesc șablonul de proces-verbal');
+    const r = await fetch('pv-template.docx?v=2', { cache: 'no-store' }); if (!r.ok) throw new Error('Nu găsesc șablonul de proces-verbal');
     const blob = await docxFill(await r.arrayBuffer(), val, await ctrStamp(), { Q_CAM: '………', Q_NVR: '………', Q_HDD: '………', HDD_TB: '………' });
     const name = ('Proces-verbal ' + nr + ' - ' + (val.ASOC || c.name)).replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() + '.docx';
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);

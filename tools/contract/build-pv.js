@@ -51,7 +51,8 @@ const body = [
 
   P([t('YCA SOLUTIONS S.R.L.', { bold: true }), t(', cu sediul în București, Str. Aviator Mircea Petre nr. 10, Camera 1, Sector 1, CUI 45211628, J2021019754409, reprezentată prin Dima Florin, în calitate de Administrator, denumită în continuare '), t('PRESTATOR', { bold: true }), t(',')], { alignment: AlignmentType.JUSTIFIED, spacing: { after: 120, line: 300 } }),
   P('și', { spacing: { after: 120, line: 300 } }),
-  P([t(`ASOCIAȚIA DE PROPRIETARI ${K('ASOC', '……………………')}`, { bold: true }), t(`, cu sediul în ${K('SEDIU', '……………………………')}, CIF ${K('CIF', '……………………')}, reprezentată prin ${K('PRES', '……………………………')}, în calitate de Președinte, denumită în continuare `), t('BENEFICIAR', { bold: true }), t(',')], { alignment: AlignmentType.JUSTIFIED, spacing: { after: 240, line: 300 } }),
+  // beneficiarul: numele exact din fișa clientului (asociație, firmă sau persoană fizică); restul frazei o completează aplicația ({{BENEF_DET}})
+  P([t(K('BENEF', 'ASOCIAȚIA DE PROPRIETARI ……………………'), { bold: true }), t(TPL ? '{{BENEF_DET}}' : `, cu sediul în ……………………………, CIF ……………………, reprezentată prin ……………………………, în calitate de ……………………, denumită în continuare `), t('BENEFICIAR', { bold: true }), t(',')], { alignment: AlignmentType.JUSTIFIED, spacing: { after: 240, line: 300 } }),
 
   P([t(`confirmăm că la adresa ${K('IMOBIL', '……………………………………………………………… (bloc / scară)')} a fost montat un sistem de supraveghere video format din:`)], { alignment: AlignmentType.JUSTIFIED, spacing: { after: 200, line: 300 } }),
   table([6325, 3200], ['Echipament', 'Cantitate'], [
@@ -76,8 +77,8 @@ const body = [
       ] }),
       new TableCell({ width: { size: 4763, type: WidthType.DXA }, borders: { top: NONE, bottom: NONE, left: NONE, right: NONE }, margins: { top: 300 }, children: [
         new Paragraph({ children: [t('BENEFICIAR', { bold: true, color: NAVY })] }),
-        new Paragraph({ children: [t('Asociația de Proprietari ' + K('ASOC', '……………………'))] }),
-        new Paragraph({ children: [t('Președinte: ' + K('PRES', '………………………………'))] }),
+        new Paragraph({ children: [t(K('BENEF', '……………………………………'))] }),
+        new Paragraph({ children: [t(TPL ? '{{REPR_LINE}}' : 'Reprezentant: ………………………………')] }),
         new Paragraph({ spacing: { before: 400 }, children: [t('Semnătura și ștampila: ………………………')] }),
       ] }),
     ] })] }),
