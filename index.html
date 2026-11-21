@@ -4765,14 +4765,14 @@ function renderCmFiles() {
     const href = `${getProxyBase()}/clients/${encodeURIComponent(cmDraft.id)}/contracts/${encodeURIComponent(f.id)}?token=${encodeURIComponent(auth ? auth.token : '')}`;
     const isW = f.kind === 'garantie';
     const es = f.esign || {};
-    const meta = [es.status === 'signed' ? '✍️ semnat electronic de ' + (es.signer || 'client') : es.status === 'pending' ? '⏳ trimis spre semnare, așteaptă clientul' : '', f.signedAt && es.status !== 'signed' ? 'semnat ' + fmtDate(f.signedAt) : '', f.validUntil ? (isW ? 'garanție până ' : 'valabil până ') + fmtDate(f.validUntil) : '', (f.size < 1048576 ? Math.max(1, Math.round(f.size / 1024)) + ' KB' : (f.size / 1048576).toFixed(1) + ' MB')].filter(Boolean).join(' · ');
+    const meta = [es.status === 'signed' ? '✍️ semnat electronic de ' + (es.signer || 'client') : es.status === 'pending' ? '⏳ trimis spre semnare' + (es.emailedTo ? ' pe ' + es.emailedTo : '') + ', așteaptă clientul' : '', f.signedAt && es.status !== 'signed' ? 'semnat ' + fmtDate(f.signedAt) : '', f.validUntil ? (isW ? 'garanție până ' : 'valabil până ') + fmtDate(f.validUntil) : '', (f.size < 1048576 ? Math.max(1, Math.round(f.size / 1024)) + ' KB' : (f.size / 1048576).toFixed(1) + ' MB')].filter(Boolean).join(' · ');
     const expired = f.validUntil && f.validUntil < todayYmd();
     const icon = (f.ext === 'jpg' || f.ext === 'png')
       ? '<path d="M21 19V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2z"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>'
       : '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/>';
     return `<div class="cm-file"><svg class="cm-file-ic" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" style="${isW ? 'color:var(--ok)' : ''}">${icon}</svg>
       <div class="cm-file-main"><div class="cm-file-name">${escapeHtml(f.name)}</div><div class="cm-file-meta">${escapeHtml(meta)}${expired ? ' · <b style="color:var(--err)">expirat' + (isW ? 'ă' : '') + '</b>' : ''}</div></div>
-      <a href="${escapeHtml(href)}" target="_blank" rel="noopener">Deschide</a>${f.ext === 'docx' && es.status !== 'signed' ? `<button type="button" class="esign" data-esign="${escapeHtml(f.id)}" title="Trimite clientului un link ca să semneze pe telefon sau calculator">📲 Semnare</button>` : ''}<button type="button" class="del" data-fid="${escapeHtml(f.id)}" aria-label="Șterge">Șterge</button></div>`;
+      <a href="${escapeHtml(href)}" target="_blank" rel="noopener">Deschide</a>${f.ext === 'docx' && es.status !== 'signed' ? `<button type="button" class="esign" data-esign="${escapeHtml(f.id)}" title="Trimite clientului pe e-mail (din fișă) linkul ca să semneze pe telefon sau calculator">📲 Semnare</button>` : ''}<button type="button" class="del" data-fid="${escapeHtml(f.id)}" aria-label="Șterge">Șterge</button></div>`;
   };
   const contracts = all.filter(f => f.kind !== 'garantie'), wars = all.filter(f => f.kind === 'garantie');
   qs('#cm-files').innerHTML = contracts.length ? contracts.map(row).join('') : '<div class="cm-hint">Niciun contract încărcat.</div>';
@@ -4940,7 +4940,15 @@ async function esignSend(fid, btn) {   // link de semnare pentru client (WhatsAp
   const c = cmDraft; if (!c || !c.id) return; const f = (c.contracts || []).find(x => x.id === fid); if (!f) return;
   btn.disabled = true;
   try {
-    const r = await clApi(`/clients/${encodeURIComponent(c.id)}/contracts/${encodeURIComponent(fid)}/sign`, jsonOpt('POST', { to: c.phone || c.email || '' }));
+    const em = String(c.email || '').trim(), hasEm = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em);
+    let r;
+    if (hasEm) {   // direct pe e-mailul din fișa clientului
+      btn.textContent = '✉️ Se trimite…';
+      try { r = await clApi(`/clients/${encodeURIComponent(c.id)}/contracts/${encodeURIComponent(fid)}/sign`, jsonOpt('POST', { email: true, to: em })); }
+      catch (e) { if (/HTTP 40[45]|necunoscut|jszip/i.test(e.message)) throw e; toast(e.message + ' — îți dau linkul să-l trimiți altfel', 'warn'); }
+      if (r && r.mailed) { cmDraft.contracts = r.client.contracts; const i = (clients || []).findIndex(x => x.id === c.id); if (i >= 0) clients[i].contracts = r.client.contracts; renderCmFiles(); toast(`✉️ Trimis pe e-mail la ${r.to}. Primești notificare când semnează.`, 'ok'); return; }
+    } else toast('Clientul nu are e-mail în fișă — trimite linkul pe WhatsApp sau copiază-l', 'warn');
+    r = await clApi(`/clients/${encodeURIComponent(c.id)}/contracts/${encodeURIComponent(fid)}/sign`, jsonOpt('POST', { to: c.phone || c.email || '' }));
     cmDraft.contracts = r.client.contracts; const i = (clients || []).findIndex(x => x.id === c.id); if (i >= 0) clients[i].contracts = r.client.contracts; renderCmFiles();
     const doc = f.name.replace(/\.docx$/i, ''), msg = `Bună ziua! Vă trimit spre semnare documentul „${doc}”. Îl puteți citi și semna direct de pe telefon sau calculator, aici: ${r.url}\n\nMulțumesc, Dima Florin – SUPRAVEGHERE24h, 0763 354 355`;
     const ph = ofWaPhone(c.phone || '');
@@ -4952,8 +4960,8 @@ async function esignSend(fid, btn) {   // link de semnare pentru client (WhatsAp
       <div class="cm-hint" style="margin-top:10px;word-break:break-all">${escapeHtml(r.url)}</div>`;
     setTimeout(() => { const cp = qs('#esign-copy'); if (cp) cp.addEventListener('click', async () => { try { await navigator.clipboard.writeText(r.url); toast('Link copiat', 'ok'); } catch { toast('Copiază linkul de mai jos', 'warn'); } }); }, 50);
     await confirmDialog({ title: '📲 Trimite spre semnare', html, okLabel: 'Gata', cancelLabel: 'Închide', tone: 'watch' });
-  } catch (e) { toast(/HTTP 40[45]|necunoscut|jszip/i.test(e.message) ? 'Actualizează serverul la versiunea 12.3 ca să meargă semnarea la distanță' : e.message, 'err'); }
-  finally { btn.disabled = false; }
+  } catch (e) { toast(/HTTP 40[45]|necunoscut|jszip/i.test(e.message) ? 'Actualizează serverul la versiunea 12.4 ca să meargă semnarea la distanță' : e.message, 'err'); }
+  finally { btn.disabled = false; btn.textContent = '📲 Semnare'; }
 }
 qs('#cm-wfiles').addEventListener('click', cmDeleteFile);
 

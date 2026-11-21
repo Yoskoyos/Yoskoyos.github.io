@@ -1268,6 +1268,22 @@ function docxToHtml(xml) {
   }
   return out;
 }
+function esignMailHtml(cl, f, link) {
+  const F = "font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;", doc = escHtml(f.name.replace(/\.docx$/i, ''));
+  return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Document spre semnare</title></head>
+<body style="margin:0;padding:0;background:#F4F7FB"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4F7FB"><tr><td align="center" style="padding:18px 10px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #E3E8EF">
+<tr><td style="background:#0D1F33;padding:16px 22px"><img src="cid:q-logo.png@s24" alt="SUPRAVEGHERE24h" width="150" style="display:block;width:150px;height:auto;border:0;background:#fff;border-radius:6px;padding:4px 8px"></td></tr>
+<tr><td style="padding:24px 22px 8px;${F}color:#14202E;font-size:16px;line-height:1.6">
+  <div>Bună ziua,</div>
+  <div style="margin-top:10px">Vă trimitem spre semnare documentul <b>„${doc}”</b>${cl.name ? `, pentru <b>${escHtml(cl.name)}</b>` : ''}.</div>
+  <div style="margin-top:10px">Îl puteți citi și semna direct de pe telefon sau calculator — semnați cu degetul sau cu mouse-ul, fără să printați nimic.</div>
+</td></tr>
+<tr><td style="padding:16px 22px 6px"><a href="${link}" style="${F}display:block;background:#F5A100;color:#0D1F33;text-decoration:none;font-weight:800;font-size:17px;text-align:center;padding:16px 20px;border-radius:10px">✍️ Citește și semnează documentul</a>
+  <div style="${F}font-size:13px;color:#5B6B7C;margin-top:10px;text-align:center">Linkul este valabil 30 de zile. După semnare puteți descărca documentul semnat.</div></td></tr>
+<tr><td style="padding:18px 22px 22px;${F}font-size:13px;color:#5B6B7C;border-top:1px solid #E3E8EF;margin-top:12px">Dima Florin — YCA SOLUTIONS S.R.L. · SUPRAVEGHERE24h<br>0763 354 355 · contact@supraveghere24h.ro</td></tr>
+</table></td></tr></table></body></html>`;
+}
 function esignFind(token) {
   const S = loadSigns(), r = S.list.find(x => x.token === token); if (!r) return null;
   const all = loadClients(), cl = (all[r.owner] || []).find(c => c.id === r.clientId), f = cl && (cl.contracts || []).find(x => x.id === r.fileId);
@@ -1424,8 +1440,21 @@ async function handleClients(req, res, pathname) {
         createdAt: Date.now(), expires: Date.now() + 30 * 864e5, status: 'pending', sentTo: str(b.to, 200) }; S.list.push(r); }
       else { r.expires = Date.now() + 30 * 864e5; if (b.to) r.sentTo = str(b.to, 200); }
       saveSigns(S);
-      f.esign = { token: r.token, status: 'pending', sentAt: Date.now() }; cl.updatedAt = Date.now(); saveClients(all);
-      return sendJson(res, 200, { url: publicBase(req) + '/s/' + r.token, client: cl });
+      const link = publicBase(req) + '/s/' + r.token;
+      let mailed = null;
+      if (b.email) {   // trimite direct pe e-mailul din fișa clientului
+        const to = str(cl.email, 200).trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return sendJson(res, 400, { error: 'Clientul nu are o adresă de e-mail validă în fișă' });
+        if (!mailReady()) return sendJson(res, 503, { error: 'E-mailul nu e configurat pe server' });
+        const html = esignMailHtml(cl, f, link);
+        mailed = await sendMail(to, `Document spre semnare: ${f.name.replace(/\.docx$/i, '')} — SUPRAVEGHERE24h`,
+          `Bună ziua,\n\nVă trimitem spre semnare documentul „${f.name.replace(/\.docx$/i, '')}”. Îl puteți citi și semna de pe telefon sau calculator, aici:\n${link}\n\nLinkul este valabil 30 de zile.\n\nMulțumim,\nDima Florin — YCA SOLUTIONS S.R.L. (SUPRAVEGHERE24h)\n0763 354 355 · contact@supraveghere24h.ro`,
+          html, emailCidAttachments(html));
+        if (!mailed) return sendJson(res, 502, { error: 'E-mailul nu a putut fi trimis — verifică setările de e-mail ale serverului' });
+        r.sentTo = to; r.emailedAt = Date.now(); saveSigns(S);
+      }
+      f.esign = { token: r.token, status: 'pending', sentAt: Date.now(), ...(mailed ? { emailedTo: r.sentTo } : {}) }; cl.updatedAt = Date.now(); saveClients(all);
+      return sendJson(res, 200, { url: link, client: cl, mailed: !!mailed, to: mailed ? r.sentTo : '' });
     }
     if (parts.length === 4) {
       if (!/^[\w-]+$/.test(cid || '')) return sendJson(res, 400, { error: 'ID invalid' });
@@ -4633,7 +4662,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.3, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.4, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
