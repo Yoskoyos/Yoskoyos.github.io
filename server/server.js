@@ -3877,6 +3877,22 @@ ${!priced || !cfg.enabled ? '' : `<script>
 </script>`}
 </body></html>`;
 }
+// Pozele reale ale echipamentelor (din Magazin / Stoc echipamente) pentru oferta trimisă clientului — „r-<tip>.<ext>” în /email-img/
+const REAL_KINDS = { nvr: c => c.cat === 'nvr', interior: c => c.cat === 'interior', exterior: c => c.cat === 'exterior' && c.sub !== 'kit' && c.sub !== 'ptz',
+  lift: c => c.cat === 'lift' || (c.cat === 'interior' && c.sub === 'dome'), hdd: c => c.cat === 'hdd' && c.sub !== 'microsd', mon: c => c.cat === 'monitor', sw: c => c.cat === 'retea' && c.sub === 'switch' };
+const REAL_PREF = { exterior: c => c.sub === 'bullet', interior: c => c.sub === 'dome' };
+function realPhoto(uname, kind) {
+  const test = REAL_KINDS[kind]; if (!test || !uname) return null;
+  const u = loadOps()[uname] || {}, skuN = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const inStock = new Set((u.stock || []).filter(s => (s.qty || 0) > 0).map(s => skuN(s.model)).filter(Boolean));
+  const pref = REAL_PREF[kind] || (() => false);
+  const L = (u.catalog || []).map(c => ({ c, f: (c.files || []).find(f => ['jpg', 'png', 'webp'].includes(f.ext)) })).filter(x => x.f && test(x.c));
+  if (!L.length) return null;
+  const score = x => (inStock.has(skuN(x.c.model)) ? 4 : 0) + (x.c.visible ? 2 : 0) + (pref(x.c) ? 1 : 0);
+  L.sort((a, b) => score(b) - score(a) || (a.c.order || 0) - (b.c.order || 0));
+  const { c, f } = L[0];
+  return { id: f.id, ext: f.ext, file: path.join(OPS_DIR, uname.replace(/[^\w.-]/g, '_'), 'catalog', c.id, f.id + '.' + f.ext), name: c.name };
+}
 function quoteEmailHtml(q, cfg, url, opt = {}) {
   // e-mail cu oferta completă, în stil „broșură”: imagine de antet, pachet cu poze, beneficii cu iconițe, cameră suplimentară, garanții.
   // Doar stiluri inline + tabele (Gmail / Outlook / telefon). Imaginile stau pe site (cfg.assetBase), logo-ul pe server (/q-logo.png).
@@ -3895,13 +3911,14 @@ function quoteEmailHtml(q, cfg, url, opt = {}) {
   const bc = Math.max(1, Math.round(qNum(cfg.baseCams)) || 3);
   const nLift = cams.lift || 0, nIE = Math.max(0, (p.totalCams || 0) - nLift);
   let nEx = Math.min(cams.ex || 0, nIE), nIn = nIE - nEx;
-  const pk = [['p-nvr.png', 'NVR (Hikvision, Dahua sau HiLook)', 'Unitatea de înregistrare și gestionare video, de înaltă performanță.', '1x']];
-  if (nIn) pk.push(['p-turret.png', 'Camere IP interior', `Camere Hikvision, Dahua sau HiLook de minimum 4 MP (2560 × 1440) pentru scări, holuri și intrări.`, nIn + 'x']);
-  if (nEx) pk.push(['p-bullet.png', 'Camere IP exterior', `Camere Hikvision, Dahua sau HiLook de minimum 4 MP (2560 × 1440), pentru exterior, cu vedere pe timp de noapte.`, nEx + 'x']);
-  if (nLift) pk.push([fs.existsSync(path.join(BASE_DIR, 'email-img', 'p-lift.png')) ? 'p-lift.png' : 'p-turret.png', 'Camere pentru lift', 'Camere mini-dome compacte și antivandal, montate în cabina liftului.', nLift + 'x']);
-  pk.push(['p-hdd.png', 'Stocare pe hard disk', 'Hard disk dedicat pentru păstrarea înregistrărilor video.', '1x'],
-          ['p-mon.png', 'Monitor', 'Monitor pentru vizualizarea live și a înregistrărilor, la fața locului.', '1x'],
-          ['p-sw.png', 'Switch PoE', 'Alimentare și conectivitate stabilă pentru camerele IP.', '✓'],
+  const rp = (kind, fb) => { const r = realPhoto(q.owner, kind); return r ? `r-${kind}.${r.ext}${opt.cid ? '' : '?v=' + r.id}` : fb; };   // poza reală din aplicație, altfel ilustrația
+  const pk = [[rp('nvr', 'p-nvr.png'), 'NVR (Hikvision, Dahua sau HiLook)', 'Unitatea de înregistrare și gestionare video, de înaltă performanță.', '1x']];
+  if (nIn) pk.push([rp('interior', 'p-turret.png'), 'Camere IP interior', `Camere Hikvision, Dahua sau HiLook de minimum 4 MP (2560 × 1440) pentru scări, holuri și intrări.`, nIn + 'x']);
+  if (nEx) pk.push([rp('exterior', 'p-bullet.png'), 'Camere IP exterior', `Camere Hikvision, Dahua sau HiLook de minimum 4 MP (2560 × 1440), pentru exterior, cu vedere pe timp de noapte.`, nEx + 'x']);
+  if (nLift) pk.push([rp('lift', fs.existsSync(path.join(BASE_DIR, 'email-img', 'p-lift.png')) ? 'p-lift.png' : 'p-turret.png'), 'Camere pentru lift', 'Camere mini-dome compacte și antivandal, montate în cabina liftului.', nLift + 'x']);
+  pk.push([rp('hdd', 'p-hdd.png'), 'Stocare pe hard disk', 'Hard disk dedicat pentru păstrarea înregistrărilor video.', '1x'],
+          [rp('mon', 'p-mon.png'), 'Monitor', 'Monitor pentru vizualizarea live și a înregistrărilor, la fața locului.', '1x'],
+          [rp('sw', 'p-sw.png'), 'Switch PoE', 'Alimentare și conectivitate stabilă pentru camerele IP.', '✓'],
           ['p-cab.png', 'Toate materialele de instalare', 'Cablu UTP, doze, pat de cablu, conectori RJ45 și toate accesoriile necesare montajului — incluse.', '✓'],
           ['p-tech.png', 'Manoperă și configurare', 'Montaj, configurare, testare și instruire — fără cost.', '✓']);
   const pkRows = pk.map(([f, t, d, n], k) => `<tr><td style="padding:14px 0;${k ? `border-top:1px solid ${LINE};` : ''}vertical-align:middle;width:92px">${img(f, 84)}</td>
@@ -4006,12 +4023,14 @@ function quoteReplyEmailHtml(q, cfg, url, msg) {
 <tr><td style="padding:18px 22px 22px;${F}font-size:12px;color:${MUT};border-top:1px solid ${LINE}"><img src="cid:q-logo.png@s24" alt="${escHtml(cfg.company)}" width="140" style="display:block;width:140px;height:auto;border:0;margin:0 0 10px">${escHtml(cfg.company)} · ${escHtml(cfg.legal || '')}</td></tr>
 </table></td></tr></table></body></html>`;
 }
-function emailCidAttachments(html) {
+function emailCidAttachments(html, owner) {
   const out = [], seen = new Set();
-  for (const m of html.matchAll(/cid:([a-z0-9-]+\.(?:png|jpg))@s24/g)) {
+  for (const m of html.matchAll(/cid:([a-z0-9-]+\.(?:png|jpg|webp))@s24/g)) {
     const n = m[1]; if (seen.has(n)) continue; seen.add(n);
-    let content = null, type = n.endsWith('.jpg') ? 'image/jpeg' : 'image/png';
-    if (n === 'q-logo.png') { const d = /^data:([^;]+);base64,(.*)$/.exec(quoteLogo() || ''); if (d) { content = Buffer.from(d[2], 'base64'); type = d[1]; } }
+    let content = null, type = n.endsWith('.jpg') ? 'image/jpeg' : n.endsWith('.webp') ? 'image/webp' : 'image/png';
+    const rk = /^r-([a-z]+)\./.exec(n);
+    if (rk) { const r = realPhoto(owner || '', rk[1]); try { if (r) content = fs.readFileSync(r.file); } catch {} }
+    else if (n === 'q-logo.png') { const d = /^data:([^;]+);base64,(.*)$/.exec(quoteLogo() || ''); if (d) { content = Buffer.from(d[2], 'base64'); type = d[1]; } }
     else { try { content = fs.readFileSync(path.join(BASE_DIR, 'email-img', n)); } catch {} }
     if (content) out.push({ filename: n, content, contentType: type, cid: n + '@s24', contentDisposition: 'inline' });
   }
@@ -4134,7 +4153,7 @@ async function handlePublicQuote(req, res, fromSite) {
     const mhtml = quoteEmailHtml(q, cfg, url, { cid: true });
     q.emailed = await sendMail(cust.email, `Oferta nr. ${q.no} — ${cfg.company}`,
       `Bună ziua, ${cust.name}!\n\nOferta pentru bloc (abonament ${lei(pricing.total)} / lună) poate fi văzută aici:\n${url}\n\nPe pagina ofertei o puteți accepta, refuza sau cere clarificări.\n\n${cfg.company}`,
-      mhtml, emailCidAttachments(mhtml));
+      mhtml, emailCidAttachments(mhtml, q.owner));
     const a2 = loadQuotes(); const x = a2.list.find(z => z.id === q.id); if (x) { x.emailed = q.emailed; saveQuotes(a2); }
   }
   notifyOwner(db, owner, `🧾 <b>Cerere nouă de ofertă #${q.no}</b>\n${escHtml(cust.name)} · ${escHtml(cust.phone)}${cust.assoc ? '\n' + escHtml(cust.assoc) : ''}${[cust.address !== cust.assoc ? cust.address : '', cust.city].filter(Boolean).length ? '\n' + escHtml([cust.address !== cust.assoc ? cust.address : '', cust.city].filter(Boolean).join(', ')) : ''}\n${pricing.totalCams} camere · <b>${lei(pricing.total)} / lună</b>${q.emailed ? '\n✉ trimisă și pe email' : !cust.email ? '\n(clientul nu a lăsat email)' : '\n(email neconfigurat pe server — oferta NU a fost trimisă pe mail)'}`, '/?q=' + encodeURIComponent(q.id));
@@ -4459,7 +4478,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.0, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.1, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
@@ -4470,10 +4489,13 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/analytics' || pathname === '/analytics/config') return await handleAnalytics(req, res, pathname, parsed);
     // ── Oferte (public: calculator, pagina ofertei; privat: listă și setări) ──
     if (pathname.startsWith('/email-img/') && req.method === 'GET') {
-      const m = /^\/email-img\/([a-z0-9-]+)\.(png|jpg)$/.exec(pathname);
-      let buf = null; try { if (m) buf = fs.readFileSync(path.join(BASE_DIR, 'email-img', m[1] + '.' + m[2])); } catch {}
+      const m = /^\/email-img\/([a-z0-9-]+)\.(png|jpg|webp)$/.exec(pathname);
+      let buf = null, real = false;
+      try { const rk = m && /^r-([a-z]+)$/.exec(m[1]);
+        if (rk) { const ow = quoteOwner(loadDb()), r = realPhoto(ow ? ow.username : '', rk[1]); if (r) { buf = fs.readFileSync(r.file); real = true; } }
+        else if (m) buf = fs.readFileSync(path.join(BASE_DIR, 'email-img', m[1] + '.' + m[2])); } catch {}
       if (!buf) { res.writeHead(404); return res.end(); }
-      res.writeHead(200, { 'Content-Type': m[2] === 'png' ? 'image/png' : 'image/jpeg', 'Cache-Control': 'public, max-age=604800', ...PUB_CORS }); return res.end(buf);
+      res.writeHead(200, { 'Content-Type': m[2] === 'png' ? 'image/png' : m[2] === 'webp' ? 'image/webp' : 'image/jpeg', 'Cache-Control': real ? 'public, max-age=3600' : 'public, max-age=604800', ...PUB_CORS }); return res.end(buf);
     }
     if (pathname === '/q-logo.png' && req.method === 'GET') {
       const m = /^data:([^;]+);base64,(.*)$/.exec(quoteLogo() || '');
