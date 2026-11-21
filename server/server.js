@@ -1268,6 +1268,26 @@ function docxToHtml(xml) {
   }
   return out;
 }
+// pagină scurtă de informare (document / ofertă indisponibilă), în stilul site-ului
+function niceInfoPage(title, msg, sub) {
+  const e = escHtml;
+  return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${e(title)} – SUPRAVEGHERE24h</title>
+<style>*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#0D1F33 radial-gradient(ellipse at top,#16365a,#0D1F33 60%);font:16px/1.6 Manrope,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#14202E;display:flex;align-items:center;justify-content:center;padding:20px}
+.c{width:100%;max-width:460px;background:#fff;border-radius:18px;box-shadow:0 30px 60px -25px rgba(0,0,0,.55);overflow:hidden;text-align:center}
+.top{padding:22px 20px 0}.top img{height:46px;max-width:80%}.bar{height:5px;background:linear-gradient(90deg,#0B5FB0,#F5A100)}
+.ic{width:72px;height:72px;border-radius:50%;background:#FFF4DC;display:flex;align-items:center;justify-content:center;margin:22px auto 6px}.ic svg{width:34px;height:34px;stroke:#D98A00}
+h1{margin:6px 22px 4px;font-size:21px;line-height:1.3;color:#0D1F33}p{margin:0 26px;color:#5B6B7C;font-size:15px}
+.btns{display:flex;flex-direction:column;gap:10px;padding:22px}.b{display:flex;align-items:center;justify-content:center;gap:9px;border-radius:12px;padding:14px 16px;font-weight:800;font-size:16px;text-decoration:none}
+.b1{background:#F5A100;color:#0D1F33}.b2{background:#EAF7EF;color:#14532D}.b3{color:#0D1F33;border:1.5px solid #E1E6EC;background:#fff}.b svg{width:20px;height:20px}
+.ft{padding:14px 20px 18px;border-top:1px solid #EEF1F5;font-size:12.5px;color:#8A96A8}</style></head><body>
+<div class="c"><div class="bar"></div><div class="top"><img src="/q-logo.png" alt="SUPRAVEGHERE24h" onerror="this.outerHTML='<b style=&quot;font-size:20px;color:#0D1F33&quot;>SUPRAVEGHERE24h</b>'"></div>
+<div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M12 12v3M12 18h.01"/></svg></div>
+<h1>${e(msg)}</h1><p>${e(sub || '')}</p>
+<div class="btns"><a class="b b1" href="tel:+40763354355"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1.9.4 1.8.7 2.7a2 2 0 01-.5 2.1L8 9.8a16 16 0 006 6l1.3-1.3a2 2 0 012.1-.4c.9.3 1.8.6 2.7.7a2 2 0 011.7 2z"/></svg>Sună: 0763 354 355</a>
+<a class="b b2" href="https://wa.me/40763354355" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1s-.5-.1-.7.1-.8 1-1 1.2-.4.2-.7.1a8.2 8.2 0 01-4-3.5c-.3-.5.3-.5.9-1.6.1-.2 0-.4 0-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5h-.6a1.1 1.1 0 00-.8.4 3.4 3.4 0 00-1 2.5 5.9 5.9 0 001.2 3.1 13.4 13.4 0 005.2 4.6c1.9.8 2.6.9 3.6.7a3 3 0 002-1.4 2.4 2.4 0 00.2-1.4c-.1-.1-.3-.2-.6-.3zM12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2z"/></svg>Scrie-ne pe WhatsApp</a>
+<a class="b b3" href="https://supraveghere24h.ro">Mergi pe supraveghere24h.ro</a></div>
+<div class="ft">YCA SOLUTIONS S.R.L. · contact@supraveghere24h.ro</div></div></body></html>`;
+}
 function esignMailHtml(cl, f, link) {
   const F = "font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;", doc = escHtml(f.name.replace(/\.docx$/i, ''));
   return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Document spre semnare</title></head>
@@ -1292,11 +1312,11 @@ function esignFind(token) {
 async function handleSignPublic(req, res, pathname) {
   const m = /^\/s\/([a-f0-9]{32})(\/doc|\/sign|\/html)?$/.exec(pathname); if (!m) return sendHtml(res, 404, 'Link invalid');
   const h = esignFind(m[1]);
-  const gone = msg => sendHtml(res, 404, `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Document indisponibil</title><p style="font:16px Arial;padding:40px 20px;text-align:center">${msg}<br><br>Ne găsiți la 0763 354 355.</p>`);
-  if (!h || !h.f) return gone('Documentul nu mai este disponibil.');
+  const gone = (msg, sub) => sendHtml(res, 404, niceInfoPage('Document indisponibil', msg, sub || 'Poate a fost înlocuit cu o variantă nouă sau linkul a expirat. Sunați-ne și vă trimitem imediat un link nou.'));
+  if (!h || !h.f) return gone('Documentul nu mai este disponibil');
   const { S, r, all, cl, f, fp } = h;
   if (m[2] === '/doc' && req.method === 'GET') {
-    let data; try { data = fs.readFileSync(fp); } catch { return gone('Documentul nu mai este disponibil.'); }
+    let data; try { data = fs.readFileSync(fp); } catch { return gone('Documentul nu mai este disponibil'); }
     const ascii = f.name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '');
     res.writeHead(200, { 'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'Content-Length': data.length, 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex',
       'Content-Disposition': `${/[?&]dl=1/.test(req.url) ? 'attachment' : 'inline'}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(f.name)}` });
@@ -1329,7 +1349,7 @@ async function handleSignPublic(req, res, pathname) {
     return sendJson(res, 200, { ok: true });
   }
   if (req.method !== 'GET') return sendJson(res, 405, { error: 'Operație necunoscută' });
-  if (r.status !== 'signed' && r.expires < Date.now()) return gone('Linkul pentru semnare a expirat.');
+  if (r.status !== 'signed' && r.expires < Date.now()) return gone('Linkul pentru semnare a expirat');
   if (r.status !== 'signed' && !r.openedAt) { r.openedAt = Date.now(); saveSigns(S); }
   return sendHtml(res, 200, esignPage(r, f, cl));
 }
@@ -4662,7 +4682,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.4, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.5, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
@@ -4703,7 +4723,7 @@ const server = http.createServer(async (req, res) => {
       const isPdf = pathname.endsWith('.pdf'), tok = pathname.slice(4, 28), all = loadOps(); let hit = null;
       for (const [un, u] of Object.entries(all)) { const o = (u.offers || []).find(x => x.pubToken === tok); if (o) { hit = { un, o }; break; } }
       let html = null; if (hit) try { html = fs.readFileSync(path.join(OPS_DIR, hit.un.replace(/[^\w.-]/g, '_'), 'offers', hit.o.id, isPdf ? 'oferta.pdf' : 'page.html'), isPdf ? undefined : 'utf8'); } catch {}
-      if (!html) return sendHtml(res, 404, '<!doctype html><meta charset="utf-8"><title>Ofertă indisponibilă</title><p style="font:16px Arial;padding:40px;text-align:center">Oferta nu mai este disponibilă. Ne găsiți la 0763 354 355.</p>');
+      if (!html) return sendHtml(res, 404, niceInfoPage('Ofertă indisponibilă', 'Oferta nu mai este disponibilă', 'Poate a fost actualizată sau a expirat. Sunați-ne și vă trimitem oferta la zi.'));
       const ua = String(req.headers['user-agent'] || '');
       if (!/bot|crawl|spider|preview|whatsapp|facebookexternalhit|telegram|slack|skype|google|bing|curl|wget|python|headless/i.test(ua)) { const first = !(hit.o.views || []).length; hit.o.views = (hit.o.views || []).concat(Date.now()).slice(-50); saveOps(all);
         if (first) { try { const db = loadDb(), ow = (db.users || []).find(u => u.username === hit.un); if (ow) notifyOwner(db, ow, `👁 <b>${escHtml(hit.o.clientName || 'Clientul')}</b> a deschis oferta OF-${hit.o.no}${hit.o.title ? ' – ' + escHtml(hit.o.title) : ''}`, '/?tab=quotes').catch(() => {}); } catch {} } }
