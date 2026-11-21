@@ -3606,12 +3606,14 @@ const QUOTE_DEFAULTS = {
   vatRate: 21,
   validDays: 30,
   intro: 'Vă mulțumim pentru interes! Mai jos găsiți oferta pentru sistemul de supraveghere video al blocului, cu plată lunară fixă.',
-  note: 'Oferta poate fi îmbunătățită după inspectarea locației. Abonamentul lunar este singurul cost suportat de asociație pe toată durata contractului.',
+  note: '',
   includes: 'Supraveghere video 24/7, rezoluție de minimum 4 MP (2560 × 1440), echipamente Hikvision, Dahua și HiLook\nInstalare, punere în funcțiune și instruire gratuite\nGaranție extinsă pe toată durata contractului, inclusiv la furt și vandalism\nMentenanță și service pe toată durata contractului\nLa finalul contractului, echipamentele devin proprietatea asociației',
 };
 function quoteCfg(db, owner) {
   const c = (owner && db.configs[owner.username] && db.configs[owner.username].quoteCfg) || {};
-  return { ...QUOTE_DEFAULTS, ...c };
+  const r = { ...QUOTE_DEFAULTS, ...c };
+  if (/poate fi îmbunătățită după inspectarea locației/i.test(r.note || '')) r.note = '';   // mențiunea veche, scoasă la cererea proprietarului (21.11.2026)
+  return r;
 }
 const qNum = v => { const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isFinite(n) && n > 0 ? n : 0; };
 function quotePriced(c) { return qNum(c.basePrice) > 0 || qNum(c.priceInterior) > 0 || qNum(c.priceExterior) > 0; }
@@ -4478,7 +4480,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.1, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.2, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
