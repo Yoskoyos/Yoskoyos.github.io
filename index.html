@@ -9159,5 +9159,27 @@ bootAuth();
 
 })();
 </script>
+<button type="button" id="to-top" aria-label="Înapoi sus" title="Înapoi sus"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+<style>
+#to-top{position:fixed;right:16px;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:110;width:50px;height:50px;border-radius:50%;border:0;display:flex;align-items:center;justify-content:center;cursor:pointer;
+  background:linear-gradient(135deg,#F5A100,#F07A12);color:#fff;box-shadow:0 6px 18px rgba(240,122,18,.4);opacity:0;transform:translateY(14px) scale(.9);pointer-events:none;transition:opacity .2s,transform .2s}
+#to-top.on{opacity:1;transform:none;pointer-events:auto}
+#to-top:active{transform:scale(.92)}
+body:has(.overlay:not(.hidden)) #to-top{display:none}
+</style>
+<script>
+(function () {   // buton „Înapoi sus”: apare după ce derulezi; urcă în elementul derulat (fereastra sau panoul)
+  const b = document.getElementById('to-top'); let box = null;
+  const top = el => el === document || el === document.documentElement || el === document.body ? (window.scrollY || document.documentElement.scrollTop) : el.scrollTop;
+  document.addEventListener('scroll', e => {
+    const el = e.target; if (el && el.closest && el.closest('.overlay, .modal')) return;
+    box = el; b.classList.toggle('on', top(el) > 500);
+  }, true);
+  b.addEventListener('click', () => {
+    const el = box; const smooth = { top: 0, behavior: 'smooth' };
+    if (!el || el === document || el === document.documentElement || el === document.body) window.scrollTo(smooth); else el.scrollTo(smooth);
+  });
+})();
+</script>
 </body>
 </html>
