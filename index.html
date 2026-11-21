@@ -5107,7 +5107,7 @@ function renderQuotes() {
       <div style="min-width:0"><div class="qt-name">${escapeHtml(c.name)}</div><div class="qt-sub">✉ ${escapeHtml(c.message || '(fără mesaj)')}</div></div>
       <div class="qt-c-contact" style="min-width:0"><div class="qt-sub"><a href="tel:${escapeHtml(c.phone.replace(/[^\d+]/g, ''))}" onclick="event.stopPropagation()">${escapeHtml(c.phone)}</a></div><div class="qt-sub">${escapeHtml(c.email || '')}</div></div>
       <div class="qt-tot qt-sub">mesaj</div>
-      <div class="qt-st"><span class="qpill ${q.handled ? 'msgdone' : 'new'}">${q.handled ? 'Rezolvat' : 'Mesaj nou'}</span>${c.page ? `<span class="qt-sub">pagina ${escapeHtml(c.page)}</span>` : ''}</div>
+      <div class="qt-st">${(() => { const o = msgOffers(q)[0]; return o ? `<span class="qpill ${MSG_OF_ST[o.status][1]}" title="Oferta OF-${o.no}">${MSG_OF_ST[o.status][0]} · OF-${o.no}</span>` : `<span class="qpill ${q.handled ? 'msgdone' : 'new'}">${q.handled ? 'Rezolvat' : 'Mesaj nou'}</span>`; })()}${c.page ? `<span class="qt-sub">pagina ${escapeHtml(c.page)}</span>` : ''}</div>
       <div class="qt-dates">${fmtTsH(q.createdAt)}</div></div>`;
     return `<div class="qt-row${qtSel.has(q.id) ? ' sel' : ''}" role="button" tabindex="0" data-qid="${escapeHtml(q.id)}">
       <div class="qt-c-no"><input type="checkbox" class="qt-chk" data-sel="${escapeHtml(q.id)}"${qtSel.has(q.id) ? ' checked' : ''} aria-label="Selectează #${q.no}" onclick="event.stopPropagation()"><span class="qt-no">#${q.no}</span><span class="qpill ${q.status}" style="display:none"></span></div>
@@ -5118,7 +5118,33 @@ function renderQuotes() {
       <div class="qt-dates">până ${fmtTs(q.validUntil)}<br>${fmtTs(q.createdAt)}</div></div>`;
   }).join('');
 }
+const MSG_OF_ST = { draft: ['Ofertă în lucru', 'clarify'], sent: ['Ofertat', 'sent'], accepted: ['Acceptat', 'accepted'], rejected: ['Refuzat', 'rejected'] };
+const msgTel = v => String(v || '').replace(/\D/g, '').slice(-9), msgMail = v => String(v || '').trim().toLowerCase();
+let _msgOfLoading = false;
+function msgOffers(q) {   // ofertele făcute pentru cel care a scris mesajul (după telefon sau e-mail), cele mai noi primele
+  if (offers === null) { if (!_msgOfLoading) { _msgOfLoading = true; loadOffers().then(() => { _msgOfLoading = false; renderQuotes(); if (qmCur && qmCur.kind === 'contact' && !qs('#quote-modal').classList.contains('hidden')) openContactMsg(qmCur); }); } return []; }
+  const c = q.customer || {}, t = msgTel(c.phone), m = msgMail(c.email);
+  return (offers || []).filter(o => o.msgId === q.id || (t.length >= 9 && msgTel(o.clientPhone) === t) || (m && msgMail(o.clientEmail) === m)).sort((a, b) => (b.no || 0) - (a.no || 0));
+}
+let ofFromMsg = null;   // mesajul din care am pornit oferta: după salvare îl marcăm rezolvat
+async function offerFromMsg(q) {
+  const c = q.customer || {}; closeQuote(); ofFromMsg = q.id;
+  await openOffer(null);
+  qs('#of-cn').value = c.assoc || c.name || ''; qs('#of-cc').value = c.assoc ? c.name || '' : ''; qs('#of-cp').value = c.phone || ''; qs('#of-ce').value = c.email || ''; qs('#of-ca').value = [c.address, c.city].filter(Boolean).join(', ');
+  const msg = String(c.message || '').trim(); qs('#of-t').value = msg ? 'Ofertă – ' + (msg.length > 70 ? msg.slice(0, 67) + '…' : msg) : 'Ofertă sistem de supraveghere video';
+  ofDraft.msgId = q.id;
+}
+async function offerToClient(o) {   // oferta acceptată → client în Clienți (o singură dată)
+  try {
+    const r = await clApi('/clients', jsonOpt('POST', { kind: o.clientCui ? 'pj' : 'pf', name: o.clientName, code: o.clientCui, contact: o.clientContact, phone: o.clientPhone, email: o.clientEmail, address: o.clientAddress, notes: `Din oferta OF-${o.no}${o.title ? ': ' + o.title : ''}` }));
+    const c = r.client || r.item || r; if (!c || !c.id) throw new Error('Clientul nu a putut fi creat');
+    if (clients) clients.push(c);
+    const r2 = await clApi('/ops/offers/' + encodeURIComponent(o.id), jsonOpt('PUT', { ...o, clientId: c.id, status: 'accepted' })); offers = r2.offers || offers; renderOffers(); renderQuotes();
+    return c;
+  } catch (e) { toast(e.message, 'err'); return null; }
+}
 function openContactMsg(q) {
+  qmCur = q;
   const c = q.customer;
   qs('#qm-title').textContent = `Mesaj de pe site #${q.no}`;
   const tel = escapeHtml(c.phone.replace(/[^\d+]/g, ''));
@@ -5129,9 +5155,28 @@ function openContactMsg(q) {
     <div class="cm-sec">Mesaj</div>
     <div class="qm-msg" style="background:var(--bg-2);white-space:pre-wrap">${escapeHtml(c.message || '(fără mesaj)')}</div>
     <div class="qm-links"><a class="btn" href="tel:${tel}">📞 Sună</a><a class="btn" href="https://wa.me/${waNum(c.phone)}" target="_blank" rel="noopener">WhatsApp</a>${c.email ? `<a class="btn" href="mailto:${escapeHtml(c.email)}?subject=${encodeURIComponent('Răspuns Supraveghere24h')}">Email</a>` : ''}</div>
+    <div class="cm-sec">Ofertă</div>
+    ${(() => { const L = msgOffers(q);
+      if (!L.length) return `<button type="button" class="btn primary" id="qm-mkoffer" style="width:100%;min-height:46px">📝 Fă ofertă pentru ${escapeHtml(c.name.split(' ')[0] || 'client')}</button><div class="cm-hint" style="margin-top:6px">Se deschide oferta cu datele lui completate. După ce o trimiți, mesajul trece pe „Ofertat”.</div>`;
+      return L.map(o => { const st = MSG_OF_ST[o.status] || MSG_OF_ST.draft, t = ofTotals(o);
+        return `<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b>OF-${o.no}${o.title ? ' · ' + escapeHtml(o.title) : ''}</b><span class="qpill ${st[1]}">${st[0]}</span></div>
+          <div class="cm-hint" style="margin:4px 0 10px">${ofL(t.total)} lei · ${escapeHtml(o.date || '')}${o.clientId ? ' · ✓ în Clienți' : ''}</div>
+          <div class="qm-links" style="margin:0"><button type="button" class="btn" data-mof="${escapeHtml(o.id)}">Deschide oferta</button>
+          ${o.status === 'accepted' ? (o.clientId ? `<button type="button" class="btn primary" data-mcl="${escapeHtml(o.id)}">👤 Fișa clientului · contract</button>` : `<button type="button" class="btn primary" data-mtr="${escapeHtml(o.id)}">➕ Transferă în Clienți</button>`)
+            : `<button type="button" class="btn" data-macc="${escapeHtml(o.id)}">✓ A acceptat</button>`}</div></div>`; }).join('') + `<button type="button" class="linkbtn" id="qm-mkoffer" style="margin-top:2px">+ Fă încă o ofertă</button>`; })()}
     <label class="cm-check"><input type="checkbox" id="qm-handled"${q.handled ? ' checked' : ''}> Am rezolvat (am răspuns / am sunat)</label>
     <div class="fg"><label for="qm-notes">Notițele mele</label><textarea id="qm-notes" rows="2">${escapeHtml(q.notes || '')}</textarea></div>`;
   qs('#quote-modal').classList.remove('hidden');
+  const mk = qs('#qm-mkoffer'); if (mk) mk.addEventListener('click', () => offerFromMsg(q));
+  qs('#qm-body').querySelectorAll('[data-mof],[data-mtr],[data-mcl],[data-macc]').forEach(b => b.addEventListener('click', async () => {
+    const id = b.dataset.mof || b.dataset.mtr || b.dataset.mcl || b.dataset.macc, o = (offers || []).find(x => x.id === id); if (!o) return;
+    if (b.dataset.mof) { closeQuote(); return openOffer(o); }
+    if (b.dataset.macc) { b.disabled = true; try { const r = await clApi('/ops/offers/' + encodeURIComponent(o.id), jsonOpt('PUT', { ...o, status: 'accepted' })); offers = r.offers || offers; renderOffers(); renderQuotes(); toast('Oferta OF-' + o.no + ' e acceptată', 'ok'); openContactMsg(q); } catch (e) { toast(e.message, 'err'); b.disabled = false; } return; }
+    if (b.dataset.mcl) { if (!clients) { try { clients = (await clApi('/clients')).clients || []; } catch {} } const c = (clients || []).find(x => x.id === o.clientId); closeQuote(); goTab('clients'); if (c) openClientModal(c); else toast('Clientul nu mai există în listă', 'warn'); return; }
+    b.disabled = true; const c = await offerToClient(o); b.disabled = false; if (!c) return;
+    closeQuote(); goTab('clients'); openClientModal(c); toast(`${c.name} e acum în Clienți — de aici generezi contractul`, 'ok');
+  }));
   qs('#qm-handled').addEventListener('change', e => quoteUpdate({ handled: e.target.checked }));
   qs('#qm-notes').addEventListener('change', e => quoteUpdate({ notes: e.target.value }, 'Notițe salvate'));
 }
@@ -8435,13 +8480,16 @@ async function ofSave(quiet) {
   try {
     const r = await clApi('/ops/offers' + (b.id ? '/' + encodeURIComponent(b.id) : ''), jsonOpt(b.id ? 'PUT' : 'POST', b));
     offers = r.offers || offers; ofDraft = JSON.parse(JSON.stringify(r.item)); qs('#of-title').textContent = `Oferta OF-${r.item.no} · ${r.item.clientName}`;
-    qs('#of-del').style.display = ''; qs('#of-dup').style.display = ''; ofClientBtn(); renderOffers(); if (!quiet) toast('Oferta OF-' + r.item.no + ' salvată', 'ok'); return r.item;
+    qs('#of-del').style.display = ''; qs('#of-dup').style.display = ''; ofClientBtn(); renderOffers();
+    if (ofFromMsg) { const mid = ofFromMsg; ofFromMsg = null; clApi('/quotes/' + encodeURIComponent(mid), jsonOpt('PUT', { handled: true })).then(x => { const i = (quotes || []).findIndex(y => y.id === mid); if (i >= 0 && x.quote) quotes[i] = x.quote; renderQuotes(); }).catch(() => {}); }
+    else if (typeof renderQuotes === 'function' && quotes) renderQuotes();
+    if (!quiet) toast('Oferta OF-' + r.item.no + ' salvată', 'ok'); return r.item;
   } catch (e) { toast(/HTTP 40[45]|necunoscut/i.test(e.message) ? 'Actualizează serverul (v9.2)' : e.message, 'err'); return null; }
   finally { btn.disabled = false; }
 }
 qs('#of-save').addEventListener('click', () => ofSave());
 qs('#of-st').addEventListener('change', () => { ofDraft.status = qs('#of-st').value; ofClientBtn(); });
-const ofClose = () => { qs('#of-modal').classList.add('hidden'); ofDraft = null; };
+const ofClose = () => { qs('#of-modal').classList.add('hidden'); ofDraft = null; ofFromMsg = null; };
 qs('#of-x').addEventListener('click', ofClose);
 qs('#of-del').addEventListener('click', async () => {
   if (!ofDraft || !ofDraft.id) return;
