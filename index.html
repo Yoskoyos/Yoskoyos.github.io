@@ -1307,6 +1307,16 @@ html:not(.unlocked) .app{display:none}
 .modal-foot .btn{flex:0 0 auto;min-width:112px;min-height:44px;border-radius:10px;padding:10px 20px;font-size:14px}
 .modal-foot .cm-del{background:transparent!important;border-color:transparent!important;min-width:0}.modal-foot .cm-del:hover{background:rgba(229,72,77,.08)!important}
 @media(max-width:480px){.modal-foot .btn:not(.cm-del){flex:1 1 0;min-width:0}.f2{grid-template-columns:1fr}}
+@media(max-width:600px){   /* fișa clientului pe telefon: documente sus, acțiuni jos */
+  #client-modal .modal-foot{display:flex!important;flex-wrap:wrap;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px))}
+  #client-modal .modal-foot .btn{min-width:0!important;min-height:46px;padding:8px 10px!important;font-size:14.5px!important;border-radius:12px;white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:6px;margin:0!important}
+  #client-modal #cm-gen,#client-modal #cm-pv{order:1;flex:1 1 calc(50% - 4px)!important;background:var(--bg-1);border:1px solid var(--border);font-weight:700}
+  #client-modal #cm-delete{order:2;flex:0 0 48px!important;width:48px;padding:0!important;color:var(--err)!important;background:rgba(229,72,77,.08)!important;border:0!important}
+  #client-modal #cm-cancel{order:3;flex:1 1 0!important}#client-modal #cm-save{order:4;flex:1.5 1 0!important;font-weight:800}
+  #client-modal #cm-delete span,#client-modal .cmf-lg{display:none}
+}
+#client-modal .cmf-sm{display:none}@media(max-width:600px){#client-modal .cmf-sm{display:inline}}
+@media(min-width:601px){#client-modal #cm-delete .cmf-ic{display:none}}
 
 /* ══════════ ASPECT PRO (v2): grafit + portocaliu, meniu lateral pe secțiuni, indicator animat ══════════ */
 :root,:root[data-theme="dark"]{
@@ -2897,9 +2907,9 @@ html:not(.unlocked) .app{display:none}
       <div class="cm-hint">PDF, maxim 20 MB. Contractele se păstrează doar pe serverul tău și se deschid numai după autentificare.</div>
     </div>
     <div class="modal-foot">
-      <button class="btn cm-del" id="cm-delete" type="button">Șterge</button>
-      <button class="btn" id="cm-gen" type="button">📄 Generează contract</button>
-      <button class="btn" id="cm-pv" type="button">📋 Proces-verbal</button>
+      <button class="btn cm-del" id="cm-delete" type="button"><svg class="cmf-ic" width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg><span>Șterge</span></button>
+      <button class="btn" id="cm-gen" type="button"><span aria-hidden="true">📄</span> <span class="cmf-lg">Generează contract</span><span class="cmf-sm">Contract</span></button>
+      <button class="btn" id="cm-pv" type="button"><span aria-hidden="true">📋</span> Proces-verbal</button>
       <button class="btn" id="cm-cancel" type="button">Anulează</button>
       <button class="btn primary" id="cm-save" type="button">Salvează</button>
     </div>
