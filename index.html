@@ -2942,13 +2942,19 @@ html:not(.unlocked) .app{display:none}
         <datalist id="pv2-stock"></datalist>
         <label class="cm-check" id="pv2-hdd-l" style="margin-top:12px;display:none"><input type="checkbox" id="pv2-hdd"> S-a înlocuit hard diskul: trec în PV că înregistrările de pe cel vechi nu se mai pot recupera</label>
         <div id="pv2-abon-box" hidden>
-          <div class="cm-sec">Abonament (opțional)</div>
+          <div class="cm-sec">Abonament</div>
+          <div class="f2">
+            <div class="fg"><label for="pv2-cam-price">Adaos pe cameră nouă (lei / lună)</label><input type="number" id="pv2-cam-price" inputmode="decimal" min="0" step="1"></div>
+            <div class="fg"><label>Abonament acum</label><div class="cm-hint" id="pv2-abon-now" style="padding:12px 2px;font-size:15px;font-weight:700;color:var(--fg)">—</div></div>
+          </div>
           <div class="f2">
             <div class="fg"><label for="pv2-abon">Abonament lunar nou (lei)</label><input type="number" id="pv2-abon" inputmode="decimal" min="0" placeholder="gol = nu se schimbă"></div>
             <div class="fg"><label for="pv2-abon-from">Începând cu</label><input type="date" id="pv2-abon-from"></div>
           </div>
-          <div class="fg"><label for="pv2-act">Act adițional nr. (dacă ați semnat unul)</label><input type="text" id="pv2-act" autocomplete="off"></div>
-          <div class="cm-hint">Schimbarea abonamentului se face prin act adițional la contract. Procesul-verbal doar o menționează.</div>
+          <div class="cm-hint" id="pv2-abon-calc" style="margin:-4px 0 8px"></div>
+          <label class="cm-check"><input type="checkbox" id="pv2-aa" checked> Generează și <b>actul adițional</b> la contract (abonamentul nou), salvat în fișa clientului</label>
+          <label class="cm-check"><input type="checkbox" id="pv2-aa-sub" checked> Actualizează abonamentul în fișa clientului</label>
+          <div class="fg"><label for="pv2-act">Act adițional nr.</label><input type="text" id="pv2-act" autocomplete="off"></div>
         </div>
         <div class="fg" style="margin-top:10px"><label for="pv2-obs">Observații</label><textarea id="pv2-obs" rows="2" placeholder="ex. camera de la intrarea în scara 2 era arsă după furtună"></textarea></div>
         <label class="cm-check" style="margin-top:10px"><input type="checkbox" id="pv2-work" checked> Salvează intervenția la Lucrări și scade din stoc echipamentele montate</label>
@@ -9275,6 +9281,16 @@ function pv2Row(k, r) {
       : f('r-in', 'Echipament', r.in, 'list="pv2-stock"') + f('r-ser', 'Model, serie', r.ser) + `<input type="number" class="r-qty" min="1" value="${escapeHtml(String(r.qty || 1))}" aria-label="Cantitate">` + f('r-loc', 'Loc de montaj', r.loc)) +
     `<button type="button" class="btn r-del" aria-label="Șterge rândul" style="min-width:40px;padding:6px">✕</button></div>`;
 }
+function pv2CamsAdded() { return pv2Rows().filter(r => /camer|ipc-|ds-2c|dome|bullet|turret/i.test(r.in + ' ' + r.ser)).reduce((t, r) => t + (r.qty || 1), 0); }
+function pv2AbonCalc() {   // abonament nou = abonamentul din fișă + adaosul pe fiecare cameră adăugată
+  if (pv2Kind !== 'adaugare') return; const c = cmDraft || {}, now = +String((c.sub && c.sub.amount) || 0).replace(',', '.') || 0;
+  const per = +qs('#pv2-cam-price').value || 0, n = pv2CamsAdded(), nv = now + n * per;
+  if (qs('#pv2-abon').dataset.auto === '1') qs('#pv2-abon').value = n && per ? String(Math.round(nv * 100) / 100) : '';
+  qs('#pv2-abon-calc').innerHTML = n ? `${fmtLei(now)} + ${n} ${n === 1 ? 'cameră' : 'camere'} × ${fmtLei(per)} = <b>${fmtLei(nv)} / lună</b>` : 'Adaugă camerele în tabelul de mai sus și abonamentul nou se calculează singur.';
+}
+qs('#pv2-cam-price').addEventListener('input', () => { lsSet('yca_cam_add_price', qs('#pv2-cam-price').value); qs('#pv2-abon').dataset.auto = '1'; pv2AbonCalc(); });
+qs('#pv2-abon').addEventListener('input', () => { qs('#pv2-abon').dataset.auto = qs('#pv2-abon').value ? '' : '1'; });
+qs('#pv2-rows').addEventListener('input', () => setTimeout(pv2AbonCalc, 0));
 function pv2Rows() { return [...document.querySelectorAll('#pv2-rows .pv2-r')].map(d => { const g = c => { const e = d.querySelector('.' + c); return e ? e.value.trim() : ''; };
   return { out: g('r-out'), def: g('r-def'), in: g('r-in'), ser: g('r-ser'), qty: Math.max(1, Math.round(+g('r-qty') || 1)), loc: g('r-loc') }; }).filter(r => r.in || r.out); }
 function pv2SetKind(k) {
@@ -9286,6 +9302,7 @@ function pv2SetKind(k) {
   qs('#pv2-rows-h').textContent = k === 'garantie' ? 'Echipamente înlocuite' : 'Echipamente adăugate';
   qs('#pv2-abon-box').hidden = k !== 'adaugare';
   qs('#pv2-rows').innerHTML = (keep.length ? keep : [{}]).map(r => pv2Row(k, r)).join('');
+  setTimeout(pv2AbonCalc, 0);
 }
 async function openPv2() {
   const c = cmDraft; if (!c || !c.id) return;
@@ -9296,7 +9313,10 @@ async function openPv2() {
   qs('#pv2-nr').value = lsGet('yca_pv_next', '1'); qs('#pv2-date').value = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' });
   qs('#pv2-contract').value = lastCtr; qs('#pv2-addr').value = c.address || '';
   const [rp, rl] = String(c.contact || '').split(/\s+[—-]\s+/); qs('#pv2-repr').value = rp || ''; qs('#pv2-calit').value = rl || (c.kind === 'pj' && !/asocia/i.test(c.name) ? 'Administrator' : 'Președinte');
-  ['#pv2-obs', '#pv2-abon', '#pv2-abon-from', '#pv2-act'].forEach(k => qs(k).value = ''); qs('#pv2-hdd').checked = false; qs('#pv2-work').checked = true;
+  ['#pv2-obs', '#pv2-abon', '#pv2-abon-from', '#pv2-act'].forEach(k => qs(k).value = '');
+  qs('#pv2-cam-price').value = lsGet('yca_cam_add_price', '50'); qs('#pv2-act').value = lsGet('yca_aa_next', '1'); qs('#pv2-abon').dataset.auto = '1';
+  qs('#pv2-abon-now').textContent = c.sub && +String(c.sub.amount).replace(',', '.') ? fmtLei(+String(c.sub.amount).replace(',', '.')) + ' / lună' : 'fără abonament în fișă';
+  qs('#pv2-abon-from').value = (() => { const d = new Date(); d.setMonth(d.getMonth() + 1, 1); return d.toLocaleDateString('sv-SE'); })(); setTimeout(pv2AbonCalc, 0); qs('#pv2-hdd').checked = false; qs('#pv2-work').checked = true;
   qs('#pv2-rows').innerHTML = '';
   const hasRec = (c.contracts || []).some(f => /^Proces-verbal\s+\d/i.test(f.name || ''));   // fără PV de recepție încă → începem cu recepția
   pv2SetKind(hasRec ? (pv2Kind === 'receptie' ? 'garantie' : pv2Kind) : 'receptie');
@@ -9307,7 +9327,7 @@ qs('#pv2-x').addEventListener('click', closePv2); qs('#pv2-cancel').addEventList
 qs('#pv2-modal').addEventListener('click', e => { if (e.target.id === 'pv2-modal') closePv2(); });
 document.querySelectorAll('#pv2-kind button').forEach(b => b.addEventListener('click', () => { if (b.dataset.k === 'receptie') { closePv2(); return genPV(); } pv2SetKind(b.dataset.k); }));   // recepția nu are formular: pornește direct
 qs('#pv2-add').addEventListener('click', () => { if (document.querySelectorAll('#pv2-rows .pv2-r').length >= 8) return toast('Maxim 8 rânduri pe un proces-verbal', 'warn'); qs('#pv2-rows').insertAdjacentHTML('beforeend', pv2Row(pv2Kind)); });
-qs('#pv2-rows').addEventListener('click', e => { const b = e.target.closest('.r-del'); if (!b) return; b.closest('.pv2-r').remove(); if (!qs('#pv2-rows .pv2-r')) qs('#pv2-rows').innerHTML = pv2Row(pv2Kind); });
+qs('#pv2-rows').addEventListener('click', e => { const b = e.target.closest('.r-del'); if (!b) return; b.closest('.pv2-r').remove(); setTimeout(pv2AbonCalc, 0); if (!qs('#pv2-rows .pv2-r')) qs('#pv2-rows').innerHTML = pv2Row(pv2Kind); });
 const pv2Dmy = d => /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d.slice(8, 10) + '.' + d.slice(5, 7) + '.' + d.slice(0, 4) : '';
 function pv2StockOf(text) {   // echipamentul din stoc după denumire sau model
   const n = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); const t = n(text); if (!t) return null;
@@ -9321,6 +9341,7 @@ qs('#pv2-go').addEventListener('click', async () => {
   const bt = qs('#pv2-go'), old = bt.textContent; bt.disabled = true; bt.textContent = 'Se generează…';
   try {
     const nr = qs('#pv2-nr').value.trim(), dIso = qs('#pv2-date').value, abon = +qs('#pv2-abon').value || 0;
+    if (pv2Kind === 'adaugare' && abon && qs('#pv2-aa').checked && !qs('#pv2-act').value.trim()) qs('#pv2-act').value = lsGet('yca_aa_next', '1');
     const val = { NR: nr, DATA: pv2Dmy(dIso), BENEF: c.name || '', SEDIU: c.address || '', CIF: c.code || '', REPR: qs('#pv2-repr').value.trim(), CALIT: qs('#pv2-calit').value.trim() || 'Reprezentant',
       CONTRACT: qs('#pv2-contract').value.trim(), IMOBIL: qs('#pv2-addr').value.trim(), OBS: qs('#pv2-obs').value.trim() || '—' };
     rows.forEach((r, i) => { const L = PV2_ROWS[i]; val['M_' + L + '_NR'] = String(i + 1); val['M_' + L + '_OUT'] = r.out; val['M_' + L + '_DEF'] = r.def; val['M_' + L + '_IN'] = r.in; val['M_' + L + '_SER'] = r.ser; val['M_' + L + '_QTY'] = String(r.qty); val['M_' + L + '_LOC'] = r.loc; });
@@ -9343,6 +9364,27 @@ qs('#pv2-go').addEventListener('click', async () => {
         msgs.push(parts.length ? `${parts.length} ${parts.length === 1 ? 'echipament scăzut' : 'echipamente scăzute'} din stoc` : 'lucrare salvată (echipamentele nu erau în stoc)');
         try { renderWorks(); renderStock(); } catch {}
       } catch (e) { msgs.push('lucrarea nu s-a salvat: ' + e.message); }
+    }
+    if (pv2Kind === 'adaugare' && abon && qs('#pv2-aa').checked) {   // act adițional: abonamentul nou
+      try {
+        const now = +String((c.sub && c.sub.amount) || 0).replace(',', '.') || 0, actNr = qs('#pv2-act').value.trim() || lsGet('yca_aa_next', '1');
+        const L = v => (Math.round(v * 100) / 100).toLocaleString('ro-RO');
+        const av = { ...val, NR: actNr, PV_NR: nr, FROM: pv2Dmy(qs('#pv2-abon-from').value) || val.DATA, ABON_VECHI: now ? L(now) : '0', ABON_NOU: L(abon), DIFF: L(Math.max(0, abon - now)),
+          ECHIP: rows.map(x => `${x.qty} × ${x.in}${x.ser ? ' (' + x.ser + ')' : ''}${x.loc ? ' – ' + x.loc : ''}`).join('; ') };
+        const ra = await fetch('act-aditional-template.docx?v=1', { cache: 'no-store' }); if (!ra.ok) throw new Error('Nu găsesc șablonul de act adițional');
+        const ab = await docxFill(await ra.arrayBuffer(), av, await ctrStamp(), { CONTRACT: '……………', REPR: '……………………', CIF: '……………', SEDIU: '……………………', IMOBIL: '……………………' });
+        const an = ('Act aditional ' + actNr + ' - ' + c.name).replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() + '.docx';
+        const a2 = document.createElement('a'); a2.href = URL.createObjectURL(ab); a2.download = an; document.body.appendChild(a2); setTimeout(() => a2.click(), 600); setTimeout(() => { URL.revokeObjectURL(a2.href); a2.remove(); }, 6000);
+        if (/^\d+$/.test(actNr)) lsSet('yca_aa_next', String(+actNr + 1));
+        try { const up = await clApi(`/clients/${encodeURIComponent(c.id)}/contracts?kind=contract&name=${encodeURIComponent(an)}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: ab });
+          cmDraft.contracts = up.client.contracts; const i = clients.findIndex(x => x.id === up.client.id); if (i >= 0) clients[i].contracts = up.client.contracts; renderCmFiles(); } catch {}
+        msgs.push('act adițional nr. ' + actNr + ' generat');
+        if (qs('#pv2-aa-sub').checked) {
+          try { const b = { ...c, sub: { ...(c.sub || {}), active: true, amount: String(abon) } }; const r2 = await clApi('/clients/' + encodeURIComponent(c.id), jsonOpt('PUT', b));
+            const i = clients.findIndex(x => x.id === c.id); if (i >= 0) clients[i] = r2.client; cmDraft.sub = r2.client.sub; const am = qs('#cm-amount'); if (am) am.value = String(abon); try { renderClients(); } catch {}
+            msgs.push('abonament actualizat la ' + L(abon) + ' lei'); } catch (e) { msgs.push('abonamentul nu s-a actualizat: ' + e.message); }
+        }
+      } catch (e) { msgs.push('actul adițional nu s-a generat: ' + e.message); }
     }
     closePv2(); toast(msgs.join(' · '), 'ok');
   } catch (e) { toast(e.message, 'err'); }
