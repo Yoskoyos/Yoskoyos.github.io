@@ -2940,7 +2940,7 @@ html:not(.unlocked) .app{display:none}
         <div id="pv2-rows" style="display:flex;flex-direction:column;gap:8px"></div>
         <button type="button" class="btn" id="pv2-add" style="margin-top:8px">+ Încă un echipament</button>
         <datalist id="pv2-stock"></datalist>
-        <label class="cm-check" id="pv2-hdd-l" style="margin-top:12px"><input type="checkbox" id="pv2-hdd"> S-a înlocuit hard diskul: trec în PV că înregistrările de pe cel vechi nu se mai pot recupera</label>
+        <label class="cm-check" id="pv2-hdd-l" style="margin-top:12px;display:none"><input type="checkbox" id="pv2-hdd"> S-a înlocuit hard diskul: trec în PV că înregistrările de pe cel vechi nu se mai pot recupera</label>
         <div id="pv2-abon-box" hidden>
           <div class="cm-sec">Abonament (opțional)</div>
           <div class="f2">
@@ -9284,7 +9284,7 @@ function pv2SetKind(k) {
   qs('#pv2-go').textContent = k === 'receptie' ? 'Continuă' : 'Generează procesul-verbal';
   if (k === 'receptie') return;
   qs('#pv2-rows-h').textContent = k === 'garantie' ? 'Echipamente înlocuite' : 'Echipamente adăugate';
-  qs('#pv2-hdd-l').hidden = k !== 'garantie'; qs('#pv2-abon-box').hidden = k !== 'adaugare';
+  qs('#pv2-abon-box').hidden = k !== 'adaugare';
   qs('#pv2-rows').innerHTML = (keep.length ? keep : [{}]).map(r => pv2Row(k, r)).join('');
 }
 async function openPv2() {
@@ -9324,7 +9324,6 @@ qs('#pv2-go').addEventListener('click', async () => {
     const val = { NR: nr, DATA: pv2Dmy(dIso), BENEF: c.name || '', SEDIU: c.address || '', CIF: c.code || '', REPR: qs('#pv2-repr').value.trim(), CALIT: qs('#pv2-calit').value.trim() || 'Reprezentant',
       CONTRACT: qs('#pv2-contract').value.trim(), IMOBIL: qs('#pv2-addr').value.trim(), OBS: qs('#pv2-obs').value.trim() || '—' };
     rows.forEach((r, i) => { const L = PV2_ROWS[i]; val['M_' + L + '_NR'] = String(i + 1); val['M_' + L + '_OUT'] = r.out; val['M_' + L + '_DEF'] = r.def; val['M_' + L + '_IN'] = r.in; val['M_' + L + '_SER'] = r.ser; val['M_' + L + '_QTY'] = String(r.qty); val['M_' + L + '_LOC'] = r.loc; });
-    if (pv2Kind === 'garantie' && qs('#pv2-hdd').checked) val.M_HDDNOTE = 'Beneficiarul a fost informat că înregistrările stocate pe hard diskul defect nu mai pot fi recuperate.';
     if (pv2Kind === 'adaugare' && abon) val.M_ABON = `Începând cu ${pv2Dmy(qs('#pv2-abon-from').value) || 'data prezentului proces-verbal'}, abonamentul lunar devine ${abon.toLocaleString('ro-RO')} lei${qs('#pv2-act').value.trim() ? ', conform actului adițional nr. ' + qs('#pv2-act').value.trim() : ', conform actului adițional la contract'}.`;
     const r = await fetch(`pv-${pv2Kind}-template.docx?v=1`, { cache: 'no-store' }); if (!r.ok) throw new Error('Nu găsesc șablonul de proces-verbal');
     const blob = await docxFill(await r.arrayBuffer(), val, await ctrStamp(), { CONTRACT: '……………', REPR: '……………………', CIF: '……………', SEDIU: '……………………', IMOBIL: '……………………' });
