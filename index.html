@@ -2548,7 +2548,7 @@ html:not(.unlocked) .app{display:none}
       <label class="cm-check"><input type="checkbox" id="sm-cod"> Plata ramburs (la curier)</label>
       <div class="fg" style="margin-top:6px"><label for="sm-codfee">Taxă ramburs (lei, 0 = fără)</label><input type="number" id="sm-codfee" inputmode="decimal" min="0" step="1"></div>
       <label class="cm-check" style="margin-top:8px"><input type="checkbox" id="sm-op"> Plata prin transfer bancar (IBAN ING din e-mailul de confirmare)</label>
-      <label class="cm-check" style="margin-top:8px"><input type="checkbox" id="sm-pickup"> Ridicare personală din București (fără transport)</label>
+      <label class="cm-check" style="margin-top:8px;display:none" hidden><input type="checkbox" id="sm-pickup"> Ridicare personală din București (fără transport)</label>
       <div class="fg" style="margin-top:8px"><label for="sm-note">Mesaj scurt pe pagina coșului (opțional)</label><input type="text" id="sm-note" maxlength="300" placeholder="ex. Comenzile plasate până la ora 14 pleacă în aceeași zi"></div>
       <div class="cm-hint">Plata cu cardul online se adaugă după ce deschizi cont la un procesator de plăți (de ex. Netopia sau Stripe).</div>
     </div>
@@ -7226,7 +7226,7 @@ qs('#om-delete').addEventListener('click', async () => {
 });
 function smFill() {
   const c = ops.shopCfg; qs('#sm-on').checked = !!c.on; qs('#sm-mk').value = c.markup; qs('#sm-base').value = c.base === 'site' ? 'site' : 'inst'; qs('#sm-ship').value = c.ship; qs('#sm-free').value = c.freeOver;
-  qs('#sm-cod').checked = !!c.cod; qs('#sm-codfee').value = c.codFee || 0; qs('#sm-op').checked = !!c.op; qs('#sm-pickup').checked = !!c.pickup; qs('#sm-note').value = c.note || '';
+  qs('#sm-cod').checked = !!c.cod; qs('#sm-codfee').value = c.codFee || 0; qs('#sm-op').checked = !!c.op; qs('#sm-pickup').checked = false; qs('#sm-note').value = c.note || '';
   qs('#sm-syncat').textContent = c.syncAt ? 'Ultima actualizare A2T: ' + new Date(c.syncAt).toLocaleString('ro-RO') : 'Prețurile A2T nu au fost citite încă.';
 }
 qs('#or-cfg-btn').addEventListener('click', () => { if (!ops || !ops.shopCfg) return toast('Actualizează serverul (v11.4) ca să pornești magazinul', 'warn'); smFill(); qs('#shop-modal').classList.remove('hidden'); });

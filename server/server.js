@@ -1806,7 +1806,7 @@ async function a2tTick(db) {
    Preț pe site = preț fix (dacă e pus) sau prețul public A2T (cu TVA) × (1 + adaos%), rotunjit în sus la leu. Firma nu e plătitoare de TVA → prețul afișat e prețul final.
    Prețul și stocul A2T se actualizează zilnic. Comenzile: ops[<proprietar>].orders, numerotate CMD-<n>. */
 const a2tInst = (s, site) => { const t = (s.tier_prices || []).map(x => +x.value).filter(v => v > 0 && v <= site); return t.length ? Math.round(Math.min(...t) * 100) / 100 : site; };
-const SHOP_DEF = { on: false, base: 'inst', markup: 20, ship: 25, freeOver: 1000, pickup: true, cod: true, op: true, codFee: 0, note: '' };
+const SHOP_DEF = { on: false, base: 'inst', markup: 20, ship: 25, freeOver: 1000, pickup: false, cod: true, op: true, codFee: 0, note: '' };
 const shopCfgOf = u => ({ ...SHOP_DEF, ...(u.shopCfg || {}) });
 const skuKey = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 const todayBuc = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' });
@@ -1886,7 +1886,7 @@ async function handlePublicOrder(req, res) {
   const c0 = b.c || {}; const c = { type: c0.type === 'pj' ? 'pj' : 'pf', name: str(c0.name, 120).trim(), phone: str(c0.phone, 40).trim(), email: str(c0.email, 160).trim(),
     company: str(c0.company, 160).trim(), cui: str(c0.cui, 30).trim(), regcom: str(c0.regcom, 40).trim(), county: str(c0.county, 60).trim(), city: str(c0.city, 80).trim(),
     address: str(c0.address, 300).trim(), zip: str(c0.zip, 12).trim(), notes: str(c0.notes, 1500).trim() };
-  const delivery = b.delivery === 'ridicare' && cfg.pickup ? 'ridicare' : 'curier';
+  const delivery = 'curier';   // ridicarea personală a fost scoasă (23.11.2026) — doar livrare prin curier
   const pay = b.pay === 'op' && cfg.op ? 'op' : b.pay === 'ramburs' && cfg.cod && delivery === 'curier' ? 'ramburs' : delivery === 'ridicare' ? 'ridicare' : '';
   if (!pay) return send(400, { error: 'Alege metoda de plată' });
   if (!c.name || c.phone.replace(/\D/g, '').length < 9) return send(400, { error: 'Completează numele și un număr de telefon valid' });
@@ -4276,7 +4276,7 @@ function catalogPublic(req, res, pathname) {
       ...(ref ? { oldPrice: ref, disc: Math.round((ref - price) / ref * 100), discUntil: x.discUntil || '' } : {}),
       specs: String(x.specs || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 20), photo: f ? `${base}/public/catalog/${x.id}/photo?v=${f.id}` : '', datasheet: pdf ? `${base}/public/catalog/${x.id}/fisa?v=${pdf.id}` : '' }; });
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=60', ...PUB_CORS });
-  res.end(JSON.stringify({ items: out, shop: cfg.on ? { on: true, ship: +cfg.ship || 0, freeOver: +cfg.freeOver || 0, codFee: +cfg.codFee || 0, pickup: !!cfg.pickup, cod: !!cfg.cod, op: !!cfg.op, note: cfg.note || '' } : { on: false } }));
+  res.end(JSON.stringify({ items: out, shop: cfg.on ? { on: true, ship: +cfg.ship || 0, freeOver: +cfg.freeOver || 0, codFee: +cfg.codFee || 0, pickup: false, cod: !!cfg.cod, op: !!cfg.op, note: cfg.note || '' } : { on: false } }));
 }
 function handlePublicPrices(req, res) {
   const db = loadDb(); const c = quoteCfg(db, quoteOwner(db));
@@ -4682,7 +4682,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.5, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.6, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
