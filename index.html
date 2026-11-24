@@ -1533,6 +1533,18 @@ html.th-anim,html.th-anim *{transition:background-color .35s ease,color .35s eas
 .nvr-mute{display:inline-flex;align-items:center;gap:4px;margin-left:6px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);background:var(--bg-3);color:var(--fg-2);font:600 11px/1.4 var(--sans);cursor:pointer;vertical-align:middle}
 .nvr-mute:hover{border-color:var(--accent);color:var(--fg)}
 @media (max-width:600px){.nvr-mute span{display:none}}
+/* ecrane scunde (laptop cu zoom): meniul se strânge pe înălțime ca să încapă tot, cu Setări */
+@media (min-width:601px) and (max-height:780px){
+  html .nav{padding-top:8px;padding-bottom:8px;gap:1px}
+  html .nav .nav-tab{height:34px;font-size:13.5px}
+  .nav-sec{padding:9px 12px 3px!important;font-size:10px}
+  .nav-foot{padding:6px 4px 0}
+  .th-pill button{height:24px}.th-pill::before{height:24px}
+}
+@media (min-width:601px) and (max-height:640px){
+  html .nav .nav-tab{height:30px;font-size:13px}
+  .nav-sec{padding:6px 12px 2px!important}
+}
 /* sub-meniurile din pagini (Cereri / Oferte proprii / Newsletter, Clienți / Încasări, SEAP…) în același stil cu meniul */
 html,body{overflow-x:hidden}
 @supports (overflow:clip){html,body{overflow-x:clip}}
