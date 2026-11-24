@@ -3499,11 +3499,12 @@ async function checkAll(){
         // (NU le marcăm pe toate ca „văzute online” — asta producea camere căzute false)
         if (prevCamsSnap.length) res.cams = prevCamsSnap.slice();
       } else {
-        const seen = nvrs[idx].seenCh || {};
-        res.cams.forEach((c, i) => { if (c === 'ok') seen[i + 1] = true; });
+        const seen = nvrs[idx].seenCh || {}, ign = nvrs[idx].ignCh || {};
+        res.cams.forEach((c, i) => { if (c === 'ok') { seen[i + 1] = true; delete ign[i + 1]; } else if (ign[i + 1]) delete seen[i + 1]; });   // „nu e cameră aici” → nu mai contează (până pornește o cameră pe canal)
+        nvrs[idx].ignCh = ign;
         // camere adăugate în NVR, dar care n-au mers niciodată → le reținem separat (utilizatorul le poate activa)
         const pend = {};
-        res.cams.forEach((c, i) => { if (c === 'err' && !seen[i + 1]) pend[i + 1] = (res.camReasons || {})[i + 1] || ''; });
+        res.cams.forEach((c, i) => { if (c === 'err' && !seen[i + 1] && !ign[i + 1]) pend[i + 1] = (res.camReasons || {})[i + 1] || ''; });
         res.cams = res.cams.map((c, i) => (c === 'err' && !seen[i + 1]) ? 'free' : c);
         nvrs[idx].seenCh = seen;
         nvrs[idx].pendCh = pend;
@@ -6078,6 +6079,7 @@ qs('#snap-modal-rec').addEventListener('click', () => { if (snapState) openRecMo
 document.addEventListener('click', e => {
   const cell = e.target.closest('.ch-cell');
   if (cell && cell.classList.contains('pend')) { watchPendingCam(cell); return; }
+  if (cell && cell.classList.contains('err')) { offlineCamAsk(cell); return; }
   if (!cell || cell.classList.contains('free')) return;
   const card = cell.closest('[data-nid]');
   if (!card) return;
@@ -6086,6 +6088,30 @@ document.addEventListener('click', e => {
   if (!ch || !nvrId) return;
   openSnapModal(nvrId, ch);
 });
+
+// Cameră offline: utilizatorul poate spune că pe canal nu e montată nicio cameră → nu mai e urmărit
+async function offlineCamAsk(cell){
+  const card = cell.closest('[data-nid]'); if (!card) return;
+  const n = nvrs.find(x => x.id === parseInt(card.dataset.nid)), ch = parseInt(cell.dataset.nch);
+  if (!n || !ch) return;
+  const why = camReasonLabel((n.camReasons || {})[ch]), ip = (n.camIp || {})[ch];
+  const ok = await confirmDialog({
+    title: `CH${ch} e offline`,
+    html: `Pe <b>CH${ch}</b> (${escapeHtml(n.name)})${ip ? ` · IP ${escapeHtml(ip)}` : ''} NVR-ul are o cameră configurată, dar nu răspunde${why ? ` — <b>${escapeHtml(why)}</b>` : ''}.<br><br>Dacă <b>nu e montată nicio cameră</b> pe canalul ăsta, apasă butonul de mai jos: nu mai apare ca offline și nu mai primești alerte. Dacă o cameră pornește vreodată pe canal, e urmărită din nou automat.`,
+    okLabel: 'Nu e cameră aici', cancelLabel: 'Închide', tone: 'watch',
+  });
+  if (!ok) return;
+  n.ignCh = n.ignCh || {}; n.ignCh[ch] = Date.now();
+  if (n.seenCh) delete n.seenCh[ch];
+  if (n.pendCh) delete n.pendCh[ch];
+  if (Array.isArray(n.cams) && n.cams[ch - 1] === 'err') n.cams[ch - 1] = 'free';
+  if (n.status === 'warning' && Array.isArray(n.cams) && !n.cams.slice(0, n.channels).includes('err')) n.status = 'online';
+  save(SK.nvrs, nvrs);
+  addLog('info', `<b>${escapeHtml(n.name)}</b> — CH${ch} marcat „fără cameră” (nu mai e urmărit)`);
+  renderAll();
+  try { pushSettings(); } catch {}
+  toast(`CH${ch} nu mai e urmărit`, 'ok');
+}
 
 // Cameră adăugată în NVR care n-a mers niciodată → utilizatorul confirmă că e o cameră reală
 async function watchPendingCam(cell){
@@ -6101,7 +6127,7 @@ async function watchPendingCam(cell){
     tone: 'watch',
   });
   if (!ok) return;
-  n.seenCh = n.seenCh || {}; n.seenCh[ch] = true;
+  n.seenCh = n.seenCh || {}; n.seenCh[ch] = true; if (n.ignCh) delete n.ignCh[ch];
   if (n.pendCh) delete n.pendCh[ch];
   if (Array.isArray(n.cams) && n.cams[ch - 1] === 'free') n.cams[ch - 1] = 'err';
   if (n.status === 'online') n.status = 'warning';
@@ -6329,7 +6355,7 @@ async function refreshMonitorHint(){
 // Setările care contează pentru server (fără starea live a NVR-urilor)
 function settingsPayload(){
   return {
-    nvrs: nvrs.map(n => ({ id: n.id, name: n.name, ip: n.ip, port: n.port, ...(n.rtspPort ? { rtspPort: n.rtspPort } : {}), channels: n.channels, location: n.location || '', seenCh: n.seenCh || {}, seenV: 2 })),
+    nvrs: nvrs.map(n => ({ id: n.id, name: n.name, ip: n.ip, port: n.port, ...(n.rtspPort ? { rtspPort: n.rtspPort } : {}), channels: n.channels, location: n.location || '', seenCh: n.seenCh || {}, ...(n.ignCh && Object.keys(n.ignCh).length ? { ignCh: n.ignCh } : {}), seenV: 2 })),
     creds, cfg,
   };
 }
@@ -6386,8 +6412,9 @@ function applyServerSettings(d, serverT){
   const prevInterval = cfg.interval;
   nvrs = d.nvrs.map(sn => {
     const o = old.get(sn.id) || { status: 'unknown', cams: [], hdds: [], activeCams: 0 };
-    const seen = { ...(o.seenCh || {}), ...((sn.seenV === 2 && sn.seenCh) || {}) };
-    return { ...o, ...sn, seenCh: seen, seenV: 2 };
+    const seen = { ...(o.seenCh || {}), ...((sn.seenV === 2 && sn.seenCh) || {}) }, ign = sn.ignCh || {};
+    for (const ch of Object.keys(ign)) delete seen[ch];
+    return { ...o, ...sn, seenCh: seen, ignCh: ign, seenV: 2 };
   });
   creds = d.creds || {};
   cfg = { ...cfg, ...(d.cfg || {}) };

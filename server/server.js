@@ -21,6 +21,7 @@
 // v4.5: clienți — furnizor echipamente + documente de garanție (PDF/JPG/PNG), câmp `kind` la fișiere.
 // v4.4: GET /company?cui= — datele firmei din serviciul public ANAF (PlatitorTvaRest v9), pt. completarea fișei clientului.
 // v4.3: evidență clienți (clients.json) + contracte PDF stocate pe VPS în contracts/ (nu în GitHub).
+// v12.7: canalele marcate în aplicație „nu e cameră aici” (ignCh) nu mai dau alerte de cameră offline.
 // v4.2: monitorul ține cont și de canalele marcate în aplicație (seenCh) — ex. cameră pusă „urmărită” deși n-a mers niciodată.
 
 const http    = require('http');
@@ -602,8 +603,10 @@ function evaluateNvr(key, nvr, res) {
   // camere
   if (res.cams) {
     const appSeen = nvr.seenCh || {};   // canale văzute online în aplicație sau marcate „urmărește” de utilizator
+    const appIgn = nvr.ignCh || {};     // canale marcate „nu e cameră aici” → nu se urmăresc cât timp sunt offline
     for (const [chS, on] of Object.entries(res.cams)) {
       const ch = parseInt(chS, 10);
+      if (!on && appIgn[ch]) { delete st.seen[ch]; delete st.cams[ch]; st.camFail[ch] = 0; continue; }
       if (!on && !st.seen[ch] && appSeen[ch]) st.seen[ch] = true;
       if (on) {
         if (st.cams[ch] === 'err') lines.push({ kind: 'info', text: `🟢 ${chLbl(st, ch)} — cameră revenită online` });
@@ -4682,7 +4685,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.6, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.7, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);

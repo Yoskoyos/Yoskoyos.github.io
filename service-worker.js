@@ -1,7 +1,7 @@
 // Supraveghere ERP — service worker
 // Pagina se ia MEREU de pe internet, ocolind memoria browserului (GitHub Pages permite păstrarea ei 10 min),
 // iar ultima versiune rămâne salvată doar pentru folosire fără internet.
-const CACHE = 'yca-erp-v51';
+const CACHE = 'yca-erp-v52';
 
 self.addEventListener('install', e => {
   e.waitUntil(
