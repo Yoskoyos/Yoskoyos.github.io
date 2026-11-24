@@ -1528,6 +1528,20 @@ html.th-anim,html.th-anim *{transition:background-color .35s ease,color .35s eas
   .nav-sec{color:var(--gl-sec)}
   .nav-foot{display:flex;padding:12px 4px 0}
 }
+/* sub-meniurile din pagini (Cereri / Oferte proprii / Newsletter, Clienți / Încasări, SEAP…) în același stil cu meniul */
+html,body{overflow-x:hidden}
+@supports (overflow:clip){html,body{overflow-x:clip}}
+.seg{background:var(--gl-bg);border:1px solid var(--gl-brd);border-radius:16px;padding:4px;gap:4px;
+  box-shadow:0 14px 34px -22px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.06);-webkit-backdrop-filter:blur(18px) saturate(1.5);backdrop-filter:blur(18px) saturate(1.5)}
+.seg button{border-radius:12px;color:var(--gl-fg);font-weight:650;transition:color .2s,background .25s,box-shadow .25s}
+.seg button:hover{background:var(--gl-hov);color:var(--fg)}
+.seg button.on,.seg button.on:hover{background:var(--pro-grad);color:#fff;box-shadow:var(--pro-glow)}
+.seg button.on .cnt{background:rgba(0,0,0,.25)}
+.modal .seg{-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--bg-2);box-shadow:none;border-color:var(--border)}
+@media (max-width:600px){
+  .panel > .seg:not([hidden]),.seg#qt-seg,.seg#shop-seg{display:flex;width:100%}
+  .panel > .seg button,.seg#qt-seg button,.seg#shop-seg button{flex:1 0 auto;justify-content:center;padding:10px 14px}
+}
 @media (prefers-reduced-motion: reduce){html .nav,.main,.nav-aura,#nav-mini,#nav-mini svg,.th-pill::before{transition:none!important}}
 </style>
 </head>
