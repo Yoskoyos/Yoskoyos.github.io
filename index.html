@@ -1528,6 +1528,9 @@ html.th-anim,html.th-anim *{transition:background-color .35s ease,color .35s eas
   .nav-sec{color:var(--gl-sec)}
   .nav-foot{display:flex;padding:12px 4px 0}
 }
+.nvr-mute{display:inline-flex;align-items:center;gap:4px;margin-left:6px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);background:var(--bg-3);color:var(--fg-2);font:600 11px/1.4 var(--sans);cursor:pointer;vertical-align:middle}
+.nvr-mute:hover{border-color:var(--accent);color:var(--fg)}
+@media (max-width:600px){.nvr-mute span{display:none}}
 /* sub-meniurile din pagini (Cereri / Oferte proprii / Newsletter, Clienți / Încasări, SEAP…) în același stil cu meniul */
 html,body{overflow-x:hidden}
 @supports (overflow:clip){html,body{overflow-x:clip}}
@@ -2420,6 +2423,8 @@ html,body{overflow-x:hidden}
     <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Deschide Web UI</button>
   <button type="button" role="menuitem" data-act="order">
     <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M7 4v16M7 4L3 8M7 4l4 4M17 20V4M17 20l-4-4M17 20l4-4"/></svg>Schimbă ordinea</button>
+  <button type="button" role="menuitem" data-act="mute">
+    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span id="nvr-menu-mute">Oprește notificările</span></button>
   <div class="nvr-menu-sep" role="separator"></div>
   <button type="button" role="menuitem" data-act="del" class="danger">
     <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>Șterge NVR</button>
@@ -3261,6 +3266,17 @@ function addLog(type, msg){
   renderLog();
 }
 
+// Notificări oprite pentru un NVR (până rezolvi problema): fără push, sunet sau Telegram de la el
+async function toggleNvrMute(nid, on){
+  const n = nvrs.find(x => x.id === nid); if (!n) return;
+  const mute = on === undefined ? !n.mute : !!on;
+  if (mute && !(await confirmDialog({ title: `Oprești notificările de la ${n.name}?`, html: 'Nu mai primești alerte (telefon, Telegram, sunet) de la acest NVR până le pornești din nou. NVR-ul rămâne monitorizat: starea lui o vezi în continuare în aplicație.', okLabel: 'Oprește notificările', tone: 'watch' }))) return;
+  n.mute = mute; if (mute) n.muteAt = Date.now(); else delete n.muteAt;
+  save(SK.nvrs, nvrs); renderAll(); try { pushSettings().catch(() => {}); } catch {}
+  addLog('info', `<b>${escapeHtml(n.name)}</b> — notificări ${mute ? 'oprite' : 'pornite din nou'}`);
+  toast(mute ? `🔕 Notificări oprite pentru ${n.name}` : `🔔 Notificări pornite pentru ${n.name}`, 'ok');
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-unmute]'); if (!b) return; e.preventDefault(); e.stopPropagation(); toggleNvrMute(parseInt(b.dataset.unmute), false); }, true);
 function addAlert(type, nvr, msg, subtype){
   const a = { id: Date.now(), type: subtype||type, nvr: nvr.name, msg, t: ts() };
   alerts.unshift(a);
@@ -3268,6 +3284,7 @@ function addAlert(type, nvr, msg, subtype){
   save(SK.alerts, alerts);
   renderAlerts();
   updateAlertBadge();
+  if (nvr.mute) return;   // notificări oprite pentru acest NVR: alerta rămâne doar în listă
   pushNotif(nvr.name, msg);
   playAlertSound();
   const emoji = subtype==='crit'?'🔴':subtype==='info'?'🟢':'🟡';
@@ -3842,7 +3859,7 @@ function nvrCardHTML(n, showDetail){
         <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01"/><circle cx="18" cy="12" r="2"/></svg>
       </div>
       <div class="nvr-info">
-        <div class="nvr-name">${n.name}</div>
+        <div class="nvr-name">${n.name}${n.mute ? ` <button type="button" class="nvr-mute" data-unmute="${n.id}" title="Notificări oprite pentru acest NVR — apasă ca să le pornești" aria-label="Notificări oprite — pornește-le">🔕 <span>fără notificări</span></button>` : ''}</div>
         <div class="nvr-meta">${n.ip}:${n.port} · ${n.location||'—'}${camsArr.length && n.status!=='offline' ? ` · <span class="nvr-cams${offlineCams>0?' warn':''}">${activeCams}/${totalChecked} cam</span>` : ''}</div>
       </div>
       <span class="nvr-badge ${n.status}" title="${n.status==='warning' ? offlineCams+' camere offline' : n.status==='offline' ? 'NVR nu răspunde' : ''}">${nvrStatusLabel(n.status)}${n.status==='warning'&&offlineCams>0?`<span class="badge-x"> · ${offlineCams} cam offline</span>`:''}</span>
@@ -4055,6 +4072,7 @@ function openNvrMenu(btn, nid){
   const m = qs('#nvr-menu');
   _menuNid = nid; _menuBtn = btn;
   qs('#nvr-menu-title').textContent = n.name;
+  qs('#nvr-menu-mute').textContent = n.mute ? 'Pornește notificările' : 'Oprește notificările';
   m.hidden = false;
   btn.setAttribute('aria-expanded','true');
   positionNvrMenu();
@@ -4091,6 +4109,7 @@ qs('#nvr-menu').addEventListener('click', e => {
   if (act === 'edit')  openEditModal(nid);
   if (act === 'webui') openNvrWebUi(nid);
   if (act === 'del')   deleteNvr(nid);
+  if (act === 'mute')  toggleNvrMute(nid);
   if (act === 'order') openOrderModal(nid);
 });
 qs('#nvr-menu').addEventListener('keydown', e => {
@@ -6442,7 +6461,7 @@ async function refreshMonitorHint(){
 // Setările care contează pentru server (fără starea live a NVR-urilor)
 function settingsPayload(){
   return {
-    nvrs: nvrs.map(n => ({ id: n.id, name: n.name, ip: n.ip, port: n.port, ...(n.rtspPort ? { rtspPort: n.rtspPort } : {}), channels: n.channels, location: n.location || '', seenCh: n.seenCh || {}, ...(n.ignCh && Object.keys(n.ignCh).length ? { ignCh: n.ignCh } : {}), seenV: 2 })),
+    nvrs: nvrs.map(n => ({ id: n.id, name: n.name, ip: n.ip, port: n.port, ...(n.rtspPort ? { rtspPort: n.rtspPort } : {}), channels: n.channels, location: n.location || '', seenCh: n.seenCh || {}, ...(n.mute ? { mute: true } : {}), ...(n.ignCh && Object.keys(n.ignCh).length ? { ignCh: n.ignCh } : {}), seenV: 2 })),
     creds, cfg,
   };
 }
@@ -6501,7 +6520,7 @@ function applyServerSettings(d, serverT){
     const o = old.get(sn.id) || { status: 'unknown', cams: [], hdds: [], activeCams: 0 };
     const seen = { ...(o.seenCh || {}), ...((sn.seenV === 2 && sn.seenCh) || {}) }, ign = sn.ignCh || {};
     for (const ch of Object.keys(ign)) delete seen[ch];
-    return { ...o, ...sn, seenCh: seen, ignCh: ign, seenV: 2 };
+    return { ...o, ...sn, seenCh: seen, ignCh: ign, mute: !!sn.mute, seenV: 2 };
   });
   creds = d.creds || {};
   cfg = { ...cfg, ...(d.cfg || {}) };

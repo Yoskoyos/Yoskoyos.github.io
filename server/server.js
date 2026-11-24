@@ -21,6 +21,7 @@
 // v4.5: clienți — furnizor echipamente + documente de garanție (PDF/JPG/PNG), câmp `kind` la fișiere.
 // v4.4: GET /company?cui= — datele firmei din serviciul public ANAF (PlatitorTvaRest v9), pt. completarea fișei clientului.
 // v4.3: evidență clienți (clients.json) + contracte PDF stocate pe VPS în contracts/ (nu în GitHub).
+// v12.8: NVR cu notificări oprite din aplicație (mute) → monitorizat, dar fără Telegram / push.
 // v12.7: canalele marcate în aplicație „nu e cameră aici” (ignCh) nu mai dau alerte de cameră offline.
 // v4.2: monitorul ține cont și de canalele marcate în aplicație (seenCh) — ex. cameră pusă „urmărită” deși n-a mers niciodată.
 
@@ -757,7 +758,7 @@ async function monitorRun() {
         let lines = evaluateNvr(t.key, t.nvr, res);
         if (res.online && res.authOk) { try { lines = lines.concat(await recCheck(t.key, t.nvr, t.cred)); } catch (e) { console.error('[monitor] înregistrare:', e.message); } }
         if (res.online && res.authOk) { try { await timeCheck(t.key, t.nvr, t.cred); } catch (e) { console.error('[ora]', e.message); } }
-        if (lines.length) (out[t.user] || (out[t.user] = { ucfg: t.ucfg, blocks: [] })).blocks.push({ nvr: t.nvr, lines });
+        if (lines.length && !t.nvr.mute) (out[t.user] || (out[t.user] = { ucfg: t.ucfg, blocks: [] })).blocks.push({ nvr: t.nvr, lines });
       }
     }));
     for (const k of Object.keys(monState.nvr)) if (!live.has(k)) delete monState.nvr[k];
@@ -788,7 +789,7 @@ async function monitorRun() {
       const rows = conf.nvrs.map(n => {
         const st = monState.nvr[user + ':' + n.id] || {};
         const icon = st.status === 'online' ? '🟢' : st.status === 'offline' ? '🔴' : st.status === 'warning' ? '🟡' : '⚪';
-        return `${icon} ${escHtml(n.name)} — ${(st.status || 'necunoscut').toUpperCase()}${st.camsTotal ? ` · ${st.camsOk}/${st.camsTotal} cam` : ''}`;
+        return `${icon} ${escHtml(n.name)}${n.mute ? ' 🔕' : ''} — ${(st.status || 'necunoscut').toUpperCase()}${st.camsTotal ? ` · ${st.camsOk}/${st.camsTotal} cam` : ''}`;
       });
       const on = conf.nvrs.filter(n => ['online', 'warning'].includes((monState.nvr[user + ':' + n.id] || {}).status)).length;
       await tgSend(ucfg, `📊 <b>Raport zilnic — Supraveghere ERP</b>\n🕐 ${bucNow()}\n\n✅ NVR online: <b>${on}/${conf.nvrs.length}</b>\n\n${rows.join('\n')}`);
@@ -4685,7 +4686,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.7, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.8, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
