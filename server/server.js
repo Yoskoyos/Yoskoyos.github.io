@@ -21,6 +21,7 @@
 // v4.5: clienți — furnizor echipamente + documente de garanție (PDF/JPG/PNG), câmp `kind` la fișiere.
 // v4.4: GET /company?cui= — datele firmei din serviciul public ANAF (PlatitorTvaRest v9), pt. completarea fișei clientului.
 // v4.3: evidență clienți (clients.json) + contracte PDF stocate pe VPS în contracts/ (nu în GitHub).
+// v12.9: recenzii Google — căutarea găsește și profilurile fără adresă publică (doar zonă deservită).
 // v12.8: NVR cu notificări oprite din aplicație (mute) → monitorizat, dar fără Telegram / push.
 // v12.7: canalele marcate în aplicație „nu e cameră aici” (ignCh) nu mai dau alerte de cameră offline.
 // v4.2: monitorul ține cont și de canalele marcate în aplicație (seenCh) — ex. cameră pusă „urmărită” deși n-a mers niciodată.
@@ -2477,7 +2478,8 @@ async function handleReviewsConfig(req, res) {
       let cand = [];
       if (!placeId) {
         const q = str(b.query, 120).trim() || 'SUPRAVEGHERE24h București';
-        const r = await gpApi('POST', 'places:searchText', key, 'places.id,places.displayName,places.formattedAddress', { textQuery: q, languageCode: 'ro', regionCode: 'RO' });
+        const r = await gpApi('POST', 'places:searchText', key, 'places.id,places.displayName,places.formattedAddress', { textQuery: q, languageCode: 'ro', regionCode: 'RO', includePureServiceAreaBusinesses: true,   // firmele fără adresă publică (doar zonă deservită) nu apar altfel
+          locationBias: { circle: { center: { latitude: 44.4268, longitude: 26.1025 }, radius: 50000 } } });
         cand = (r.places || []).map(p => ({ placeId: p.id, name: (p.displayName || {}).text || '', address: p.formattedAddress || '' }));
         if (!cand.length) return sendJson(res, 404, { error: 'Nu am găsit profilul pe Google. Scrie numele exact al profilului sau adresa.' });
         placeId = cand[0].placeId;
@@ -4686,7 +4688,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.8, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 12.9, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);
