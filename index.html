@@ -1496,7 +1496,9 @@ html.th-anim,html.th-anim *{transition:background-color .35s ease,color .35s eas
   html .nav .nav-tab:hover{background:var(--gl-hov);color:var(--fg)}
   html .nav .nav-tab.on{color:#fff!important}
   html .nav .nav-tab > span:not(.badge){transition:opacity .25s ease;white-space:nowrap}
-  .nav-sec{color:var(--gl-sec);white-space:nowrap;overflow:hidden;transition:opacity .2s,height .3s,padding .3s}
+  .nav-sec{color:var(--gl-sec);white-space:nowrap;overflow:hidden;flex-shrink:0;transition:opacity .2s,height .3s,padding .3s}
+  html .nav{-webkit-user-select:none;user-select:none}
+  .nav-foot{flex-shrink:0}
   html .nav .nav-tab .badge{background:var(--gl-hov);color:var(--gl-fg)}
   .nav-foot{display:flex}
   #nav-mini{display:grid;place-items:center;position:fixed;z-index:45;top:calc(var(--hdr-h) + env(safe-area-inset-top,0px) + var(--gl-gap) + 22px);left:calc(var(--gl-gap) + var(--side-w) - 13px);
