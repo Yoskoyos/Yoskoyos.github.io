@@ -1064,6 +1064,36 @@ html:not(.unlocked) .app{display:none}
 .ls-feat svg{color:var(--l-org)}
 .ls-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:11px;color:#8FA3B8;padding:0 4px}
 .ls-lock{display:inline-flex;align-items:center;gap:5px}
+
+/* ── Login animat: panou portocaliu în diagonală + trecere „măturată” între autentificare / parolă uitată ── */
+.ls-panel,.ls-sweep{background:linear-gradient(135deg,#FFB21E 0%,#F58A0A 45%,#E2560F 100%)}
+.ls-panel{display:none}
+.ls-sweep{position:absolute;inset:0;z-index:6;pointer-events:none;clip-path:polygon(110% 0%,140% 0%,130% 100%,100% 100%)}
+.ls-card{animation:ls-pop .7s cubic-bezier(.22,1,.36,1) both;box-shadow:0 30px 70px -25px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.06),0 0 60px -20px rgba(245,138,10,.55)}
+@keyframes ls-pop{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
+.ls-form.ls-in>*,.ls-panel-in.ls-in>*{animation:ls-rise .55s cubic-bezier(.22,1,.36,1) both}
+.ls-form.ls-in>*:nth-child(2),.ls-panel-in.ls-in>*:nth-child(2){animation-delay:.06s}
+.ls-form.ls-in>*:nth-child(3){animation-delay:.12s}.ls-form.ls-in>*:nth-child(4){animation-delay:.18s}
+.ls-form.ls-in>*:nth-child(5){animation-delay:.24s}.ls-form.ls-in>*:nth-child(n+6){animation-delay:.3s}
+@keyframes ls-rise{from{opacity:0;transform:translateX(var(--ls-dx,-22px));filter:blur(8px)}to{opacity:1;transform:none;filter:none}}
+.ls-card.mirror{--ls-dx:22px}
+.ls-card.mirror .ls-panel-in{--ls-dx:-22px}
+.ls-card.mirror .ls-title,.ls-card.mirror .ls-sub{display:none}
+.ls-card.mirror .ls-brand{margin-bottom:12px}
+@media (min-width:760px){
+  .ls-wrap{max-width:920px}
+  .ls-card{padding:34px calc(54% + 22px) 28px 36px;min-height:500px;transition:padding .01s}
+  .ls-card.mirror{padding:34px 36px 28px calc(54% + 22px)}
+  .ls-title{display:none}
+  .ls-panel{display:flex;position:absolute;top:0;bottom:0;right:0;width:54%;z-index:1;clip-path:polygon(24% 0,100% 0,100% 100%,0 100%);
+    align-items:center;justify-content:flex-end;padding:40px 40px 40px 26%;color:#fff;text-align:right}
+  .ls-card.mirror .ls-panel{right:auto;left:0;clip-path:polygon(0 0,100% 0,76% 100%,0 100%);justify-content:flex-start;padding:40px 26% 40px 40px;text-align:left}
+  .ls-panel::after{content:"";position:absolute;inset:0;background:radial-gradient(420px 300px at 80% 10%,rgba(255,255,255,.22),transparent 60%),repeating-linear-gradient(135deg,rgba(255,255,255,.05) 0 2px,transparent 2px 14px);pointer-events:none}
+  .ls-panel-in{position:relative;z-index:1;max-width:280px}
+  .ls-panel-in b{display:block;font-size:40px;line-height:1.02;font-weight:900;letter-spacing:-.02em;text-transform:uppercase;text-shadow:0 6px 24px rgba(120,40,0,.35)}
+  .ls-panel-in p{margin-top:14px;font-size:14.5px;line-height:1.5;color:rgba(255,255,255,.92)}
+}
+@media (prefers-reduced-motion: reduce){.ls-card,.ls-form.ls-in>*,.ls-panel-in.ls-in>*{animation:none}}
 @media (prefers-reduced-motion: reduce){.ls-card.shake{animation:none}.ls-spin{animation-duration:1.6s}.ls-kicker i{animation:none}}
 @media (max-width:380px){.ls-card{padding:24px 18px 18px}.ls-logo-plate img{height:54px}}
 @media (max-width:640px){.ls-bg::after{right:-170px;opacity:.55}}
@@ -2397,6 +2427,8 @@ html,body{overflow-x:hidden}
         <div id="ls-r-msg" class="ls-err" role="alert" aria-live="polite"></div>
         <button type="button" class="ls-link" data-ls-back>← Înapoi la autentificare</button>
       </form>
+      <div class="ls-panel" aria-hidden="true"><div class="ls-panel-in" id="ls-panel-in"><b>Bine ai<br>revenit!</b><p>NVR-urile, clienții și ofertele tale, într-un singur loc.</p></div></div>
+      <div class="ls-sweep" aria-hidden="true"></div>
     </div>
     <div class="ls-feats" aria-hidden="true">
       <div class="ls-feat"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>NVR-uri<br>monitorizate</div>
@@ -6719,13 +6751,33 @@ try { qs('#ls-logo').src = qs('#brand-logo').src; } catch {}
 
 // Moduri ecran login: login / forgot / reset
 let resetToken = null;
-function setLsMode(mode) {
+const LS_PANEL = { login: ['Bine ai<br>revenit!', 'NVR-urile, clienții și ofertele tale, într-un singur loc.'],
+  forgot: ['Ai uitat<br>parola?', 'Nicio grijă: îți trimitem pe e-mail un link ca s-o schimbi.'],
+  reset: ['Parolă<br>nouă', 'Alege o parolă ușor de ținut minte, dar greu de ghicit.'] };
+function lsApply(mode) {
+  const card = qs('#ls-card');
   qs('#ls-form').hidden   = mode !== 'login';
   qs('#ls-forgot').hidden = mode !== 'forgot';
   qs('#ls-reset').hidden  = mode !== 'reset';
+  card.classList.toggle('mirror', mode !== 'login'); card.dataset.mode = mode;
+  const pin = qs('#ls-panel-in'), t = LS_PANEL[mode] || LS_PANEL.login;
+  pin.innerHTML = `<b>${t[0]}</b><p>${t[1]}</p>`;
+  const f = qs(mode === 'forgot' ? '#ls-forgot' : mode === 'reset' ? '#ls-reset' : '#ls-form');
+  [f, pin].forEach(el => { el.classList.remove('ls-in'); void el.offsetWidth; el.classList.add('ls-in'); });
   const focusEl = mode === 'forgot' ? '#ls-f-login' : mode === 'reset' ? '#ls-r-pass' : null;
   if (focusEl) setTimeout(() => qs(focusEl).focus(), 60);
 }
+// trecerea dintre ecrane: un panou portocaliu în diagonală „mătură” cardul, apoi îl descoperă în oglindă
+function setLsMode(mode) {
+  const card = qs('#ls-card'), sw = card.querySelector('.ls-sweep'), prev = card.dataset.mode;
+  const still = !prev || prev === mode || !sw || !sw.animate || qs('#login-screen').hidden || matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (still) return lsApply(mode);
+  const R = 'polygon(110% 0%,140% 0%,130% 100%,100% 100%)', C = 'polygon(-30% 0%,130% 0%,140% 100%,-40% 100%)', L = 'polygon(-40% 0%,-10% 0%,-20% 100%,-50% 100%)';
+  const fwd = mode !== 'login', a = fwd ? R : L, b = fwd ? L : R, ez = 'cubic-bezier(.7,0,.3,1)';
+  const k1 = sw.animate([{ clipPath: a }, { clipPath: C }], { duration: 430, easing: ez, fill: 'forwards' });
+  k1.onfinish = () => { lsApply(mode); sw.animate([{ clipPath: C }, { clipPath: b }], { duration: 520, easing: ez, fill: 'forwards' }); };
+}
+try { lsApply('login'); } catch {}
 qs('#ls-to-forgot').addEventListener('click', () => {
   qs('#ls-f-login').value = qs('#ls-user').value.trim();
   setMsg(qs('#ls-f-msg'), '');
