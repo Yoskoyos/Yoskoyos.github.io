@@ -2675,9 +2675,9 @@ html,body{overflow-x:hidden}
     </div>
   </div>
 </div>
-<div class="overlay hidden" id="shop-modal" role="dialog" aria-modal="true" aria-labelledby="sm-title">
+<div class="overlay hidden" id="shop-modal" role="dialog" aria-modal="true" aria-labelledby="shm-title">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title" id="sm-title">Setări magazin online</div><div class="modal-x" id="sm-x" role="button" aria-label="Închide">✕</div></div>
+    <div class="modal-hdr"><div class="modal-title" id="shm-title">Setări magazin online</div><div class="modal-x" id="shm-x" role="button" aria-label="Închide">✕</div></div>
     <div class="modal-body">
       <label class="cm-check" style="font-weight:700"><input type="checkbox" id="sm-on"> Magazinul e pornit (prețuri și comenzi pe site)</label>
       <div class="cm-hint">Când e oprit, pagina Echipamente arată produsele fără prețuri, cu „Cere ofertă”, ca înainte.</div>
@@ -2702,8 +2702,8 @@ html,body{overflow-x:hidden}
       <div class="cm-hint">Plata cu cardul online se adaugă după ce deschizi cont la un procesator de plăți (de ex. Netopia sau Stripe).</div>
     </div>
     <div class="modal-foot">
-      <button class="btn" id="sm-cancel" type="button">Anulează</button>
-      <button class="btn primary" id="sm-save" type="button">Salvează</button>
+      <button class="btn" id="shm-cancel" type="button">Anulează</button>
+      <button class="btn primary" id="shm-save" type="button">Salvează</button>
     </div>
   </div>
 </div>
@@ -7447,9 +7447,9 @@ function smFill() {
 }
 qs('#or-cfg-btn').addEventListener('click', () => { if (!ops || !ops.shopCfg) return toast('Actualizează serverul (v11.4) ca să pornești magazinul', 'warn'); smFill(); qs('#shop-modal').classList.remove('hidden'); });
 const closeShop = () => qs('#shop-modal').classList.add('hidden');
-qs('#sm-x').addEventListener('click', closeShop); qs('#sm-cancel').addEventListener('click', closeShop);
+qs('#shm-x').addEventListener('click', closeShop); qs('#shm-cancel').addEventListener('click', closeShop);
 qs('#shop-modal').addEventListener('click', e => { if (e.target.id === 'shop-modal') closeShop(); });
-qs('#sm-save').addEventListener('click', async () => {
+qs('#shm-save').addEventListener('click', async () => {
   const b = { on: qs('#sm-on').checked, base: qs('#sm-base').value, markup: qs('#sm-mk').value, ship: qs('#sm-ship').value, freeOver: qs('#sm-free').value, cod: qs('#sm-cod').checked, codFee: qs('#sm-codfee').value, op: qs('#sm-op').checked, pickup: qs('#sm-pickup').checked, note: qs('#sm-note').value.trim() };
   if (b.on && !b.cod && !b.op && !b.pickup) return toast('Alege cel puțin o metodă de plată', 'warn');
   try { opsApply(await clApi('/ops/shop-cfg', jsonOpt('PUT', b))); renderOrders(); renderCatalog(); closeShop(); toast(b.on ? 'Magazinul e pornit — prețurile apar pe site în cel mult un minut' : 'Setări salvate', 'ok'); } catch (e) { toast(e.message, 'err'); }
