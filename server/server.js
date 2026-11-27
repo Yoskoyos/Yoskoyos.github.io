@@ -21,6 +21,7 @@
 // v4.5: clienți — furnizor echipamente + documente de garanție (PDF/JPG/PNG), câmp `kind` la fișiere.
 // v4.4: GET /company?cui= — datele firmei din serviciul public ANAF (PlatitorTvaRest v9), pt. completarea fișei clientului.
 // v4.3: evidență clienți (clients.json) + contracte PDF stocate pe VPS în contracts/ (nu în GitHub).
+// v13.1: GET /admin/sys — starea serverului în aplicație (uptime, RAM, CPU, disc, baza de date, monitor).
 // v13.0: recenzii Google — mai multe căutări (nume, nume + oraș, telefon), profilul cu numele potrivit e ales primul.
 // v12.9: recenzii Google — căutarea găsește și profilurile fără adresă publică (doar zonă deservită).
 // v12.8: NVR cu notificări oprite din aplicație (mute) → monitorizat, dar fără Telegram / push.
@@ -41,6 +42,7 @@ const bcrypt  = require('bcryptjs');
 const PORT           = parseInt(process.env.PORT || '3000', 10);
 const BASE_DIR       = process.env.NVR_PROXY_DIR || __dirname;
 const DB_FILE        = path.join(BASE_DIR, 'db.json');
+const VERSION_NUM    = 13.1;
 const SECRET_FILE    = path.join(BASE_DIR, '.jwt-secret');
 const MAX_CONCURRENT = 16;   // cereri simultane către NVR-uri (miniaturile cer multe imagini)
 const MAX_BODY       = 5 * 1024 * 1024;   // 5 MB (config sincronizată)
@@ -4678,6 +4680,32 @@ async function handleReset(req, res) {
   sendJson(res, 200, { ok: true, username: u.username });
 }
 
+
+/* ───────────── Starea serverului (doar administratorul): uptime, RAM, CPU, disc, monitor ───────────── */
+const APP_STARTED = Date.now();
+function cpuTimes() { return os.cpus().reduce((t, c) => { const x = c.times; t.idle += x.idle; t.all += x.user + x.nice + x.sys + x.idle + x.irq; return t; }, { idle: 0, all: 0 }); }
+async function sysInfo() {
+  const a = cpuTimes(); await new Promise(r => setTimeout(r, 400)); const b = cpuTimes();
+  const cpuPct = b.all > a.all ? Math.round(100 * (1 - (b.idle - a.idle) / (b.all - a.all))) : 0;
+  let memTotal = os.totalmem(), memAvail = os.freemem();
+  try { const m = fs.readFileSync('/proc/meminfo', 'utf8'); const g = k => { const x = new RegExp('^' + k + ':\\s+(\\d+)', 'm').exec(m); return x ? +x[1] * 1024 : null; };
+    memTotal = g('MemTotal') || memTotal; memAvail = g('MemAvailable') ?? memAvail; } catch {}
+  let disk = null;
+  try { if (fs.statfsSync) { const st = fs.statfsSync(BASE_DIR); disk = { total: st.blocks * st.bsize, free: st.bavail * st.bsize }; } } catch {}
+  if (!disk) { try { const o = execFileSync('df', ['-kP', BASE_DIR], { timeout: 4000 }).toString().trim().split('\n').pop().split(/\s+/); disk = { total: +o[1] * 1024, free: +o[3] * 1024 }; } catch {} }
+  let dataSize = null; try { dataSize = +execFileSync('du', ['-sk', BASE_DIR], { timeout: 6000 }).toString().split(/\s+/)[0] * 1024; } catch {}
+  const t0 = Date.now(); let dbOk = true; try { loadDb(); } catch { dbOk = false; } const dbMs = Date.now() - t0;
+  const nv = Object.values(monState.nvr || {}); const cnt = k => nv.filter(x => x.status === k).length;
+  return { at: Date.now(), version: VERSION_NUM, node: process.version, host: os.hostname(),
+    uptime: Math.round(os.uptime()), appUptime: Math.round((Date.now() - APP_STARTED) / 1000),
+    cpu: { pct: cpuPct, load: os.loadavg().map(x => Math.round(x * 100) / 100), cores: os.cpus().length },
+    mem: { total: memTotal, used: Math.max(0, memTotal - memAvail), app: process.memoryUsage().rss },
+    disk: disk && { total: disk.total, used: disk.total - disk.free }, dataSize,
+    db: { ok: dbOk, ms: dbMs },
+    services: { mail: mailReady(), push: !!webPush(), ffmpeg: hasFfmpeg(), nvrweb: nvrWebOn, monitor: MONITOR_ENABLED },
+    monitor: { lastRun: monLastRun, nvrs: nv.length, online: cnt('online'), warning: cnt('warning'), offline: cnt('offline') } };
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     if (req.method === 'OPTIONS') { res.writeHead(204, CORS); res.end(); return; }
@@ -4699,7 +4727,8 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/forgot' && req.method === 'POST') return await handleForgot(req, res);
     if (pathname === '/auth/reset'  && req.method === 'POST') return await handleReset(req, res);
 
-    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: 13.0, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
+    if (pathname === '/admin/sys' && req.method === 'GET') { const ctx = requireUser(req, res); if (!ctx) return; if (ctx.user.role !== 'admin') return sendJson(res, 403, { error: 'Doar administratorul' }); return sendJson(res, 200, await sysInfo()); }
+    if (pathname === '/health') return sendJson(res, 200, { ok: true, version: VERSION_NUM, mail: mailReady(), rtsp: hasFfmpeg(), nvrweb: nvrWebOn, push: !!webPush(), monitor: { enabled: MONITOR_ENABLED, lastRun: monLastRun, nvrs: Object.keys(monState.nvr).length } });
     if (pathname === '/snap' && req.method === 'GET') return await handleSnap(req, res, parsed);
     if (pathname === '/rec/day' && req.method === 'GET') return await handleRecDay(req, res, parsed);
     if (pathname === '/rec/play' && req.method === 'GET') return await handleRecPlay(req, res, parsed);

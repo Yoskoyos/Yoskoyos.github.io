@@ -1575,6 +1575,28 @@ html.th-anim,html.th-anim *{transition:background-color .35s ease,color .35s eas
   html .nav .nav-tab{flex-basis:30px;font-size:13px}
   .nav-sec{padding:6px 12px 2px!important}
 }
+
+/* ── Starea serverului (pop-up din antet, doar administratorul) ── */
+#btn-sys{position:relative}
+.sys-dot{position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:transparent;box-shadow:0 0 0 2px var(--bg-1)}
+.sys-dot.ok{background:#22c55e}.sys-dot.warn{background:#f59e0b}.sys-dot.err{background:#ef4444}
+.sys-pop{position:fixed;z-index:180;width:min(380px,calc(100vw - 24px));background:var(--bg-1);color:var(--fg);border:1px solid var(--border);border-radius:18px;
+  box-shadow:0 24px 60px -20px rgba(0,0,0,.55);padding:16px 18px 12px;animation:sysIn .22s cubic-bezier(.22,1,.36,1)}
+@keyframes sysIn{from{opacity:0;transform:translateY(-6px) scale(.98)}to{opacity:1;transform:none}}
+.sys-hd b{display:block;font-size:17px;font-weight:800;letter-spacing:-.01em}
+.sys-hd span{display:block;font-size:13.5px;font-weight:600;margin-top:2px;color:var(--fg-3)}
+.sys-hd span.ok{color:#16a34a}.sys-hd span.warn{color:#d97706}.sys-hd span.err{color:#dc2626}
+.sys-rows{margin-top:10px}
+.sys-r{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--border);font-size:14px}
+.sys-r:first-child{border-top:0}
+.sys-r svg{flex-shrink:0;color:var(--fg-3)}
+.sys-r .k{flex:1;color:var(--fg-2)}
+.sys-r .v{font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.sys-r .v.ok{color:#16a34a}.sys-r .v.warn{color:#d97706}.sys-r .v.err{color:#dc2626}
+.sys-bar{height:4px;border-radius:3px;background:var(--bg-3);margin-top:5px;overflow:hidden}
+.sys-bar i{display:block;height:100%;border-radius:3px;background:#22c55e;transition:width .4s}
+.sys-bar i.warn{background:#f59e0b}.sys-bar i.err{background:#ef4444}
+.sys-ft{font-size:12px;color:var(--fg-3);padding-top:8px;border-top:1px solid var(--border);margin-top:2px}
 /* sub-meniurile din pagini (Cereri / Oferte proprii / Newsletter, Clienți / Încasări, SEAP…) în același stil cu meniul */
 html,body{overflow-x:hidden}
 @supports (overflow:clip){html,body{overflow-x:clip}}
@@ -1602,6 +1624,11 @@ html,body{overflow-x:hidden}
   </div>
 </div>
 <div id="toast-wrap"></div>
+<div id="sys-pop" class="sys-pop" role="dialog" aria-label="Starea serverului" hidden>
+  <div class="sys-hd"><b>Starea serverului</b><span id="sys-state">Se verifică…</span></div>
+  <div id="sys-rows" class="sys-rows"></div>
+  <div class="sys-ft" id="sys-ft"></div>
+</div>
 
 <div class="app">
   <!-- Header -->
@@ -1621,6 +1648,7 @@ html,body{overflow-x:hidden}
 
     <div class="hdr-actions">
       <span class="hdr-chip" id="hdr-date"><span class="dot"></span><span></span></span>
+      <button class="icon-btn" id="btn-sys" data-adm type="button" title="Starea serverului" aria-label="Starea serverului" aria-expanded="false"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="8" rx="2"/><rect x="2" y="13" width="20" height="8" rx="2"/><path d="M6 7h.01M6 17h.01"/><path d="M11 17h2l1.5-2.5L16 19l1.2-2H19"/></svg><i class="sys-dot" id="sys-dot"></i></button>
       <button class="icon-btn" id="btn-bell" title="Notificări">
         <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
       </button>
@@ -8483,6 +8511,56 @@ document.querySelectorAll('.nav-tab[data-tab="seap"]').forEach(t => t.addEventLi
   });
   try { qs('#s-theme').addEventListener('change', paint); matchMedia('(prefers-color-scheme: light)').addEventListener('change', paint); } catch {}
   paint();
+})();
+
+
+/* ── Starea serverului: uptime, RAM, CPU, disc, baza de date, monitorul NVR (doar administratorul) ── */
+(function sysPanel() {
+  const btn = qs('#btn-sys'), pop = qs('#sys-pop'); if (!btn || !pop) return;
+  let timer = null;
+  const I = d => `<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const IC = { up: I('<rect x="2" y="3" width="20" height="8" rx="2"/><rect x="2" y="13" width="20" height="8" rx="2"/><path d="M6 7h.01M6 17h.01"/>'), app: I('<polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/>'),
+    db: I('<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/>'), ram: I('<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>'),
+    cpu: I('<path d="M12 14l4-4"/><path d="M3.3 19a10 10 0 1 1 17.4 0"/>'), disk: I('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M7 15h4"/>'),
+    data: I('<path d="M4 4h16v4H4zM4 10h16v4H4zM4 16h16v4H4z"/>'), nvr: I('<path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>'), svc: I('<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>') };
+  const GB = b => b >= 1e12 ? (b / 1e12).toFixed(1) + ' TB' : b >= 1e9 ? Math.round(b / 1e9) + ' GB' : b >= 1e6 ? Math.round(b / 1e6) + ' MB' : Math.round((b || 0) / 1e3) + ' KB';
+  const DUR = s => { s = Math.max(0, s | 0); const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); return d ? `${d}z ${h}h` : h ? `${h}h ${m}m` : `${m}m`; };
+  const lvl = p => p >= 90 ? 'err' : p >= 75 ? 'warn' : 'ok';
+  const row = (ic, k, v, cls, pct) => `<div class="sys-r">${IC[ic]}<div class="k">${k}${pct != null ? `<div class="sys-bar"><i class="${cls}" style="width:${Math.min(100, pct)}%"></i></div>` : ''}</div><div class="v ${cls || ''}">${v}</div></div>`;
+  function place() { const r = btn.getBoundingClientRect(); pop.style.top = (r.bottom + 8) + 'px'; pop.style.left = Math.max(12, Math.min(innerWidth - pop.offsetWidth - 12, r.right - pop.offsetWidth)) + 'px'; }
+  async function load() {
+    try {
+      const d = await clApi('/admin/sys');
+      const mp = d.mem.total ? Math.round(100 * d.mem.used / d.mem.total) : 0, dp = d.disk && d.disk.total ? Math.round(100 * d.disk.used / d.disk.total) : null;
+      const cp = d.cpu.pct, warns = [];
+      if (!d.db.ok) warns.push('baza de date'); if (lvl(mp) !== 'ok') warns.push('memoria'); if (lvl(cp) !== 'ok') warns.push('procesorul'); if (dp != null && lvl(dp) !== 'ok') warns.push('discul');
+      const bad = warns.length ? (!d.db.ok || [mp, cp, dp].some(x => x != null && x >= 90) ? 'err' : 'warn') : 'ok';
+      const st = qs('#sys-state'); st.className = bad; st.textContent = bad === 'ok' ? 'Totul funcționează normal' : 'Atenție: ' + warns.join(', ');
+      qs('#sys-dot').className = 'sys-dot ' + bad;
+      const m = d.monitor || {}, sv = d.services || {}, Y = x => x ? '✓' : '✗';
+      qs('#sys-rows').innerHTML =
+        row('up', 'Server pornit de', DUR(d.uptime)) +
+        row('app', 'Aplicația pornită de', DUR(d.appUptime)) +
+        row('db', 'Baza de date', d.db.ok ? `OK (${d.db.ms} ms)` : 'Eroare', d.db.ok ? 'ok' : 'err') +
+        row('ram', 'Memorie (RAM)', `${mp}% (${GB(d.mem.used)} / ${GB(d.mem.total)})`, lvl(mp), mp) +
+        row('cpu', 'Procesor (CPU)', `${cp}% · ${d.cpu.cores} nuclee`, lvl(cp), cp) +
+        (dp != null ? row('disk', 'Disc', `${dp}% (${GB(d.disk.used)} / ${GB(d.disk.total)})`, lvl(dp), dp) : '') +
+        (d.dataSize != null ? row('data', 'Datele aplicației', GB(d.dataSize)) : '') +
+        row('nvr', 'Monitor NVR', sv.monitor ? `${m.nvrs || 0} NVR · ${m.offline ? m.offline + ' offline' : 'toate online'}` : 'oprit', sv.monitor ? (m.offline ? 'warn' : 'ok') : 'warn') +
+        row('svc', 'E-mail · Push · Video', `${Y(sv.mail)} · ${Y(sv.push)} · ${Y(sv.ffmpeg)}`, sv.mail && sv.push && sv.ffmpeg ? 'ok' : 'warn');
+      qs('#sys-ft').textContent = `Verificat la ${new Date(d.at).toLocaleTimeString('ro-RO')} · server v${d.version} · Node ${d.node}` + (m.lastRun ? ` · monitor: ${new Date(m.lastRun).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}` : '');
+    } catch (e) {
+      const st = qs('#sys-state'); st.className = 'warn';
+      st.textContent = /404|actualizează|Necunoscut/i.test(e.message) ? 'Actualizează serverul (v13.1) ca să vezi starea lui' : e.message;
+      qs('#sys-rows').innerHTML = ''; qs('#sys-ft').textContent = '';
+    }
+    place();
+  }
+  const close = () => { pop.hidden = true; btn.setAttribute('aria-expanded', 'false'); clearInterval(timer); timer = null; };
+  btn.addEventListener('click', e => { e.stopPropagation(); if (!pop.hidden) return close(); pop.hidden = false; btn.setAttribute('aria-expanded', 'true'); place(); load(); timer = setInterval(load, 10000); });
+  document.addEventListener('click', e => { if (!pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !pop.hidden) close(); });
+  window.addEventListener('resize', () => { if (!pop.hidden) place(); });
 })();
 
 /* ── Aspect pro: indicatorul animat din meniul lateral, data și contul din antet ── */
