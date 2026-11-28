@@ -21,6 +21,7 @@
 // v4.5: clienți — furnizor echipamente + documente de garanție (PDF/JPG/PNG), câmp `kind` la fișiere.
 // v4.4: GET /company?cui= — datele firmei din serviciul public ANAF (PlatitorTvaRest v9), pt. completarea fișei clientului.
 // v4.3: evidență clienți (clients.json) + contracte PDF stocate pe VPS în contracts/ (nu în GitHub).
+// v13.5: POST /public/retragere — retragere din contract / anularea comenzii online, cu confirmare imediată pe e-mail.
 // v13.4: plata cu cardul NETOPIA în magazin: /plata/<comandă> (redirecționare criptată), /netopia/ipn (confirmare), pagina de rezultat.
 // v13.3: NETOPIA — fără verificarea „pereche” între .cer și .key (sunt chei diferite: publică NETOPIA / privată comerciant).
 // v13.2: /netopia/config — semnătura + cheile NETOPIA (test și real) se încarcă din aplicație și stau doar pe server.
@@ -45,7 +46,7 @@ const bcrypt  = require('bcryptjs');
 const PORT           = parseInt(process.env.PORT || '3000', 10);
 const BASE_DIR       = process.env.NVR_PROXY_DIR || __dirname;
 const DB_FILE        = path.join(BASE_DIR, 'db.json');
-const VERSION_NUM    = 13.4;
+const VERSION_NUM    = 13.5;
 const SECRET_FILE    = path.join(BASE_DIR, '.jwt-secret');
 const MAX_CONCURRENT = 16;   // cereri simultane către NVR-uri (miniaturile cer multe imagini)
 const MAX_BODY       = 5 * 1024 * 1024;   // 5 MB (config sincronizată)
@@ -1938,7 +1939,7 @@ ${delivery === 'curier' ? `<tr><td colspan="2" style="padding:2px 0;color:#6b748
 <p style="font-size:12px;color:#8a93a3;margin:4px 0 0">Prețuri finale. YCA SOLUTIONS S.R.L. nu este plătitoare de TVA.</p></td></tr>
 ${bank}
 <tr><td style="padding:6px 30px 14px;font-size:14px;line-height:22px;color:#3b4456"><b>Plata:</b> ${PAY[pay]}<br><b>${delivery === 'curier' ? 'Livrare' : 'Ridicare'}:</b> ${delivery === 'curier' ? escHtml([c.address, c.city, c.county].filter(Boolean).join(', ')) : 'din sediul nostru din București, după ce te sunăm'}${c.type === 'pj' ? `<br><b>Factură pe:</b> ${escHtml(c.company)} · CUI ${escHtml(c.cui)}` : ''}</td></tr>
-<tr><td style="padding:6px 30px 20px;font-size:13px;line-height:20px;color:#6b7487">Ai dreptul să te retragi din contract în 14 zile de la primirea produselor, fără să justifici decizia. Detalii: <a href="https://supraveghere24h.ro/livrare-si-retur" style="color:#1B7AB3">Livrare și retur</a> · <a href="https://supraveghere24h.ro/termeni-si-conditii" style="color:#1B7AB3">Termeni și condiții</a>.<br><br>Întrebări despre comandă: <a href="tel:+40763354355" style="color:#F5A100;font-weight:bold;text-decoration:none">0763 354 355</a> · <a href="mailto:contact@supraveghere24h.ro" style="color:#1B7AB3">contact@supraveghere24h.ro</a></td></tr>
+<tr><td style="padding:6px 30px 20px;font-size:13px;line-height:20px;color:#6b7487">Ai dreptul să te retragi din contract în 14 zile de la primirea produselor, fără să justifici decizia: <a href="https://supraveghere24h.ro/retragere?comanda=CMD-${no}&amp;email=${encodeURIComponent(c.email)}" style="color:#1B7AB3">retrage-te online</a> sau anulează comanda cât nu a plecat. Detalii: <a href="https://supraveghere24h.ro/livrare-si-retur" style="color:#1B7AB3">Livrare și retur</a> · <a href="https://supraveghere24h.ro/termeni-si-conditii" style="color:#1B7AB3">Termeni și condiții</a>.<br><br>Întrebări despre comandă: <a href="tel:+40763354355" style="color:#F5A100;font-weight:bold;text-decoration:none">0763 354 355</a> · <a href="mailto:contact@supraveghere24h.ro" style="color:#1B7AB3">contact@supraveghere24h.ro</a></td></tr>
 <tr><td style="padding:14px 30px;background:#0D1F33;font-size:11px;line-height:17px;color:#b9c6dc">YCA SOLUTIONS S.R.L. · CUI 45211628 · J2021019754409 · Str. Aviator Mircea Petre nr. 10, Sector 1, București</td></tr></table></td></tr></table></body></html>`;
   const text = `Bună ziua, ${c.name.split(' ')[0]},\n\nAm primit comanda ta nr. CMD-${no}. Te sunăm în cel mai scurt timp ca să o confirmăm.\n\n${lines.map(l => `${l.qty} × ${l.name} (${l.sku}) — ${lei2(l.qty * l.price)}`).join('\n')}\nSubtotal: ${lei2(sub)}${delivery === 'curier' ? `\nTransport: ${ship ? lei2(ship) : 'gratuit'}` : ''}${fee ? `\nTaxă ramburs: ${lei2(fee)}` : ''}\nTotal de plată: ${lei2(o.total)}\nPlata: ${PAY[pay]}${pay === 'op' ? `\n\nPlata prin transfer: YCA SOLUTIONS S.R.L., IBAN RO62INGB0000999911979489 (ING Bank), detalii plată: CMD-${no}` : ''}\n\nDreptul de retragere (14 zile) și condițiile de retur: https://supraveghere24h.ro/livrare-si-retur\n\nSUPRAVEGHERE24h · 0763 354 355 · contact@supraveghere24h.ro`;
   const mailed = mailReady() ? await sendMail(c.email, `Comanda ta CMD-${no} – SUPRAVEGHERE24h`, text, html) : false;
@@ -3065,6 +3066,34 @@ async function handleNetopiaIpn(req, res) {
     try { const db = loadDb(); const ow = (db.users || []).find(x => x.username === hit.un); if (ow) notifyOwner(db, ow, `⚠️ Plata cu cardul nu a reușit · CMD-${o.no}\n${escHtml(errMsg || action)}`, '/?tab=shop&view=orders').catch(() => {}); } catch {}
   }
   return reply(`<crc>${xmlEsc(errMsg || 'OK')}</crc>`);
+}
+
+/* ── Retragere din contract / anularea comenzii, online (art. 11^1 OUG 34/2014): confirmare imediată pe e-mail ── */
+async function handleWithdrawal(req, res) {
+  const send = (st, o) => { res.writeHead(st, { 'Content-Type': 'application/json; charset=utf-8', ...PUB_CORS }); res.end(JSON.stringify(o)); };
+  if (pubLimited(req, 6)) return send(429, { error: 'Prea multe cereri. Încearcă mai târziu sau scrie-ne la contact@supraveghere24h.ro.' });
+  let b; try { b = JSON.parse((await readRaw(req, 32 * 1024)).toString('utf8') || '{}'); } catch { return send(400, { error: 'Cerere invalidă' }); }
+  if (b.website) return send(200, { ok: true, at: '', ref: '0' });
+  const d = { kind: b.kind === 'anulare' ? 'anulare' : 'retragere', name: str(b.name, 120).trim(), email: str(b.email, 160).trim(), phone: str(b.phone, 40).trim(),
+    order: str(b.order, 20).trim().toUpperCase(), items: str(b.items, 600).trim(), received: /^\d{4}-\d{2}-\d{2}$/.test(String(b.received || '')) ? b.received : '', reason: str(b.reason, 1000).trim() };
+  if (!d.name || !d.order) return send(400, { error: 'Completează numele și numărul comenzii.' });
+  if (!/^[^\s@<>,;]+@[^\s@<>,;]+\.[a-z]{2,}$/i.test(d.email)) return send(400, { error: 'Completează o adresă de e-mail validă (aici primești confirmarea).' });
+  const db = loadDb(); const owner = quoteOwner(db); if (!owner) return send(503, { error: 'Serviciu indisponibil. Scrie-ne la contact@supraveghere24h.ro.' });
+  const all = loadOps(); const u = all[owner.username] = all[owner.username] || {};
+  const no = parseInt(d.order.replace(/\D/g, ''), 10); const o = (u.orders || []).find(x => x.no === no && String(x.c.email).toLowerCase() === d.email.toLowerCase());
+  const now = Date.now(), ref = 'RT-' + now.toString(36).toUpperCase(), atTxt = new Date(now).toLocaleString('ro-RO', { timeZone: 'Europe/Bucharest' });
+  const rec = { ref, at: now, ...d, matched: !!o };
+  u.withdrawals = (u.withdrawals || []).concat(rec).slice(-1000);
+  if (o) { o.withdraw = rec; o.history = (o.history || []).concat({ t: now, st: d.kind === 'anulare' ? 'cerere-anulare' : 'retragere' }); }
+  saveOps(all);
+  const what = d.kind === 'anulare' ? 'anularea comenzii' : 'retragerea din contract';
+  const txt = `Bună ziua, ${d.name.split(' ')[0]},\n\nConfirmăm că am primit declarația ta de ${what}.\n\nNumăr înregistrare: ${ref}\nData și ora primirii: ${atTxt}\nComanda: ${d.order}\nProduse: ${d.items || 'toată comanda'}${d.received ? '\nData primirii produselor: ' + d.received : ''}${d.reason ? '\nMotiv: ' + d.reason : ''}\nNume: ${d.name}\nE-mail: ${d.email}${d.phone ? '\nTelefon: ' + d.phone : ''}\n\n`
+    + (d.kind === 'anulare' ? 'Dacă comanda nu a fost expediată, o anulăm și, dacă ai plătit, îți returnăm întreaga sumă în cel mult 14 zile. Dacă fusese deja expediată, te anunțăm și se aplică dreptul de retragere.'
+      : 'Te contactăm cu instrucțiunile pentru returnarea produselor. Îți returnăm sumele plătite, inclusiv costul livrării standard, în cel mult 14 zile de la data de mai sus (putem amâna rambursarea până primim produsele înapoi sau dovada expedierii lor).')
+    + `\n\nYca Solutions SRL · SUPRAVEGHERE24h · 0763 354 355 · contact@supraveghere24h.ro`;
+  const mailed = mailReady() ? await sendMail(d.email, `Confirmare ${what} ${d.order} – SUPRAVEGHERE24h`, txt, null).catch(() => false) : false;
+  try { await notifyOwner(db, owner, `↩️ <b>${d.kind === 'anulare' ? 'Cerere de anulare' : 'Retragere din contract'}</b> · ${escHtml(d.order)}${o ? '' : ' (comandă negăsită după e-mail)'}\n${escHtml(d.name)} · ${escHtml(d.email)}${d.phone ? ' · ' + escHtml(d.phone) : ''}\n${escHtml(d.items || 'toată comanda')}${d.reason ? '\n„' + escHtml(d.reason.slice(0, 200)) + '”' : ''}`, '/?tab=shop&view=orders'); } catch {}
+  return send(200, { ok: true, ref, at: atTxt, mailed: !!mailed, matched: !!o });
 }
 // căutare în catalogul A2T (Atu Tech) — același serviciu folosit de magazinul lor
 function a2tSearch(q, size) {
@@ -4914,6 +4943,7 @@ const server = http.createServer(async (req, res) => {
     if ((pathname === '/cerere' || pathname === '/public/cerere') && req.method === 'POST') return await handlePublicQuote(req, res, true);
     if (pathname === '/public/prices' && req.method === 'GET') return handlePublicPrices(req, res);
     if (pathname === '/public/order' && req.method === 'POST') return await handlePublicOrder(req, res);
+    if (pathname === '/public/retragere' && req.method === 'POST') return await handleWithdrawal(req, res);
     if (pathname === '/public/reviews' && req.method === 'GET') return reviewsPublic(req, res);
     if (pathname === '/reviews/config') return await handleReviewsConfig(req, res);
     if ((pathname === '/public/catalog' || /^\/public\/catalog\/[\w-]+\/(photo|fisa)$/.test(pathname)) && req.method === 'GET') return catalogPublic(req, res, pathname);
