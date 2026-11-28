@@ -21,6 +21,7 @@
 // v4.5: clienți — furnizor echipamente + documente de garanție (PDF/JPG/PNG), câmp `kind` la fișiere.
 // v4.4: GET /company?cui= — datele firmei din serviciul public ANAF (PlatitorTvaRest v9), pt. completarea fișei clientului.
 // v4.3: evidență clienți (clients.json) + contracte PDF stocate pe VPS în contracts/ (nu în GitHub).
+// v13.2: /netopia/config — semnătura + cheile NETOPIA (test și real) se încarcă din aplicație și stau doar pe server.
 // v13.1: GET /admin/sys — starea serverului în aplicație (uptime, RAM, CPU, disc, baza de date, monitor).
 // v13.0: recenzii Google — mai multe căutări (nume, nume + oraș, telefon), profilul cu numele potrivit e ales primul.
 // v12.9: recenzii Google — căutarea găsește și profilurile fără adresă publică (doar zonă deservită).
@@ -42,7 +43,7 @@ const bcrypt  = require('bcryptjs');
 const PORT           = parseInt(process.env.PORT || '3000', 10);
 const BASE_DIR       = process.env.NVR_PROXY_DIR || __dirname;
 const DB_FILE        = path.join(BASE_DIR, 'db.json');
-const VERSION_NUM    = 13.1;
+const VERSION_NUM    = 13.2;
 const SECRET_FILE    = path.join(BASE_DIR, '.jwt-secret');
 const MAX_CONCURRENT = 16;   // cereri simultane către NVR-uri (miniaturile cer multe imagini)
 const MAX_BODY       = 5 * 1024 * 1024;   // 5 MB (config sincronizată)
@@ -2913,6 +2914,43 @@ async function handleAiConfig(req, res) {
   }
   return sendJson(res, 405, { error: 'Operație necunoscută' });
 }
+
+/* ───────────── Plăți cu cardul: NETOPIA Payments (cheile stau doar pe server, în netopia.json 0600) ───────────── */
+const NP_FILE = path.join(BASE_DIR, 'netopia.json');
+function loadNp() { try { return JSON.parse(fs.readFileSync(NP_FILE, 'utf8')) || {}; } catch { return {}; } }
+function npEnvInfo(e) {
+  if (!e) return { configured: false };
+  let certEnd = '', certOk = false; try { const c = new crypto.X509Certificate(e.cer); certOk = true; certEnd = c.validTo; } catch {}
+  return { configured: !!(e.signature && e.cer && e.key && certOk), signature: e.signature || '', cer: !!e.cer, key: !!e.key, certValidTo: certEnd, savedAt: e.savedAt || 0 };
+}
+async function handleNetopiaConfig(req, res) {
+  const ctx = requireUser(req, res, 'admin'); if (!ctx) return;
+  const info = () => { const c = loadNp(); return { mode: c.mode === 'live' ? 'live' : 'sandbox', sandbox: npEnvInfo(c.sandbox), live: npEnvInfo(c.live) }; };
+  if (req.method === 'GET') return sendJson(res, 200, info());
+  const u = url.parse(req.url, true).query, envName = u.env === 'live' ? 'live' : 'sandbox';
+  if (req.method === 'DELETE') { const c = loadNp(); delete c[envName]; if (envName === 'live' && c.mode === 'live') c.mode = 'sandbox'; fs.writeFileSync(NP_FILE, JSON.stringify(c, null, 2), { mode: 0o600 }); return sendJson(res, 200, info()); }
+  if (req.method === 'PUT' || req.method === 'POST') {
+    const b = await readJson(req) || {}; const c = loadNp();
+    if (b.mode === 'live' || b.mode === 'sandbox') {
+      if (b.mode === 'live' && !npEnvInfo(c.live).configured) return sendJson(res, 400, { error: 'Încarcă întâi semnătura și cheile pentru plăți reale' });
+      c.mode = b.mode; fs.writeFileSync(NP_FILE, JSON.stringify(c, null, 2), { mode: 0o600 }); return sendJson(res, 200, info());
+    }
+    const old = c[envName] || {};
+    const signature = str(b.signature, 40).trim().toUpperCase() || old.signature || '';
+    if (!/^[A-Z0-9]{4}(-[A-Z0-9]{4}){4}$/.test(signature)) return sendJson(res, 400, { error: 'Semnătura are forma XXXX-XXXX-XXXX-XXXX-XXXX (o găsești în contul NETOPIA, la punctul de vânzare)' });
+    const cer = b.cer ? String(b.cer).slice(0, 20000) : old.cer, key = b.key ? String(b.key).slice(0, 20000) : old.key;
+    if (!cer || !key) return sendJson(res, 400, { error: 'Alege ambele fișiere: cheia publică (.cer) și cheia privată (.key)' });
+    let cert, pk;
+    try { cert = new crypto.X509Certificate(cer); } catch { return sendJson(res, 400, { error: 'Fișierul .cer nu e un certificat valid' }); }
+    try { pk = crypto.createPrivateKey(key); } catch { return sendJson(res, 400, { error: 'Fișierul .key nu e o cheie privată validă' }); }
+    try { const pub = crypto.createPublicKey(pk).export({ type: 'spki', format: 'der' }), cpub = cert.publicKey.export({ type: 'spki', format: 'der' });
+      if (!pub.equals(cpub)) return sendJson(res, 400, { error: 'Cheia privată nu se potrivește cu certificatul. Verifică să fie din același punct de vânzare și același mediu (test / real).' }); } catch {}
+    c[envName] = { signature, cer, key, savedAt: Date.now() };
+    fs.writeFileSync(NP_FILE, JSON.stringify(c, null, 2), { mode: 0o600 });
+    return sendJson(res, 200, info());
+  }
+  return sendJson(res, 405, { error: 'Operație necunoscută' });
+}
 // căutare în catalogul A2T (Atu Tech) — același serviciu folosit de magazinul lor
 function a2tSearch(q, size) {
   return new Promise(resolve => {
@@ -4791,6 +4829,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/client/nvrs' && req.method === 'GET') return handleClientNvrs(req, res);
     if (pathname === '/nvrweb/open' && req.method === 'POST') return await handleNvrWebOpen(req, res);
     if (pathname === '/ai/config') return await handleAiConfig(req, res);
+    if (pathname === '/netopia/config') return await handleNetopiaConfig(req, res);
     if (pathname === '/seap' || pathname.startsWith('/seap/')) return await handleSeap(req, res, pathname, parsed);
 
     // Starea monitorizării pentru utilizatorul logat
