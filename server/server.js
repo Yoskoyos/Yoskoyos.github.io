@@ -21,6 +21,7 @@
 // v4.5: clienți — furnizor echipamente + documente de garanție (PDF/JPG/PNG), câmp `kind` la fișiere.
 // v4.4: GET /company?cui= — datele firmei din serviciul public ANAF (PlatitorTvaRest v9), pt. completarea fișei clientului.
 // v4.3: evidență clienți (clients.json) + contracte PDF stocate pe VPS în contracts/ (nu în GitHub).
+// v13.3: NETOPIA — fără verificarea „pereche” între .cer și .key (sunt chei diferite: publică NETOPIA / privată comerciant).
 // v13.2: /netopia/config — semnătura + cheile NETOPIA (test și real) se încarcă din aplicație și stau doar pe server.
 // v13.1: GET /admin/sys — starea serverului în aplicație (uptime, RAM, CPU, disc, baza de date, monitor).
 // v13.0: recenzii Google — mai multe căutări (nume, nume + oraș, telefon), profilul cu numele potrivit e ales primul.
@@ -43,7 +44,7 @@ const bcrypt  = require('bcryptjs');
 const PORT           = parseInt(process.env.PORT || '3000', 10);
 const BASE_DIR       = process.env.NVR_PROXY_DIR || __dirname;
 const DB_FILE        = path.join(BASE_DIR, 'db.json');
-const VERSION_NUM    = 13.2;
+const VERSION_NUM    = 13.3;
 const SECRET_FILE    = path.join(BASE_DIR, '.jwt-secret');
 const MAX_CONCURRENT = 16;   // cereri simultane către NVR-uri (miniaturile cer multe imagini)
 const MAX_BODY       = 5 * 1024 * 1024;   // 5 MB (config sincronizată)
@@ -2943,8 +2944,7 @@ async function handleNetopiaConfig(req, res) {
     let cert, pk;
     try { cert = new crypto.X509Certificate(cer); } catch { return sendJson(res, 400, { error: 'Fișierul .cer nu e un certificat valid' }); }
     try { pk = crypto.createPrivateKey(key); } catch { return sendJson(res, 400, { error: 'Fișierul .key nu e o cheie privată validă' }); }
-    try { const pub = crypto.createPublicKey(pk).export({ type: 'spki', format: 'der' }), cpub = cert.publicKey.export({ type: 'spki', format: 'der' });
-      if (!pub.equals(cpub)) return sendJson(res, 400, { error: 'Cheia privată nu se potrivește cu certificatul. Verifică să fie din același punct de vânzare și același mediu (test / real).' }); } catch {}
+    // la NETOPIA cele două nu formează o pereche: .cer = cheia publică NETOPIA (criptăm cererea), .key = cheia ta privată (decriptăm confirmările IPN)
     c[envName] = { signature, cer, key, savedAt: Date.now() };
     fs.writeFileSync(NP_FILE, JSON.stringify(c, null, 2), { mode: 0o600 });
     return sendJson(res, 200, info());
