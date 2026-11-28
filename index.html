@@ -7874,7 +7874,7 @@ async function npLoad() {
     const row = (lbl, e) => intgRow(lbl, e.configured ? `✓ ${escapeHtml(e.signature)}${e.certValidTo ? ' · cert. până la ' + escapeHtml(new Date(e.certValidTo).toLocaleDateString('ro-RO')) : ''}` : 'neîncărcat');
     qs('#np-info').innerHTML = row('Test (sandbox)', sb) + row('Plăți reale', lv) + intgRow('Folosit acum', r.mode === 'live' ? 'plăți reale' : 'mediul de test');
     st.className = 'intg-msg'; st.textContent = any ? '' : 'Încarcă semnătura și cele două chei din contul NETOPIA. Întâi pe cele de test (sandbox), ca să încercăm plățile fără bani reali.';
-    qs('#np-mode-box').hidden = !any; qs('#np-mode').value = r.mode || 'sandbox';
+    qs('#np-mode-box').style.display = any ? '' : 'none'; qs('#np-mode').value = r.mode || 'sandbox';
     qs('#np-del').hidden = !sb.configured; qs('#np-form').open = !any;
     qs('#np-form summary').textContent = any ? 'Încarcă / schimbă cheile' : 'Încarcă semnătura și cheile'; }
   catch (e) { intgPill('#np-pill', 'err', 'Eroare'); st.className = 'intg-msg err';
