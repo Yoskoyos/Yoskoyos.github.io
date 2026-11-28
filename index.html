@@ -2748,6 +2748,7 @@ html,body{overflow-x:hidden}
       <label class="cm-check"><input type="checkbox" id="sm-cod"> Plata ramburs (la curier)</label>
       <div class="fg" style="margin-top:6px"><label for="sm-codfee">Taxă ramburs (lei, 0 = fără)</label><input type="number" id="sm-codfee" inputmode="decimal" min="0" step="1"></div>
       <label class="cm-check" style="margin-top:8px"><input type="checkbox" id="sm-op"> Plata prin transfer bancar (IBAN ING din e-mailul de confirmare)</label>
+      <label class="cm-check" style="margin-top:8px"><input type="checkbox" id="sm-card"> Plata cu cardul online (NETOPIA Payments) <span class="cm-hint" id="sm-card-h" style="display:block;margin:2px 0 0 30px"></span></label>
       <label class="cm-check" style="margin-top:8px;display:none" hidden><input type="checkbox" id="sm-pickup"> Ridicare personală din București (fără transport)</label>
       <div class="fg" style="margin-top:8px"><label for="sm-note">Mesaj scurt pe pagina coșului (opțional)</label><input type="text" id="sm-note" maxlength="300" placeholder="ex. Comenzile plasate până la ora 14 pleacă în aceeași zi"></div>
       <div class="cm-hint">Plata cu cardul online se adaugă după ce deschizi cont la un procesator de plăți (de ex. Netopia sau Stripe).</div>
@@ -7437,7 +7438,8 @@ qs('#ctm-sell').addEventListener('change', ctmPriceInfo);
 qs('#ctm-cat').addEventListener('change', () => ctmSubFill(''));
 
 const OR_ST = { noua: ['Nouă', 'new'], confirmata: ['Confirmată', 'sent'], expediata: ['Expediată', 'viewed'], livrata: ['Livrată', 'accepted'], anulata: ['Anulată', 'expired'] };
-const OR_PAY = { ramburs: 'Ramburs', op: 'Transfer bancar', ridicare: 'La ridicare' };
+const OR_PAY = { ramburs: 'Ramburs', op: 'Transfer bancar', ridicare: 'La ridicare', card: 'Card online' };
+const orCard = o => o.pay !== 'card' ? '' : o.paid ? ' · <span style="color:var(--ok);font-weight:700">💳 plătită</span>' : (o.card && ['failed', 'canceled'].includes(o.card.status)) ? ' · <span style="color:var(--err);font-weight:700">💳 plată eșuată</span>' : ' · <span style="color:var(--warn);font-weight:700">💳 neplătită încă</span>';
 let omDraft = null;
 function renderOrders() {
   if (!ops) return; const list = qs('#or-list'); if (!list) return;
@@ -7455,7 +7457,7 @@ function renderOrders() {
   list.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">${L.map(o => { const st = OR_ST[o.status] || ['?', ''];
     return `<div class="cl-card" role="button" tabindex="0" data-orid="${escapeHtml(o.id)}">
       <div class="cl-main"><div class="cl-name"><span>CMD-${o.no} · ${escapeHtml(o.c.type === 'pj' && o.c.company ? o.c.company : o.c.name)}</span></div>
-      <div class="cl-sub">${escapeHtml(new Date(o.at).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }))} · ${o.lines.reduce((t, l) => t + l.qty, 0)} buc. · ${escapeHtml(OR_PAY[o.pay] || o.pay)}${o.delivery === 'curier' ? ' · curier ' + escapeHtml(o.c.city || '') : ' · ridicare'}${o.mailErr ? ' · <span style="color:var(--err)">e-mailul de confirmare nu a plecat</span>' : ''}</div></div>
+      <div class="cl-sub">${escapeHtml(new Date(o.at).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }))} · ${o.lines.reduce((t, l) => t + l.qty, 0)} buc. · ${escapeHtml(OR_PAY[o.pay] || o.pay)}${orCard(o)}${o.delivery === 'curier' ? ' · curier ' + escapeHtml(o.c.city || '') : ' · ridicare'}${o.mailErr ? ' · <span style="color:var(--err)">e-mailul de confirmare nu a plecat</span>' : ''}</div></div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0"><b style="white-space:nowrap">${fmtLei(o.total)}</b><span class="qpill ${st[1]}">${st[0]}</span></div></div>`; }).join('')}</div>`;
 }
 function openOrder(o) {
@@ -7471,7 +7473,7 @@ function openOrder(o) {
     <div class="cm-sec">Client</div>
     ${row('Nume', escapeHtml(c.name))}${row('Telefon', escapeHtml(c.phone))}${row('E-mail', escapeHtml(c.email))}
     ${c.type === 'pj' ? row('Firmă', escapeHtml(c.company)) + row('CUI', escapeHtml(c.cui)) + row('Reg. Com.', escapeHtml(c.regcom)) : row('Factură', 'persoană fizică')}
-    ${row('Plata', escapeHtml(OR_PAY[o.pay] || o.pay))}${row(o.delivery === 'curier' ? 'Livrare' : 'Ridicare', o.delivery === 'curier' ? escapeHtml([c.address, c.city, c.county, c.zip].filter(Boolean).join(', ')) : 'din sediu, București')}
+    ${row('Plata', escapeHtml(OR_PAY[o.pay] || o.pay) + orCard(o) + (o.card && o.card.env === 'sandbox' ? ' <span class="cm-hint">(test)</span>' : '') + (o.card && o.card.msg ? `<br><span class="cm-hint">${escapeHtml(o.card.msg)}${o.card.purchase ? ' · tranzacția ' + escapeHtml(o.card.purchase) : ''}</span>` : ''))}${row(o.delivery === 'curier' ? 'Livrare' : 'Ridicare', o.delivery === 'curier' ? escapeHtml([c.address, c.city, c.county, c.zip].filter(Boolean).join(', ')) : 'din sediu, București')}
     ${row('Observații', escapeHtml(c.notes))}${row('Trimisă', escapeHtml(new Date(o.at).toLocaleString('ro-RO')))}${row('Termeni', o.terms ? 'acceptați la trimitere' : '')}
     <div class="fg" style="margin-top:12px"><label for="om-notes">Notițele mele (nu le vede clientul)</label><textarea id="om-notes" rows="3" placeholder="ex. AWB, factura nr., ce s-a vorbit la telefon">${escapeHtml(o.notes || '')}</textarea></div>
     ${(o.history || []).length > 1 ? `<div class="cm-hint" style="margin-top:8px">${o.history.map(h => `${escapeHtml(new Date(h.t).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }))}: ${escapeHtml((OR_ST[h.st] || [h.st])[0])}`).join(' · ')}</div>` : ''}`;
@@ -7493,7 +7495,8 @@ qs('#om-delete').addEventListener('click', async () => {
 });
 function smFill() {
   const c = ops.shopCfg; qs('#sm-on').checked = !!c.on; qs('#sm-mk').value = c.markup; qs('#sm-base').value = c.base === 'site' ? 'site' : 'inst'; qs('#sm-ship').value = c.ship; qs('#sm-free').value = c.freeOver;
-  qs('#sm-cod').checked = !!c.cod; qs('#sm-codfee').value = c.codFee || 0; qs('#sm-op').checked = !!c.op; qs('#sm-pickup').checked = false; qs('#sm-note').value = c.note || '';
+  qs('#sm-cod').checked = !!c.cod; qs('#sm-codfee').value = c.codFee || 0; qs('#sm-op').checked = !!c.op; qs('#sm-card').checked = !!c.card;
+  clApi('/netopia/config').then(r => { const m = r.mode === 'live' ? r.live : r.sandbox; qs('#sm-card-h').textContent = m && m.configured ? (r.mode === 'live' ? 'Plăți reale' : 'Mod test (sandbox) — fără bani reali. Treci pe plăți reale din Setări → NETOPIA.') : 'Încarcă întâi cheile în Setări → Plăți cu cardul — NETOPIA.'; }).catch(() => { qs('#sm-card-h').textContent = 'Actualizează serverul (v13.4).'; }); qs('#sm-pickup').checked = false; qs('#sm-note').value = c.note || '';
   qs('#sm-syncat').textContent = c.syncAt ? 'Ultima actualizare A2T: ' + new Date(c.syncAt).toLocaleString('ro-RO') : 'Prețurile A2T nu au fost citite încă.';
 }
 qs('#or-cfg-btn').addEventListener('click', () => { if (!ops || !ops.shopCfg) return toast('Actualizează serverul (v11.4) ca să pornești magazinul', 'warn'); smFill(); qs('#shop-modal').classList.remove('hidden'); });
@@ -7501,8 +7504,8 @@ const closeShop = () => qs('#shop-modal').classList.add('hidden');
 qs('#shm-x').addEventListener('click', closeShop); qs('#shm-cancel').addEventListener('click', closeShop);
 qs('#shop-modal').addEventListener('click', e => { if (e.target.id === 'shop-modal') closeShop(); });
 qs('#shm-save').addEventListener('click', async () => {
-  const b = { on: qs('#sm-on').checked, base: qs('#sm-base').value, markup: qs('#sm-mk').value, ship: qs('#sm-ship').value, freeOver: qs('#sm-free').value, cod: qs('#sm-cod').checked, codFee: qs('#sm-codfee').value, op: qs('#sm-op').checked, pickup: qs('#sm-pickup').checked, note: qs('#sm-note').value.trim() };
-  if (b.on && !b.cod && !b.op && !b.pickup) return toast('Alege cel puțin o metodă de plată', 'warn');
+  const b = { on: qs('#sm-on').checked, base: qs('#sm-base').value, markup: qs('#sm-mk').value, ship: qs('#sm-ship').value, freeOver: qs('#sm-free').value, cod: qs('#sm-cod').checked, card: qs('#sm-card').checked, codFee: qs('#sm-codfee').value, op: qs('#sm-op').checked, pickup: qs('#sm-pickup').checked, note: qs('#sm-note').value.trim() };
+  if (b.on && !b.cod && !b.op && !b.card && !b.pickup) return toast('Alege cel puțin o metodă de plată', 'warn');
   try { opsApply(await clApi('/ops/shop-cfg', jsonOpt('PUT', b))); renderOrders(); renderCatalog(); closeShop(); toast(b.on ? 'Magazinul e pornit — prețurile apar pe site în cel mult un minut' : 'Setări salvate', 'ok'); } catch (e) { toast(e.message, 'err'); }
 });
 /* ── Adaugă din A2T ── */

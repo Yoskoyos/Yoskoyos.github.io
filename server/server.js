@@ -21,6 +21,7 @@
 // v4.5: clienți — furnizor echipamente + documente de garanție (PDF/JPG/PNG), câmp `kind` la fișiere.
 // v4.4: GET /company?cui= — datele firmei din serviciul public ANAF (PlatitorTvaRest v9), pt. completarea fișei clientului.
 // v4.3: evidență clienți (clients.json) + contracte PDF stocate pe VPS în contracts/ (nu în GitHub).
+// v13.4: plata cu cardul NETOPIA în magazin: /plata/<comandă> (redirecționare criptată), /netopia/ipn (confirmare), pagina de rezultat.
 // v13.3: NETOPIA — fără verificarea „pereche” între .cer și .key (sunt chei diferite: publică NETOPIA / privată comerciant).
 // v13.2: /netopia/config — semnătura + cheile NETOPIA (test și real) se încarcă din aplicație și stau doar pe server.
 // v13.1: GET /admin/sys — starea serverului în aplicație (uptime, RAM, CPU, disc, baza de date, monitor).
@@ -44,7 +45,7 @@ const bcrypt  = require('bcryptjs');
 const PORT           = parseInt(process.env.PORT || '3000', 10);
 const BASE_DIR       = process.env.NVR_PROXY_DIR || __dirname;
 const DB_FILE        = path.join(BASE_DIR, 'db.json');
-const VERSION_NUM    = 13.3;
+const VERSION_NUM    = 13.4;
 const SECRET_FILE    = path.join(BASE_DIR, '.jwt-secret');
 const MAX_CONCURRENT = 16;   // cereri simultane către NVR-uri (miniaturile cer multe imagini)
 const MAX_BODY       = 5 * 1024 * 1024;   // 5 MB (config sincronizată)
@@ -1816,7 +1817,7 @@ async function a2tTick(db) {
    Preț pe site = preț fix (dacă e pus) sau prețul public A2T (cu TVA) × (1 + adaos%), rotunjit în sus la leu. Firma nu e plătitoare de TVA → prețul afișat e prețul final.
    Prețul și stocul A2T se actualizează zilnic. Comenzile: ops[<proprietar>].orders, numerotate CMD-<n>. */
 const a2tInst = (s, site) => { const t = (s.tier_prices || []).map(x => +x.value).filter(v => v > 0 && v <= site); return t.length ? Math.round(Math.min(...t) * 100) / 100 : site; };
-const SHOP_DEF = { on: false, base: 'inst', markup: 20, ship: 25, freeOver: 1000, pickup: false, cod: true, op: true, codFee: 0, note: '' };
+const SHOP_DEF = { on: false, base: 'inst', markup: 20, ship: 25, freeOver: 1000, pickup: false, cod: true, op: true, card: false, codFee: 0, note: '' };
 const shopCfgOf = u => ({ ...SHOP_DEF, ...(u.shopCfg || {}) });
 const skuKey = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 const todayBuc = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' });
@@ -1897,7 +1898,7 @@ async function handlePublicOrder(req, res) {
     company: str(c0.company, 160).trim(), cui: str(c0.cui, 30).trim(), regcom: str(c0.regcom, 40).trim(), county: str(c0.county, 60).trim(), city: str(c0.city, 80).trim(),
     address: str(c0.address, 300).trim(), zip: str(c0.zip, 12).trim(), notes: str(c0.notes, 1500).trim() };
   const delivery = 'curier';   // ridicarea personală a fost scoasă (23.11.2026) — doar livrare prin curier
-  const pay = b.pay === 'op' && cfg.op ? 'op' : b.pay === 'ramburs' && cfg.cod && delivery === 'curier' ? 'ramburs' : delivery === 'ridicare' ? 'ridicare' : '';
+  const pay = b.pay === 'card' && cfg.card && npReady() ? 'card' : b.pay === 'op' && cfg.op ? 'op' : b.pay === 'ramburs' && cfg.cod && delivery === 'curier' ? 'ramburs' : delivery === 'ridicare' ? 'ridicare' : '';
   if (!pay) return send(400, { error: 'Alege metoda de plată' });
   if (!c.name || c.phone.replace(/\D/g, '').length < 9) return send(400, { error: 'Completează numele și un număr de telefon valid' });
   if (!/^[^\s@<>,;]+@[^\s@<>,;]+\.[a-z]{2,}$/i.test(c.email)) return send(400, { error: 'Completează o adresă de e-mail validă (îți trimitem confirmarea comenzii)' });
@@ -1919,9 +1920,10 @@ async function handlePublicOrder(req, res) {
   const no = u.orderSeq = (u.orderSeq || 1000) + 1;
   const fwd = req.headers['x-forwarded-for'] || req.headers['x-real-ip'];
   const o = { id: newId(), no, at: Date.now(), status: 'noua', c, delivery, pay, lines, sub, ship, fee, total: sub + ship + fee,
-    terms: { at: Date.now(), ip: fwd ? String(fwd).split(',')[0].trim() : '' }, notes: '', history: [{ t: Date.now(), st: 'noua' }] };
+    terms: { at: Date.now(), ip: fwd ? String(fwd).split(',')[0].trim() : '' }, notes: '', history: [{ t: Date.now(), st: 'noua' }],
+    ...(pay === 'card' ? { card: { status: 'pending', env: npMode(), at: Date.now() } } : {}) };
   u.orders = (u.orders || []).concat(o).slice(-3000); saveOps(all);
-  const PAY = { ramburs: 'Ramburs (plătești la curier)', op: 'Transfer bancar (ordin de plată)', ridicare: 'La ridicare, din sediu' };
+  const PAY = { ramburs: 'Ramburs (plătești la curier)', op: 'Transfer bancar (ordin de plată)', ridicare: 'La ridicare, din sediu', card: 'Card online (NETOPIA Payments)' };
   const rows = lines.map(l => `<tr><td style="padding:8px 0;border-bottom:1px solid #eef1f5">${escHtml(l.name)}<br><span style="color:#8a93a3;font-size:12px">${escHtml(l.sku || '')}</span></td><td align="center" style="padding:8px;border-bottom:1px solid #eef1f5">${l.qty}</td><td align="right" style="padding:8px 0;border-bottom:1px solid #eef1f5;white-space:nowrap">${lei2(l.qty * l.price)}</td></tr>`).join('');
   const bank = pay === 'op' ? `<tr><td style="padding:6px 30px 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFF6E0;border-radius:10px"><tr><td style="padding:14px 16px;font-size:14px;line-height:22px;color:#3b4456"><b>Date pentru plată</b><br>Beneficiar: YCA SOLUTIONS S.R.L. · CUI 45211628<br>IBAN: <b>RO62INGB0000999911979489</b> (ING Bank)<br>Suma: <b>${lei2(o.total)}</b> · Detalii plată: <b>CMD-${no}</b><br><span style="color:#6b7487;font-size:13px">Expediem comanda după ce primim plata. Factura o primești pe e-mail.</span></td></tr></table></td></tr>` : '';
   const html = `<!doctype html><html lang="ro"><body style="margin:0;background:#eef2f7;font-family:Arial,Helvetica,sans-serif;color:#1d2433"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef2f7"><tr><td align="center" style="padding:24px 12px">
@@ -1942,7 +1944,7 @@ ${bank}
   const mailed = mailReady() ? await sendMail(c.email, `Comanda ta CMD-${no} – SUPRAVEGHERE24h`, text, html) : false;
   if (!mailed) { o.mailErr = true; const cur = loadOps(); const co = ((cur[owner.username] || {}).orders || []).find(z => z.id === o.id); if (co) { co.mailErr = true; saveOps(cur); } }
   notifyOwner(db, owner, `🛒 <b>Comandă nouă CMD-${no}</b> · ${lei2(o.total)}\n${escHtml(c.name)} · ${escHtml(c.phone)}${c.type === 'pj' ? ' · ' + escHtml(c.company) : ''}\n${lines.map(l => `${l.qty} × ${escHtml(l.name)}`).join('\n')}\n${PAY[pay]}${delivery === 'curier' ? ' · curier ' + escHtml(c.city) : ' · ridicare'}`, '/?tab=catalog&view=orders').catch(() => {});
-  return send(200, { ok: true, no: 'CMD-' + no, total: o.total, pay, mailed });
+  return send(200, { ok: true, no: 'CMD-' + no, total: o.total, pay, mailed, ...(pay === 'card' ? { payUrl: publicBase(req) + '/plata/' + o.id + '?t=' + npTok(o.id) } : {}) });
 }
 // căutare pe A2T pentru importul în Echipamente: după coduri exacte sau după text; fără produse resigilate, inactive sau fără preț
 function a2tFind(o) {
@@ -2136,7 +2138,7 @@ async function handleOps(req, res, pathname) {
       u.shopCfg = { ...(u.shopCfg || {}), base: b.base === 'site' ? 'site' : b.base === 'inst' ? 'inst' : o.base, on: b.on !== undefined ? !!b.on : o.on, markup: b.markup !== undefined ? Math.min(500, Math.max(-50, num(b.markup))) : o.markup,
         ship: b.ship !== undefined ? Math.max(0, num(b.ship)) : o.ship, freeOver: b.freeOver !== undefined ? Math.max(0, num(b.freeOver)) : o.freeOver,
         codFee: b.codFee !== undefined ? Math.max(0, num(b.codFee)) : o.codFee, pickup: b.pickup !== undefined ? !!b.pickup : o.pickup,
-        cod: b.cod !== undefined ? !!b.cod : o.cod, op: b.op !== undefined ? !!b.op : o.op, note: b.note !== undefined ? str(b.note, 300) : o.note };
+        cod: b.cod !== undefined ? !!b.cod : o.cod, op: b.op !== undefined ? !!b.op : o.op, card: b.card !== undefined ? !!b.card : o.card, note: b.note !== undefined ? str(b.note, 300) : o.note };
       shopRecord(u); saveOps(all); return sendJson(res, 200, shopView()); }
   }
   if (coll === 'a2t-find' && req.method === 'GET') {   // caută pe A2T: după coduri (mai multe, pe rânduri sau cu virgulă) sau după text
@@ -2950,6 +2952,119 @@ async function handleNetopiaConfig(req, res) {
     return sendJson(res, 200, info());
   }
   return sendJson(res, 405, { error: 'Operație necunoscută' });
+}
+
+/* ── NETOPIA: plata cu cardul (protocolul mobilPay: XML criptat AES-256-CBC, cheia simetrică criptată RSA cu cheia publică NETOPIA) ── */
+const npMode = () => (loadNp().mode === 'live' ? 'live' : 'sandbox');
+const npEnv = () => { const c = loadNp(); const e = c[c.mode === 'live' ? 'live' : 'sandbox']; return e && e.signature && e.cer && e.key ? e : null; };
+const npReady = () => !!npEnv();
+const npTok = id => crypto.createHmac('sha256', JWT_SECRET).update('np:' + id).digest('hex').slice(0, 24);
+const xmlEsc = v => String(v == null ? '' : v).replace(/[<>&'"]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[ch]));
+function npEncrypt(cer, xml) {
+  const key = crypto.randomBytes(32), iv = crypto.randomBytes(16);
+  const c = crypto.createCipheriv('aes-256-cbc', key, iv); const data = Buffer.concat([c.update(xml, 'utf8'), c.final()]).toString('base64');
+  const envKey = crypto.publicEncrypt({ key: new crypto.X509Certificate(cer).publicKey, padding: crypto.constants.RSA_PKCS1_PADDING }, key).toString('base64');
+  return { env_key: envKey, data, cipher: 'aes-256-cbc', iv: iv.toString('base64') };
+}
+function npRsaDecrypt(pem, b64) {   // RSA PKCS#1 v1.5 — Node nou nu mai permite PKCS1 la privateDecrypt, așa că scoatem padding-ul manual
+  const raw = crypto.privateDecrypt({ key: pem, padding: crypto.constants.RSA_NO_PADDING }, Buffer.from(b64, 'base64'));
+  if (raw[0] !== 0 || raw[1] !== 2) throw new Error('padding RSA invalid');
+  const sep = raw.indexOf(0, 2); if (sep < 10) throw new Error('padding RSA invalid');
+  return raw.subarray(sep + 1);
+}
+function npDecrypt(pem, f) {
+  const key = npRsaDecrypt(pem, f.env_key), cipher = String(f.cipher || 'aes-256-cbc').toLowerCase();
+  if (cipher === 'rc4') throw new Error('cifrul RC4 nu e acceptat');
+  const d = crypto.createDecipheriv(cipher, key, Buffer.from(String(f.iv || ''), 'base64'));
+  return Buffer.concat([d.update(Buffer.from(String(f.data || ''), 'base64')), d.final()]).toString('utf8');
+}
+function npOrderXml(o, e, base) {
+  const nm = String(o.c.name || '').trim().split(/\s+/); const last = nm.length > 1 ? nm.pop() : nm[0] || 'Client', first = nm.join(' ') || last;
+  const pj = o.c.type === 'pj';
+  const contact = `<billing type="${pj ? 'company' : 'person'}"><first_name>${xmlEsc(pj ? o.c.company : first)}</first_name><last_name>${xmlEsc(pj ? o.c.name : last)}</last_name>`
+    + `<address>${xmlEsc([o.c.address, o.c.city, o.c.county].filter(Boolean).join(', ').slice(0, 250))}</address><email>${xmlEsc(o.c.email)}</email><mobile_phone>${xmlEsc(o.c.phone)}</mobile_phone>`
+    + (pj && o.c.cui ? `<fiscal_number>${xmlEsc(o.c.cui)}</fiscal_number>` : '') + `</billing>`;
+  const pid = o.id + '_' + Date.now().toString(36);   // NETOPIA cere un ID unic la fiecare încercare de plată
+  const xml = `<?xml version="1.0" encoding="utf-8"?>\n<order type="card" id="${xmlEsc(pid)}" timestamp="${Date.now()}"><signature>${xmlEsc(e.signature)}</signature>`
+    + `<url><return>${xmlEsc(base + '/plata/' + o.id + '/gata?t=' + npTok(o.id))}</return><confirm>${xmlEsc(base + '/netopia/ipn')}</confirm></url>`
+    + `<invoice currency="RON" amount="${(Math.round(o.total * 100) / 100).toFixed(2)}"><details>${xmlEsc('Comanda CMD-' + o.no + ' supraveghere24h.ro')}</details><contact_info>${contact}</contact_info></invoice>`
+    + `<ipn_cipher>aes-256-cbc</ipn_cipher></order>`;
+  return { xml, pid };
+}
+function npFindOrder(id) {
+  const all = loadOps();
+  for (const [un, u] of Object.entries(all)) { const o = (u.orders || []).find(x => x.id === id); if (o) return { all, un, u, o }; }
+  return null;
+}
+const NP_ACTIONS = { confirmed: 'plătită', confirmed_pending: 'în verificare', paid_pending: 'în verificare', paid: 'autorizată', canceled: 'anulată', credit: 'returnată' };
+async function handleNetopiaPay(req, res, pathname, parsed) {
+  const m = /^\/plata\/([\w-]+)(\/gata)?$/.exec(pathname); if (!m) return sendHtml(res, 404, niceInfoPage('Plată', 'Link invalid', ''));
+  const t = String(parsed.query.t || ''); if (t !== npTok(m[1])) return sendHtml(res, 404, niceInfoPage('Plată', 'Link de plată invalid', 'Sună-ne și te ajutăm să finalizezi comanda.'));
+  const hit = npFindOrder(m[1]); if (!hit) return sendHtml(res, 404, niceInfoPage('Plată', 'Comanda nu mai există', 'Sună-ne și te ajutăm.'));
+  const o = hit.o, cs = (o.card || {}).status;
+  if (m[2]) {   // întoarcerea clientului de la NETOPIA
+    if (o.paid || cs === 'confirmed') return sendHtml(res, 200, npResultPage(true, o));
+    if (cs === 'canceled' || cs === 'failed') return sendHtml(res, 200, npResultPage(false, o, req));
+    return sendHtml(res, 200, npResultPage(null, o, req));
+  }
+  if (o.paid || cs === 'confirmed') return sendHtml(res, 200, npResultPage(true, o));
+  if (o.status === 'anulata') return sendHtml(res, 200, niceInfoPage('Plată', `Comanda CMD-${o.no} a fost anulată`, 'Pentru o comandă nouă intră pe supraveghere24h.ro.'));
+  const e = npEnv(); if (!e) return sendHtml(res, 503, niceInfoPage('Plată', 'Plata cu cardul nu este disponibilă acum', 'Sună-ne la 0763 354 355 și finalizăm comanda prin ramburs sau transfer bancar.'));
+  const { xml, pid } = npOrderXml(o, e, publicBase(req)); const enc = npEncrypt(e.cer, xml);
+  o.card = { ...(o.card || {}), status: o.card && o.card.status === 'failed' ? 'pending' : (o.card || {}).status || 'pending', env: npMode(), lastPid: pid, tries: ((o.card || {}).tries || 0) + 1, at: Date.now() };
+  saveOps(hit.all);
+  const target = npMode() === 'live' ? 'https://secure.mobilpay.ro' : 'https://sandboxsecure.mobilpay.ro';
+  const inp = Object.entries(enc).map(([k, v]) => `<input type="hidden" name="${k}" value="${escHtml(v)}">`).join('');
+  return sendHtml(res, 200, `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Plata cu cardul – SUPRAVEGHERE24h</title>
+<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0D1F33;font:16px/1.5 -apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#fff;text-align:center;padding:20px}
+.s{width:40px;height:40px;border:4px solid rgba(255,255,255,.25);border-top-color:#F5A100;border-radius:50%;margin:0 auto 18px;animation:r .8s linear infinite}@keyframes r{to{transform:rotate(360deg)}}
+button{margin-top:18px;background:#F5A100;color:#0D1F33;border:0;border-radius:12px;padding:14px 22px;font-weight:800;font-size:16px;cursor:pointer}</style></head>
+<body><form id="f" method="post" action="${target}"><div class="s"></div><b>Te ducem la pagina securizată NETOPIA Payments…</b><br><span style="opacity:.75;font-size:14px">Comanda CMD-${o.no} · ${lei2(o.total)}</span><br>${inp}<noscript><button type="submit">Continuă la plată</button></noscript></form>
+<script>setTimeout(function(){document.getElementById('f').submit()},300)</script></body></html>`);
+}
+function npResultPage(ok, o, req) {
+  const e = escHtml, again = req ? '/plata/' + o.id + '?t=' + npTok(o.id) : '';
+  const head = ok ? 'Plata a fost confirmată' : ok === false ? 'Plata nu a reușit' : 'Plata se verifică';
+  const msg = ok ? `Mulțumim! Am primit plata pentru comanda CMD-${o.no} (${lei2(o.total)}). Îți trimitem confirmarea pe e-mail și te sunăm pentru livrare.`
+    : ok === false ? `Plata pentru comanda CMD-${o.no} nu a fost aprobată${o.card && o.card.msg ? ': ' + o.card.msg : ''}. Poți încerca din nou cu același card sau cu altul.`
+    : `NETOPIA confirmă plata în câteva momente. Pagina se actualizează singură; primești și un e-mail când plata e confirmată.`;
+  return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">${ok === null ? '<meta http-equiv="refresh" content="5">' : ''}<title>${e(head)} – SUPRAVEGHERE24h</title>
+<style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:#0D1F33 radial-gradient(ellipse at top,#16365a,#0D1F33 60%);font:16px/1.6 -apple-system,'Segoe UI',Roboto,Arial,sans-serif}
+.c{width:100%;max-width:460px;background:#fff;border-radius:18px;overflow:hidden;text-align:center;box-shadow:0 30px 60px -25px rgba(0,0,0,.55)}.bar{height:5px;background:linear-gradient(90deg,#0B5FB0,#F5A100)}
+.ic{width:76px;height:76px;border-radius:50%;margin:26px auto 8px;display:flex;align-items:center;justify-content:center;font-size:38px;background:${ok ? '#E7F7EE' : ok === false ? '#FDECEC' : '#FFF4DC'}}
+h1{margin:4px 22px;font-size:22px;color:#0D1F33}p{margin:8px 26px 0;color:#5B6B7C;font-size:15px}.btns{display:flex;flex-direction:column;gap:10px;padding:22px}
+a.b{display:block;border-radius:12px;padding:14px;font-weight:800;text-decoration:none}.b1{background:#F5A100;color:#0D1F33}.b2{border:1.5px solid #E1E6EC;color:#0D1F33}.ft{padding:12px;border-top:1px solid #EEF1F5;font-size:12px;color:#8A96A8}</style></head>
+<body><div class="c"><div class="bar"></div><div class="ic">${ok ? '✅' : ok === false ? '✖️' : '⏳'}</div><h1>${e(head)}</h1><p>${e(msg)}</p><div class="btns">
+${ok === false && again ? `<a class="b b1" href="${e(again)}">Încearcă din nou plata</a>` : ''}<a class="b ${ok === false ? 'b2' : 'b1'}" href="https://supraveghere24h.ro">Înapoi pe supraveghere24h.ro</a><a class="b b2" href="tel:+40763354355">Sună-ne: 0763 354 355</a></div>
+<div class="ft">Plată procesată de NETOPIA Payments · YCA SOLUTIONS S.R.L.</div></div></body></html>`;
+}
+async function handleNetopiaIpn(req, res) {
+  const reply = (xml) => { res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8' }); res.end('<?xml version="1.0" encoding="utf-8"?>\n' + xml); };
+  let f, xml; try { f = await readBodyAny(req); } catch { return reply('<crc error_type="1" error_code="1">cerere invalidă</crc>'); }
+  const c = loadNp(); let used = null;
+  for (const k of [c.mode === 'live' ? 'live' : 'sandbox', c.mode === 'live' ? 'sandbox' : 'live']) { const e = c[k]; if (!e || !e.key) continue; try { xml = npDecrypt(e.key, f); used = e; break; } catch {} }
+  if (!xml) { console.error('[netopia] IPN: nu pot decripta'); return reply('<crc error_type="1" error_code="2">nu pot decripta</crc>'); }
+  const tag = (t, src) => { const x = new RegExp('<' + t + '(\\s[^>]*)?>([\\s\\S]*?)</' + t + '>').exec(src || xml); return x ? x[2].replace(/^<!\[CDATA\[|\]\]>$/g, '').trim() : ''; };
+  const attr = (t, a) => { const x = new RegExp('<' + t + '\\s[^>]*\\b' + a + '="([^"]*)"').exec(xml); return x ? x[1] : ''; };
+  const pid = attr('order', 'id'), sig = tag('signature'), mp = tag('mobilpay'), action = tag('action', mp), errCode = attr('error', 'code') || '0', errMsg = tag('error', mp);
+  const amount = num(tag('processed_amount', mp) || tag('original_amount', mp)), purchase = tag('purchase', mp);
+  if (!pid || (used && sig && sig !== used.signature)) return reply('<crc error_type="2" error_code="3">comandă necunoscută</crc>');
+  const hit = npFindOrder(pid.split('_')[0]); if (!hit) return reply('<crc error_type="2" error_code="4">comandă inexistentă</crc>');
+  const o = hit.o, wasPaid = !!o.paid, okPay = action === 'confirmed' && errCode === '0';
+  const st = errCode !== '0' ? 'failed' : action;
+  o.card = { ...(o.card || {}), status: okPay ? 'confirmed' : st, action, code: errCode, msg: errMsg.slice(0, 200), amount, purchase: purchase.slice(0, 60), pid, ipnAt: Date.now() };
+  o.history = (o.history || []).concat({ t: Date.now(), st: 'card:' + (okPay ? 'confirmed' : st) });
+  if (okPay) { o.paid = true; o.paidAt = Date.now(); }
+  saveOps(hit.all);
+  if (okPay && !wasPaid) {
+    try { const db = loadDb(); const ow = (db.users || []).find(x => x.username === hit.un);
+      if (ow) notifyOwner(db, ow, `💳 <b>Plată cu cardul confirmată</b> · CMD-${o.no}\n${lei2(o.total)} · ${escHtml(o.c.name)}${o.card.env === 'sandbox' ? '\n(mediul de test – fără bani reali)' : ''}`, '/?tab=shop&view=orders').catch(() => {}); } catch {}
+    if (mailReady() && o.c.email) sendMail(o.c.email, `Plata pentru comanda CMD-${o.no} a fost confirmată – SUPRAVEGHERE24h`,
+      `Bună ziua, ${String(o.c.name).split(' ')[0]},\n\nAm primit plata cu cardul pentru comanda CMD-${o.no}, în valoare de ${lei2(o.total)}. Te sunăm în cel mai scurt timp pentru livrare.\n\nMulțumim!\nSUPRAVEGHERE24h · 0763 354 355`).catch(() => {});
+  } else if (st === 'failed' || action === 'canceled') {
+    try { const db = loadDb(); const ow = (db.users || []).find(x => x.username === hit.un); if (ow) notifyOwner(db, ow, `⚠️ Plata cu cardul nu a reușit · CMD-${o.no}\n${escHtml(errMsg || action)}`, '/?tab=shop&view=orders').catch(() => {}); } catch {}
+  }
+  return reply(`<crc>${xmlEsc(errMsg || 'OK')}</crc>`);
 }
 // căutare în catalogul A2T (Atu Tech) — același serviciu folosit de magazinul lor
 function a2tSearch(q, size) {
@@ -4333,7 +4448,7 @@ function catalogPublic(req, res, pathname) {
       ...(ref ? { oldPrice: ref, disc: Math.round((ref - price) / ref * 100), discUntil: x.discUntil || '' } : {}),
       specs: String(x.specs || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 20), photo: f ? `${base}/public/catalog/${x.id}/photo?v=${f.id}` : '', datasheet: pdf ? `${base}/public/catalog/${x.id}/fisa?v=${pdf.id}` : '' }; });
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=60', ...PUB_CORS });
-  res.end(JSON.stringify({ items: out, shop: cfg.on ? { on: true, ship: +cfg.ship || 0, freeOver: +cfg.freeOver || 0, codFee: +cfg.codFee || 0, pickup: false, cod: !!cfg.cod, op: !!cfg.op, note: cfg.note || '' } : { on: false } }));
+  res.end(JSON.stringify({ items: out, shop: cfg.on ? { on: true, ship: +cfg.ship || 0, freeOver: +cfg.freeOver || 0, codFee: +cfg.codFee || 0, pickup: false, cod: !!cfg.cod, op: !!cfg.op, card: !!(cfg.card && npReady()), note: cfg.note || '' } : { on: false } }));
 }
 function handlePublicPrices(req, res) {
   const db = loadDb(); const c = quoteCfg(db, quoteOwner(db));
@@ -4830,6 +4945,8 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/nvrweb/open' && req.method === 'POST') return await handleNvrWebOpen(req, res);
     if (pathname === '/ai/config') return await handleAiConfig(req, res);
     if (pathname === '/netopia/config') return await handleNetopiaConfig(req, res);
+    if (pathname === '/netopia/ipn' && req.method === 'POST') return await handleNetopiaIpn(req, res);
+    if (pathname.startsWith('/plata/') && req.method === 'GET') return await handleNetopiaPay(req, res, pathname, parsed);
     if (pathname === '/seap' || pathname.startsWith('/seap/')) return await handleSeap(req, res, pathname, parsed);
 
     // Starea monitorizării pentru utilizatorul logat
